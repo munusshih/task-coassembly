@@ -3,6 +3,7 @@
 *::before,
 *::after {
     box-sizing: border-box;
+    border-radius: 0 !important;
 }
 
 html {
@@ -13,7 +14,7 @@ body {
     min-height: 100vh;
     overflow-x: hidden;
     margin: 0;
-    background: var(--c-bg);
+    background: var(--c-page);
     color: var(--c-ink);
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: var(--t-b2);

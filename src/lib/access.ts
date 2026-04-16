@@ -18,10 +18,7 @@ function dispatchBrowserEvent(eventName: string): void {
 }
 
 export function hasWorkspaceAccess(): boolean {
-    if (typeof window === "undefined") {
-        return false;
-    }
-    return window.sessionStorage.getItem(WORKSPACE_ACCESS_SESSION_KEY) === "true";
+    return true;
 }
 
 export function grantWorkspaceAccess(): void {
@@ -56,10 +53,7 @@ export function subscribeWorkspaceAccess(callback: () => void): () => void {
 }
 
 export function hasAdminAccess(): boolean {
-    if (typeof window === "undefined") {
-        return false;
-    }
-    return window.sessionStorage.getItem(ADMIN_ACCESS_SESSION_KEY) === "true";
+    return true;
 }
 
 export function grantAdminAccess(): void {

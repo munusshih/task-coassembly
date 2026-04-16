@@ -4,33 +4,37 @@
    ════════════════════════════════════════════════════════════════════════════ */
 .workspace-panel {
     background: var(--c-bg);
-    border-top: 4px solid var(--c-border);
-    padding: clamp(var(--sp-4), 1.5vw, var(--sp-6));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: clamp(var(--sp-5), 2vw, var(--sp-7));
 }
 
 .workspace-panel-tight {
     background: var(--c-bg);
-    border-top: 4px solid var(--c-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
 }
 
-/* metric-card: full metric treatment (4px border + metric padding) */
+/* metric-card — matches new .metric design */
 .metric-card {
     background: var(--c-bg);
-    border-top: 4px solid var(--c-border);
-    padding: var(--sp-5) var(--sp-4);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    border-left: 3px solid var(--c-border);
+    padding: var(--sp-5) var(--sp-5);
 }
 
 /* Color variants for metric-card by position in ws-metrics row */
 .ws-metrics>.metric-card:nth-child(1) {
-    border-top-color: var(--c-blue);
+    border-left-color: var(--c-blue);
 }
 
 .ws-metrics>.metric-card:nth-child(2) {
-    border-top-color: var(--c-red);
+    border-left-color: var(--c-red);
 }
 
 .ws-metrics>.metric-card:nth-child(3) {
-    border-top-color: var(--c-green);
+    border-left-color: var(--c-green);
 }
 
 .swiss-item-row {
@@ -45,15 +49,13 @@
     gap: var(--sp-2);
 }
 
-/* swiss-tag → use .tag */
+/* swiss-tag — plain inline label, no border */
 .swiss-tag {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
     font-size: var(--t-caption);
-    color: var(--c-ink-2);
-    border-bottom: 1px solid var(--c-hairline);
-    padding-block-end: 1px;
+    color: var(--c-ink-3);
 }
 
 .swiss-check {
@@ -65,47 +67,51 @@
 }
 
 .swiss-info-strip {
-    background: var(--c-bg);
-    border-top: 1px solid var(--c-hairline);
+    background: var(--c-surface);
+    border-radius: var(--radius-sm);
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--t-caption);
     color: var(--c-ink-2);
 }
 
 .swiss-empty-state {
-    background: var(--c-bg);
-    border: 1px dashed var(--c-border);
-    padding: var(--sp-3) var(--sp-4);
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: var(--sp-5) var(--sp-6);
     font-size: var(--t-b2);
     color: var(--c-ink-2);
 }
 
-/* swiss-segment → use .segment */
+/* swiss-segment → clean inline tab strip */
 .swiss-segment {
     display: inline-flex;
-    border-bottom: 1px solid var(--c-border);
-    background: var(--c-bg);
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: 3px;
+    gap: 2px;
     overflow: hidden;
 }
 
 .swiss-segment__button {
     border: 0;
-    border-right: 1px solid var(--c-hairline);
-    background: var(--c-bg);
+    border-radius: 0;
+    background: transparent;
     color: var(--c-ink-2);
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-3);
     font-size: var(--t-b2);
     font-weight: 500;
+    transition: background 120ms, color 120ms;
 }
 
 .swiss-segment__button:last-child {
-    border-right: 0;
+    /* no special treatment needed */
 }
 
 .swiss-segment__button[data-active="true"] {
-    color: var(--c-red);
-    text-decoration: underline;
-    text-underline-offset: .2em;
+    background: var(--c-bg);
+    color: var(--c-ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    text-decoration: none;
 }
 
 /* swiss-toolbar → use .toolbar */
@@ -128,6 +134,5 @@
 }
 
 .swiss-toolbar__meta-item {
-    border-bottom: 1px solid var(--c-hairline);
-    padding-block-end: 1px;
+    color: var(--c-ink-3);
 }

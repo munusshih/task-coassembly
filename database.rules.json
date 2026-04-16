@@ -1,0 +1,13 @@
+{
+    "rules": {
+        "presence": {
+            "$scope": {
+                ".read": true,
+                "$sessionId": {
+                    ".write": true,
+                    ".validate": "newData.isNull() || (newData.hasChildren(['joinedAt', 'path']) && newData.child('path').isString())"
+                }
+            }
+        }
+    }
+}

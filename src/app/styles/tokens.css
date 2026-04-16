@@ -1,8 +1,9 @@
 /* ═══ DESIGN TOKENS ══════════════════════════════════════════════════════════ */
 :root {
     /* Surface */
+    --c-page: #f5f5f5;
     --c-bg: #ffffff;
-    --c-surface: #f7f7f7;
+    --c-surface: #f0f0f0;
 
     /* Ink */
     --c-ink: #0a0a0a;
@@ -30,9 +31,19 @@
     --sp-4: 1rem;
     --sp-5: 1.25rem;
     --sp-6: 1.5rem;
+    --sp-7: 1.75rem;
     --sp-8: 2rem;
     --sp-10: 2.5rem;
     --sp-12: 3rem;
+
+    /* Radii */
+    --radius-sm: 0;
+    --radius: 0;
+    --radius-lg: 0;
+
+    /* Shadows */
+    --shadow-card: 0 1px 3px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.06);
+    --shadow-card-hover: 0 4px 12px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.06);
 
     /* Type scale */
     --t-display: clamp(2.25rem, 5vw, 4rem);

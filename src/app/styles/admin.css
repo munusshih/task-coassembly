@@ -4,30 +4,32 @@
     gap: var(--sp-3);
 }
 
-/* 4px colored top border — same weight as metric cards for data consistency */
+/* Stat card — shadow for elevation, left accent for category colour */
 .summary-card {
-    border-top: 4px solid var(--c-border);
+    box-shadow: var(--shadow-card);
+    border-left: 3px solid var(--c-border);
+    border-radius: var(--radius);
     background: var(--c-bg);
-    padding: var(--sp-4);
+    padding: var(--sp-5) var(--sp-5);
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
 }
 
 .summary-card--members {
-    border-top-color: var(--c-blue);
+    border-left-color: var(--c-blue);
 }
 
 .summary-card--projects {
-    border-top-color: var(--c-red);
+    border-left-color: var(--c-red);
 }
 
 .summary-card--budget {
-    border-top-color: var(--c-green);
+    border-left-color: var(--c-green);
 }
 
 .summary-card--tasks {
-    border-top-color: var(--c-amber);
+    border-left-color: var(--c-amber);
 }
 
 @media (min-width: 40rem) {

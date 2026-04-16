@@ -9,6 +9,7 @@
     color: var(--c-ink);
     background: var(--c-bg);
     border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
     transition: border-color 120ms, box-shadow 120ms;
     appearance: none;
 }

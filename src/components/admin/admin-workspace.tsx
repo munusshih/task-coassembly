@@ -657,9 +657,7 @@ function normalizeStaffing(
 }
 
 function statusPillClass(isSelected: boolean): string {
-  return isSelected
-    ? "bg-white/15 text-white ring-white/20"
-    : "bg-slate-100 text-slate-700 ring-slate-200";
+  return "bg-slate-100 text-slate-700 ring-slate-200";
 }
 
 function stageLabel(value: Project["stage"]): string {
@@ -880,34 +878,10 @@ export function AdminWorkspace({
       </div>
 
       <div className="swiss-shell__main">
-        <Card className="border-slate-300 bg-white">
-          <CardHeader className="gap-4 border-b border-slate-200 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-end">
-            <div className="swiss-segment">
-              <button
-                type="button"
-                className={cn(
-                  "swiss-segment__button inline-flex flex-1 items-center justify-center gap-2 text-sm font-medium",
-                )}
-                data-active={activeView === "members"}
-                onClick={() => setActiveView("members")}
-              >
-                <Users className="h-4 w-4" />
-                Members
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "swiss-segment__button inline-flex flex-1 items-center justify-center gap-2 text-sm font-medium",
-                )}
-                data-active={activeView === "projects"}
-                onClick={() => setActiveView("projects")}
-              >
-                <FolderOpen className="h-4 w-4" />
-                Projects
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <Card>
+          <CardHeader className="gap-4 border-b border-slate-100">
+            {/* Row 1: Title + action button */}
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <CardTitle className="t-h3">
                   {activeView === "members"
@@ -922,7 +896,7 @@ export function AdminWorkspace({
               </div>
               <Button
                 type="button"
-                className="gap-2"
+                className="shrink-0 gap-2"
                 onClick={() => {
                   if (activeView === "members") {
                     setMemberSelection(NEW_MEMBER_SELECTION);
@@ -940,52 +914,74 @@ export function AdminWorkspace({
               </Button>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="admin-record-search">
-                {activeView === "members"
-                  ? "Search members"
-                  : "Search projects"}
-              </Label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  id="admin-record-search"
-                  value={activeView === "members" ? memberQuery : projectQuery}
-                  onChange={(event) => {
-                    if (activeView === "members") {
-                      setMemberQuery(event.target.value);
-                      return;
+            {/* Row 2: View tabs (left) + Search (right) */}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="swiss-segment">
+                <button
+                  type="button"
+                  className={cn(
+                    "swiss-segment__button inline-flex flex-1 items-center justify-center gap-2 text-sm font-medium",
+                  )}
+                  data-active={activeView === "members"}
+                  onClick={() => setActiveView("members")}
+                >
+                  <Users className="h-4 w-4" />
+                  Members
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "swiss-segment__button inline-flex flex-1 items-center justify-center gap-2 text-sm font-medium",
+                  )}
+                  data-active={activeView === "projects"}
+                  onClick={() => setActiveView("projects")}
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Projects
+                </button>
+              </div>
+              <div className="grid min-w-56 grow gap-2">
+                <Label htmlFor="admin-record-search">
+                  {activeView === "members"
+                    ? "Search members"
+                    : "Search projects"}
+                </Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="admin-record-search"
+                    value={activeView === "members" ? memberQuery : projectQuery}
+                    onChange={(event) => {
+                      if (activeView === "members") {
+                        setMemberQuery(event.target.value);
+                        return;
+                      }
+                      setProjectQuery(event.target.value);
+                    }}
+                    className="pl-9"
+                    placeholder={
+                      activeView === "members"
+                        ? "Search by name, email, location, or role"
+                        : "Search by name, client, purpose, or stage"
                     }
-                    setProjectQuery(event.target.value);
-                  }}
-                  className="pl-9"
-                  placeholder={
-                    activeView === "members"
-                      ? "Search by name, email, location, or role"
-                      : "Search by name, client, purpose, or stage"
-                  }
-                />
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-xs">
+            {/* Row 3: Counts */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
               {activeView === "members" ? (
                 <>
-                  <span className="swiss-tag">{members.length} total</span>
-                  <span className="swiss-tag">{activeMembers} active</span>
-                  <span className="swiss-tag">
-                    {filteredMembers.length} visible
-                  </span>
+                  <span>{members.length} total</span>
+                  <span>{activeMembers} active</span>
+                  <span>{filteredMembers.length} visible</span>
                 </>
               ) : (
                 <>
-                  <span className="swiss-tag">{projects.length} total</span>
-                  <span className="swiss-tag">
-                    {projectsInDelivery} in delivery
-                  </span>
-                  <span className="swiss-tag">
-                    {filteredProjects.length} visible
-                  </span>
+                  <span>{projects.length} total</span>
+                  <span>{projectsInDelivery} in delivery</span>
+                  <span>{filteredProjects.length} visible</span>
                 </>
               )}
             </div>
@@ -1003,20 +999,20 @@ export function AdminWorkspace({
                       key={member.id}
                       type="button"
                       className={cn(
-                        "grid w-full gap-2.5 border px-3 py-2.5 text-left transition-colors",
+                        "grid w-full gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors",
                         isSelected
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-transparent bg-white text-slate-900 hover:border-slate-200",
+                          ? "border-slate-300 bg-slate-50 text-slate-900"
+                          : "border-slate-100 bg-white text-slate-900 hover:border-slate-200 hover:bg-slate-50",
                       )}
                       onClick={() => setMemberSelection(member.id)}
                     >
                       <div className="flex items-start gap-3">
                         <div
                           className={cn(
-                            "flex h-9 w-9 shrink-0 items-center justify-center border text-sm font-semibold",
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded border text-sm font-semibold",
                             isSelected
-                              ? "bg-white/15 text-white"
-                              : "border-slate-300 text-slate-700",
+                              ? "border-slate-300 bg-slate-100 text-slate-700"
+                              : "border-slate-200 bg-slate-50 text-slate-700",
                           )}
                         >
                           {getInitials(member.name)}
@@ -1037,8 +1033,7 @@ export function AdminWorkspace({
                           </div>
                           <p
                             className={cn(
-                              "truncate text-sm",
-                              isSelected ? "text-slate-200" : "text-slate-500",
+                              "truncate text-sm text-slate-500",
                             )}
                           >
                             {member.email}
@@ -1090,20 +1085,20 @@ export function AdminWorkspace({
                     key={project.id}
                     type="button"
                     className={cn(
-                      "grid w-full gap-2.5 border px-3 py-2.5 text-left transition-colors",
+                      "grid w-full gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors",
                       isSelected
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-transparent bg-white text-slate-900 hover:border-slate-200",
+                        ? "border-slate-300 bg-slate-50 text-slate-900"
+                        : "border-slate-100 bg-white text-slate-900 hover:border-slate-200 hover:bg-slate-50",
                     )}
                     onClick={() => setProjectSelection(project.id)}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center border",
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded border",
                           isSelected
-                            ? "bg-white/15 text-white"
-                            : "border-slate-300 text-slate-700",
+                            ? "border-slate-300 bg-slate-100 text-slate-700"
+                            : "border-slate-200 bg-slate-50 text-slate-700",
                         )}
                       >
                         <FolderOpen className="h-4 w-4" />
@@ -1121,10 +1116,7 @@ export function AdminWorkspace({
                           </span>
                         </div>
                         <p
-                          className={cn(
-                            "truncate text-sm",
-                            isSelected ? "text-slate-200" : "text-slate-500",
-                          )}
+                          className="truncate text-sm text-slate-500"
                         >
                           {project.clientName || "Internal project"}
                         </p>
@@ -1222,14 +1214,14 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <Card className="border-slate-300 bg-white">
+    <Card>
       <CardContent className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="t-b2 text-slate-500">{label}</p>
           <p className="t-h2 text-slate-950">{value}</p>
           <p className="t-b2 text-slate-500">{detail}</p>
         </div>
-        <div className="border border-slate-200 p-3 text-slate-700">
+        <div className="rounded-lg bg-slate-100 p-3 text-slate-600">
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>
@@ -1345,23 +1337,21 @@ function TabNav({
   onChange: (tab: string) => void;
 }) {
   return (
-    <nav className="flex overflow-x-auto border-b border-slate-200 px-1">
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => onChange(tab)}
-          className={cn(
-            "shrink-0 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-            activeTab === tab
-              ? "border-slate-900 text-slate-900"
-              : "border-transparent text-slate-500 hover:text-slate-700",
-          )}
-        >
-          {tab}
-        </button>
-      ))}
-    </nav>
+    <div className="px-4 pt-4">
+      <div className="swiss-segment">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onChange(tab)}
+            className="swiss-segment__button whitespace-nowrap text-sm font-medium"
+            data-active={activeTab === tab}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1390,11 +1380,11 @@ function SectionPanel({
   return (
     <div
       className={cn(
-        "border bg-white p-4 transition-colors duration-150",
-        editing ? "border-slate-900" : "border-slate-300",
+        "rounded-lg p-4 transition-colors duration-150",
+        editing ? "bg-white ring-1 ring-slate-200" : "bg-slate-50",
       )}
     >
-      <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+      <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
         <div className="space-y-0.5">
           <p className="text-sm font-semibold text-slate-900">{title}</p>
           {description && (
@@ -1610,7 +1600,7 @@ function MemberEditor({
       {/* Record header */}
       <div className="flex flex-col gap-4 border border-slate-300 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-bold text-slate-700">
             {isNew ? (
               <UserRound className="h-5 w-5" />
             ) : (
@@ -1686,7 +1676,7 @@ function MemberEditor({
       </div>
 
       {/* Tabbed sections */}
-      <div className="overflow-hidden border border-slate-300 bg-white">
+      <div className="overflow-hidden">
         <TabNav
           tabs={MEMBER_TABS}
           activeTab={activeTab}
@@ -2356,7 +2346,7 @@ function ProjectEditor({
       </div>
 
       {/* Tabbed sections */}
-      <div className="overflow-hidden border border-slate-300 bg-white">
+      <div className="overflow-hidden">
         <TabNav
           tabs={PROJECT_TABS}
           activeTab={activeTab}
@@ -3282,7 +3272,7 @@ function FieldBlock({
       <div className="flex flex-wrap items-center gap-2">
         <Label>{label}</Label>
         {required ? (
-          <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] text-white">
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-700">
             Required
           </span>
         ) : null}

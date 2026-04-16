@@ -32,23 +32,22 @@
     gap: var(--sp-1);
     font-size: var(--t-caption);
     color: var(--c-ink-2);
-    border-bottom: 1px solid var(--c-hairline);
-    padding-block-end: 1px;
 }
 
-@media (min-width: 80rem) {
+@media (min-width: 48rem) {
     .toolbar__main {
         grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
         align-items: end;
     }
 }
 
-/* View segment control */
+/* View segment control — pill-style tabs */
 .segment {
     display: inline-flex;
-    border: 1px solid var(--c-border);
-    background: var(--c-bg);
-    overflow: hidden;
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: 3px;
+    gap: 2px;
     width: 100%;
 }
 
@@ -58,27 +57,21 @@
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-3);
     font-size: var(--t-b2);
     font-weight: 500;
     font-family: inherit;
-    background: var(--c-bg);
+    background: transparent;
     color: var(--c-ink-2);
     border: 0;
-    border-right: 1px solid var(--c-hairline);
-    transition: color 120ms;
+    border-radius: 0;
+    transition: background 120ms, color 120ms;
 }
 
-.segment__btn:last-child {
-    border-right: 0;
-}
-
-/* Active: red underline instead of background color — Swiss precision */
 .segment__btn[data-active="true"] {
-    color: var(--c-red);
-    text-decoration: underline;
-    text-underline-offset: .25em;
-    text-decoration-color: var(--c-red);
+    background: var(--c-bg);
+    color: var(--c-ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
 }
 
 @media (min-width: 40rem) {
@@ -97,12 +90,11 @@
     gap: var(--sp-5);
 }
 
-/* 2px bottom rule — stronger than hairline for a real section separator */
 .kanban__header {
     display: grid;
     gap: var(--sp-3);
-    border-bottom: 2px solid var(--c-border);
-    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--c-hairline);
+    padding-bottom: var(--sp-5);
 }
 
 .kanban__title-row {
@@ -124,19 +116,29 @@
     gap: var(--sp-3);
 }
 
+/* No outer border — rows carry their own bottom divider */
 .kanban-rows {
     display: grid;
-    gap: var(--sp-2);
+    gap: 0;
 }
 
 .kanban-row {
-    border-top: 1px solid var(--c-hairline);
+    border-bottom: 1px solid var(--c-hairline);
     padding: var(--sp-3) var(--sp-4);
     background: var(--c-bg);
+    border-radius: 0;
+}
+
+.kanban-row:first-child {
+    border-top: 1px solid var(--c-hairline);
+}
+
+.kanban-row:last-child {
+    border-bottom: 0;
 }
 
 .kanban-row:hover {
-    background: #fafafa;
+    background: var(--c-surface);
 }
 
 .kanban-row__body {
@@ -184,17 +186,18 @@
     gap: var(--sp-4);
 }
 
-/* 2px bottom rule — consistent with kanban header */
+/* 1px bottom rule — light section separator */
 .notes__header {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    border-bottom: 2px solid var(--c-border);
-    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--c-hairline);
+    padding-bottom: var(--sp-5);
 }
 
 .notes__context {
-    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    border-radius: var(--radius-sm);
     padding: var(--sp-3);
     font-size: var(--t-b2);
     color: var(--c-ink-2);
@@ -214,17 +217,18 @@
 .note-card {
     display: grid;
     gap: var(--sp-1);
-    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-card);
     padding: var(--sp-3);
     text-align: left;
     background: var(--c-bg);
     color: var(--c-ink);
-    transition: background-color 100ms, border-color 100ms;
+    transition: box-shadow 100ms;
     font-family: inherit;
 }
 
 .note-card:hover {
-    background: #fafafa;
+    box-shadow: var(--shadow-card-hover);
 }
 
 /* Active state: full red fill — bold color instead of border */
@@ -253,7 +257,8 @@
 }
 
 .note-form {
-    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    border-radius: var(--radius);
     padding: var(--sp-4);
     display: grid;
     gap: var(--sp-4);
@@ -314,13 +319,14 @@
     gap: var(--sp-5);
 }
 
-/* Board header: 2px bottom rule creates strong section boundaries */
+/* Board header: 1px bottom rule */
 .board__header {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    border-bottom: 2px solid var(--c-border);
+    gap: var(--sp-2);
+    border-bottom: 1px solid var(--c-hairline);
     padding-bottom: var(--sp-4);
+    margin-bottom: var(--sp-2);
 }
 
 .board__hours {
@@ -335,31 +341,40 @@
 
 .member-grid {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
-/* Member selector: subtle top rule that activates to red on selection */
+/* Member selector button — pill-style cards on gray surface */
 .member-btn {
     display: grid;
-    border-top: 3px solid var(--c-hairline);
+    border-radius: var(--radius);
+    border: 1px solid var(--c-hairline);
+    border-left: 2px solid transparent;
     padding: var(--sp-3) var(--sp-4);
     background: var(--c-bg);
     text-align: left;
-    transition: border-top-color 100ms, background-color 100ms;
+    transition: border-left-color 100ms, background-color 100ms, box-shadow 100ms;
     color: var(--c-ink-2);
     font-family: inherit;
 }
 
-.member-btn:hover {
-    border-top-color: var(--c-border);
-    background: #fafafa;
+.member-btn:first-child {
+    /* no special treatment */
 }
 
-/* Selected: red rule + red tint background — bold color as section separator */
+.member-btn:hover {
+    border-left-color: var(--c-border);
+    background: var(--c-surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+
+/* Selected: blue left-edge */
 .member-btn[data-selected="true"] {
-    border-top-color: var(--c-red);
-    background: var(--c-red-bg);
+    border-left-color: var(--c-blue);
+    background: var(--c-blue-bg);
     color: var(--c-ink);
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
 }
 
 .member-btn__name {
@@ -385,12 +400,19 @@
     gap: var(--sp-3);
 }
 
+/* Metrics inside board panel use standard metric styling */
+.board-metrics>.metric {
+    border-left-width: 3px;
+}
+
 /* ═══ TASK FORM ════════════════════════════════════════════════════════════════ */
 .task-form {
-    border: 1px solid var(--c-border);
-    padding: var(--sp-3);
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: var(--sp-4);
     display: grid;
     gap: var(--sp-3);
+    margin-top: var(--sp-2);
 }
 
 .task-form__fields {
@@ -404,15 +426,24 @@
 }
 
 /* ═══ TASK ROW ════════════════════════════════════════════════════════════════ */
+/* No outer border — rows flow naturally with dividers between them */
 .task-list {
     display: grid;
-    gap: var(--sp-2);
+    gap: 0;
 }
 
 .task-row {
-    border-top: 1px solid var(--c-hairline);
+    border-bottom: 1px solid var(--c-hairline);
     padding: var(--sp-3) var(--sp-4);
     background: var(--c-bg);
+}
+
+.task-row:first-child {
+    border-top: 1px solid var(--c-hairline);
+}
+
+.task-row:last-child {
+    border-bottom: 0;
 }
 
 .task-row__main {

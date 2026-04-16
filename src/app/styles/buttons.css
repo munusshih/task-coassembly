@@ -10,6 +10,7 @@
     font-weight: 500;
     font-family: inherit;
     border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: inherit;
     cursor: pointer;

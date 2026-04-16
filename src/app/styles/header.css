@@ -4,14 +4,15 @@
    ════════════════════════════════════════════════════════════════════════════ */
 .app-header {
     background: var(--c-bg);
-    border-top: 5px solid var(--c-red);
-    padding: clamp(var(--sp-4), 2vw, var(--sp-6));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
 }
 
 .app-header__inner {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
+    padding: clamp(var(--sp-5), 2vw, var(--sp-7));
 }
 
 .app-header__body {
@@ -19,15 +20,16 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-width: 0;
+    padding: var(--sp-2) 0;
 }
 
 .app-header__kicker {
     font-size: var(--t-label);
     font-weight: 600;
     line-height: 1;
-    letter-spacing: .12em;
+    letter-spacing: .08em;
     text-transform: uppercase;
-    color: var(--c-red);
+    color: var(--c-ink-3);
 }
 
 .app-header__heading {
@@ -75,7 +77,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-3);
-    border: 1px solid var(--c-border);
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--radius);
     background: var(--c-bg);
     padding: var(--sp-1) var(--sp-3);
 }
@@ -94,8 +97,9 @@
     height: 1.75rem;
     font-size: var(--t-label);
     font-weight: 600;
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-bg);
+    border-radius: 0;
     color: var(--c-ink-2);
 }
 
@@ -109,7 +113,8 @@
     justify-content: center;
     width: 1.75rem;
     height: 1.75rem;
-    border: 1px solid var(--c-border);
+    border: 1.5px dashed var(--c-border);
+    border-radius: 0;
     background: var(--c-bg);
     color: var(--c-ink-3);
 }
