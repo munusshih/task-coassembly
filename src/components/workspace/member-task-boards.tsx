@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, inputClassName } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Member, Project, Task } from "@/lib/types";
 
@@ -48,6 +49,30 @@ const defaultDraft = (): TaskDraft => ({
   estimateHours: 1,
 });
 
+const NEW_TASK_DRAFTS_STORAGE_KEY = "coassembly:new-task-drafts";
+
+function buildTaskDraft(task: Task): TaskDraft {
+  return {
+    title: task.title,
+    deadline: task.deadline || "",
+    projectId: task.projectId || "",
+    workstream: task.workstream,
+    billable: task.billable,
+    estimateHours: task.estimateHours,
+  };
+}
+
+function serializeTaskDraft(draft: TaskDraft): Partial<Omit<Task, "id">> {
+  return {
+    title: draft.title.trim(),
+    deadline: draft.deadline || undefined,
+    projectId: draft.projectId || undefined,
+    workstream: draft.workstream,
+    billable: draft.billable,
+    estimateHours: Number(draft.estimateHours) || 0,
+  };
+}
+
 const categoryLabel: Record<string, string> = {
   workerOwner: "Worker Owner",
   associate: "Associate",
@@ -62,6 +87,43 @@ const monthlyRoleLabel: Record<string, string> = {
   noteTaker: "Note taker",
 };
 
+function normalizeTaskDraft(draft?: Partial<TaskDraft>): TaskDraft {
+  return {
+    title: String(draft?.title || ""),
+    deadline: String(draft?.deadline || ""),
+    projectId: String(draft?.projectId || ""),
+    workstream:
+      draft?.workstream === "admin" || draft?.workstream === "internal"
+        ? draft.workstream
+        : "client",
+    billable: typeof draft?.billable === "boolean" ? draft.billable : true,
+    estimateHours: Number(draft?.estimateHours) || 1,
+  };
+}
+
+function readStoredTaskDrafts(): Record<string, TaskDraft> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(NEW_TASK_DRAFTS_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, Partial<TaskDraft>>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([memberId, draft]) => [
+        memberId,
+        normalizeTaskDraft(draft),
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
 export function MemberTaskBoards({
   members,
   projects,
@@ -74,40 +136,9 @@ export function MemberTaskBoards({
   const [expandedTaskId, setExpandedTaskId] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
   const [newTaskDrafts, setNewTaskDrafts] = useState<Record<string, TaskDraft>>(
-    {},
+    () => readStoredTaskDrafts(),
   );
   const [taskDrafts, setTaskDrafts] = useState<Record<string, TaskDraft>>({});
-
-  useEffect(() => {
-    if (!selectedMemberId && members[0]?.id) {
-      setSelectedMemberId(members[0].id);
-    }
-  }, [members, selectedMemberId]);
-
-  useEffect(() => {
-    setNewTaskDrafts((current) => {
-      const next = { ...current };
-      for (const member of members) {
-        next[member.id] = next[member.id] || defaultDraft();
-      }
-      return next;
-    });
-  }, [members]);
-
-  useEffect(() => {
-    const next: Record<string, TaskDraft> = {};
-    for (const task of tasks) {
-      next[task.id] = {
-        title: task.title,
-        deadline: task.deadline || "",
-        projectId: task.projectId || "",
-        workstream: task.workstream,
-        billable: task.billable,
-        estimateHours: task.estimateHours,
-      };
-    }
-    setTaskDrafts(next);
-  }, [tasks]);
 
   const projectNameById = useMemo(
     () =>
@@ -115,8 +146,15 @@ export function MemberTaskBoards({
     [projects],
   );
 
+  const resolvedSelectedMemberId = members.some(
+    (member) => member.id === selectedMemberId,
+  )
+    ? selectedMemberId
+    : members[0]?.id || "";
+
   const selectedMember =
-    members.find((member) => member.id === selectedMemberId) || members[0];
+    members.find((member) => member.id === resolvedSelectedMemberId) ||
+    members[0];
 
   const memberTasks = useMemo(() => {
     if (!selectedMember) {
@@ -143,28 +181,63 @@ export function MemberTaskBoards({
     (sum, task) => sum + (Number(task.estimateHours) || 0),
     0,
   );
+  const reviewTasks = activeTasks.filter((task) => task.status === "review");
 
   async function commitTask(taskId: string) {
-    const draft = taskDrafts[taskId];
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    const draft =
+      taskDrafts[taskId] || (task ? buildTaskDraft(task) : undefined);
     if (!draft) {
       return;
     }
-    await onUpdateTask(taskId, {
-      title: draft.title.trim(),
-      deadline: draft.deadline || undefined,
-      projectId: draft.projectId || undefined,
-      workstream: draft.workstream,
-      billable: draft.billable,
-      estimateHours: Number(draft.estimateHours) || 0,
-    });
+    await onUpdateTask(taskId, serializeTaskDraft(draft));
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      NEW_TASK_DRAFTS_STORAGE_KEY,
+      JSON.stringify(newTaskDrafts),
+    );
+  }, [newTaskDrafts]);
+
+  useEffect(() => {
+    const timeoutIds = Object.entries(taskDrafts).flatMap(([taskId, draft]) => {
+      const task = tasks.find((candidate) => candidate.id === taskId);
+      if (!task) {
+        return [];
+      }
+
+      const savedDraft = buildTaskDraft(task);
+      const snapshot = JSON.stringify(normalizeTaskDraft(draft));
+      if (snapshot === JSON.stringify(savedDraft)) {
+        return [];
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        void onUpdateTask(
+          taskId,
+          serializeTaskDraft(normalizeTaskDraft(draft)),
+        );
+      }, 500);
+
+      return [timeoutId];
+    });
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
+  }, [onUpdateTask, taskDrafts, tasks]);
 
   if (!selectedMember) {
     return (
-      <section className="grid gap-3 border-b border-slate-200 pb-6">
+      <section className="panel board">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">Task board</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="t-h3">Task board</h2>
+          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
             Add members in Admin Control to start assigning work.
           </p>
         </div>
@@ -175,24 +248,18 @@ export function MemberTaskBoards({
   const draft = newTaskDrafts[selectedMember.id] || defaultDraft();
 
   return (
-    <section className="grid gap-5 border-b border-slate-200 pb-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="panel board">
+      <div className="board__header">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">Task board</h2>
-          <p className="text-sm text-slate-500">
-            Personal work stays here first. Project to-dos can be sent into this
-            board when they become assigned work.
-          </p>
+          <h2 className="t-h3">Task board</h2>
         </div>
-        <div className="text-sm text-slate-500">
-          <span className="font-medium text-slate-900">
-            {activeHours.toFixed(1)}h
-          </span>{" "}
+        <p className="board__hours">
+          <strong>{activeHours.toFixed(1)}h</strong>{" "}
           active for {selectedMember.name}
-        </div>
+        </p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="member-grid">
         {members.map((member) => {
           const memberActiveHours = tasks
             .filter(
@@ -207,26 +274,15 @@ export function MemberTaskBoards({
             <button
               key={member.id}
               type="button"
-              className={cn(
-                "min-w-45 rounded-2xl border px-4 py-3 text-left transition-colors",
-                selectedMemberId === member.id
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-              )}
+              className="member-btn"
+              data-selected={resolvedSelectedMemberId === member.id}
               onClick={() => {
                 setSelectedMemberId(member.id);
                 setExpandedTaskId("");
               }}
             >
-              <p className="font-medium">{member.name}</p>
-              <p
-                className={cn(
-                  "mt-1 text-xs",
-                  selectedMemberId === member.id
-                    ? "text-slate-200"
-                    : "text-slate-500",
-                )}
-              >
+              <span className="member-btn__name">{member.name}</span>
+              <span className="member-btn__role">
                 {categoryLabel[
                   member.category ||
                     (member.workerOwner ? "workerOwner" : "member")
@@ -234,46 +290,150 @@ export function MemberTaskBoards({
                 {member.monthlyRole && member.monthlyRole !== "none"
                   ? ` · ${monthlyRoleLabel[member.monthlyRole] || member.monthlyRole}`
                   : ""}
-              </p>
-              <p
-                className={cn(
-                  "mt-3 text-sm",
-                  selectedMemberId === member.id
-                    ? "text-white"
-                    : "text-slate-700",
-                )}
-              >
+              </span>
+              <span className="member-btn__hours">
                 {memberActiveHours.toFixed(1)}h active
-              </p>
+              </span>
             </button>
           );
         })}
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            value={draft.title}
-            onChange={(event) =>
-              setNewTaskDrafts((current) => ({
-                ...current,
-                [selectedMember.id]: {
-                  ...current[selectedMember.id],
-                  title: event.target.value,
-                },
-              }))
-            }
-            placeholder={`Add a task for ${selectedMember.name}`}
-            className="min-w-0 flex-1 border-0 px-0 text-base shadow-none focus-visible:ring-0"
-          />
+      <div className="board-metrics">
+        <div className="metric metric--active">
+          <p className="t-label">Active tasks</p>
+          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{activeTasks.length}</p>
+          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+            In progress for {selectedMember.name}
+          </p>
+        </div>
+        <div className="metric metric--review">
+          <p className="t-label">In review</p>
+          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{reviewTasks.length}</p>
+          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+            Tasks waiting on a pass or follow-up
+          </p>
+        </div>
+        <div className="metric metric--done">
+          <p className="t-label">Completed</p>
+          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{completedTasks.length}</p>
+          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+            Finished tasks kept below for reference
+          </p>
+        </div>
+      </div>
+
+      <div className="task-form panel--inset">
+        <div className="task-form__fields">
+          <div className="field">
+            <Label htmlFor="new-task-title">Task title</Label>
+            <Input
+              id="new-task-title"
+              value={draft.title}
+              onChange={(event) =>
+                setNewTaskDrafts((current) => ({
+                  ...current,
+                  [selectedMember.id]: {
+                    ...current[selectedMember.id],
+                    title: event.target.value,
+                  },
+                }))
+              }
+              placeholder={`Add a task for ${selectedMember.name}`}
+            />
+          </div>
+          <div className="field">
+            <Label htmlFor="new-task-deadline">Deadline</Label>
+            <Input
+              id="new-task-deadline"
+              type="date"
+              value={draft.deadline}
+              onChange={(event) =>
+                setNewTaskDrafts((current) => ({
+                  ...current,
+                  [selectedMember.id]: {
+                    ...current[selectedMember.id],
+                    deadline: event.target.value,
+                  },
+                }))
+              }
+            />
+          </div>
+          <div className="field">
+            <Label htmlFor="new-task-project">Project</Label>
+            <select
+              id="new-task-project"
+              className={inputClassName}
+              value={draft.projectId}
+              onChange={(event) =>
+                setNewTaskDrafts((current) => ({
+                  ...current,
+                  [selectedMember.id]: {
+                    ...current[selectedMember.id],
+                    projectId: event.target.value,
+                  },
+                }))
+              }
+            >
+              <option value="">No project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <Label htmlFor="new-task-billing">Billing</Label>
+            <select
+              id="new-task-billing"
+              className={inputClassName}
+              value={`${draft.workstream}:${draft.billable ? "1" : "0"}`}
+              onChange={(event) => {
+                const [workstream, billable] = event.target.value.split(":");
+                setNewTaskDrafts((current) => ({
+                  ...current,
+                  [selectedMember.id]: {
+                    ...current[selectedMember.id],
+                    workstream: workstream as Task["workstream"],
+                    billable: billable === "1",
+                  },
+                }));
+              }}
+            >
+              <option value="client:1">Billable</option>
+              <option value="client:0">Non-billable client</option>
+              <option value="admin:0">Admin</option>
+              <option value="internal:0">Internal</option>
+            </select>
+          </div>
+          <div className="field">
+            <Label htmlFor="new-task-hours">Hours</Label>
+            <Input
+              id="new-task-hours"
+              type="number"
+              min={0}
+              step={0.5}
+              value={draft.estimateHours}
+              onChange={(event) =>
+                setNewTaskDrafts((current) => ({
+                  ...current,
+                  [selectedMember.id]: {
+                    ...current[selectedMember.id],
+                    estimateHours: Number(event.target.value) || 0,
+                  },
+                }))
+              }
+              placeholder="Estimated"
+            />
+          </div>
+        </div>
+
+        <div className="task-form__submit">
           <Button
             type="button"
-            variant="ghost"
-            className="gap-2"
             onClick={() => {
-              if (!draft.title.trim()) {
-                return;
-              }
+              if (!draft.title.trim()) return;
               void onCreateTask({
                 title: draft.title.trim(),
                 deadline: draft.deadline || undefined,
@@ -292,109 +452,30 @@ export function MemberTaskBoards({
               });
             }}
           >
-            <Plus className="h-4 w-4" />
-            Add
+            <Plus className="icon-sm" />
+            Add task
           </Button>
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-4">
-          <Input
-            type="date"
-            value={draft.deadline}
-            onChange={(event) =>
-              setNewTaskDrafts((current) => ({
-                ...current,
-                [selectedMember.id]: {
-                  ...current[selectedMember.id],
-                  deadline: event.target.value,
-                },
-              }))
-            }
-          />
-          <select
-            className={inputClassName}
-            value={draft.projectId}
-            onChange={(event) =>
-              setNewTaskDrafts((current) => ({
-                ...current,
-                [selectedMember.id]: {
-                  ...current[selectedMember.id],
-                  projectId: event.target.value,
-                },
-              }))
-            }
-          >
-            <option value="">No project</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className={inputClassName}
-            value={`${draft.workstream}:${draft.billable ? "1" : "0"}`}
-            onChange={(event) => {
-              const [workstream, billable] = event.target.value.split(":");
-              setNewTaskDrafts((current) => ({
-                ...current,
-                [selectedMember.id]: {
-                  ...current[selectedMember.id],
-                  workstream: workstream as Task["workstream"],
-                  billable: billable === "1",
-                },
-              }));
-            }}
-          >
-            <option value="client:1">Billable</option>
-            <option value="client:0">Non-billable client</option>
-            <option value="admin:0">Admin</option>
-            <option value="internal:0">Internal</option>
-          </select>
-          <Input
-            type="number"
-            min={0}
-            step={0.5}
-            value={draft.estimateHours}
-            onChange={(event) =>
-              setNewTaskDrafts((current) => ({
-                ...current,
-                [selectedMember.id]: {
-                  ...current[selectedMember.id],
-                  estimateHours: Number(event.target.value) || 0,
-                },
-              }))
-            }
-            placeholder="Estimated hours"
-          />
         </div>
       </div>
 
-      <div className="grid gap-1">
+      <div className="task-list">
         {activeTasks.map((task) => {
-          const rowDraft = taskDrafts[task.id] || defaultDraft();
+          const rowDraft = taskDrafts[task.id] || buildTaskDraft(task);
           const detailsOpen = expandedTaskId === task.id;
           const isReview = task.status === "review";
 
           return (
-            <div
-              key={task.id}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-            >
-              <div className="flex items-center gap-2">
+            <div key={task.id} className="task-row">
+              <div className="task-row__main">
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 px-0"
+                  className="btn--sq"
                   onClick={() => {
-                    void onUpdateTask(task.id, {
-                      status: "done",
-                      archived: true,
-                    });
+                    void onUpdateTask(task.id, { status: "done", archived: true });
                   }}
                 >
-                  <Circle className="h-4 w-4" />
+                  <Circle className="icon-sm" />
                 </Button>
 
                 <input
@@ -402,184 +483,157 @@ export function MemberTaskBoards({
                   onChange={(event) =>
                     setTaskDrafts((current) => ({
                       ...current,
-                      [task.id]: {
-                        ...current[task.id],
-                        title: event.target.value,
-                      },
+                      [task.id]: { ...current[task.id], title: event.target.value },
                     }))
                   }
-                  onBlur={() => {
-                    void commitTask(task.id);
-                  }}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none"
+                  onBlur={() => { void commitTask(task.id); }}
+                  className="task-row__title"
                 />
 
                 {task.deadline ? (
-                  <span className="hidden items-center gap-1 text-xs text-slate-500 md:inline-flex">
-                    <CalendarDays className="h-3.5 w-3.5" />
+                  <span className="task-row__meta">
+                    <CalendarDays className="icon-xs" />
                     {task.deadline}
                   </span>
                 ) : null}
 
                 {task.estimateHours ? (
-                  <span className="hidden items-center gap-1 text-xs text-slate-500 md:inline-flex">
-                    <Clock3 className="h-3.5 w-3.5" />
+                  <span className="task-row__meta">
+                    <Clock3 className="icon-xs" />
                     {task.estimateHours}h
                   </span>
                 ) : null}
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={cn("h-8 w-8 px-0", isReview && "text-amber-600")}
-                  onClick={() => {
-                    void onUpdateTask(task.id, {
-                      status: isReview ? "todo" : "review",
-                      archived: false,
-                    });
-                  }}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                <div className="task-row__actions">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={cn("btn--sq", isReview && "btn--review")}
+                    onClick={() => {
+                      void onUpdateTask(task.id, {
+                        status: isReview ? "todo" : "review",
+                        archived: false,
+                      });
+                    }}
+                  >
+                    <Eye className="icon-sm" />
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-8 w-8 px-0",
-                    rowDraft.billable && "text-emerald-600",
-                  )}
-                  onClick={() => {
-                    const nextBillable = !rowDraft.billable;
-                    setTaskDrafts((current) => ({
-                      ...current,
-                      [task.id]: {
-                        ...current[task.id],
-                        billable: nextBillable,
-                      },
-                    }));
-                    void onUpdateTask(task.id, { billable: nextBillable });
-                  }}
-                >
-                  <DollarSign className="h-4 w-4" />
-                </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={cn("btn--sq", rowDraft.billable && "btn--billable")}
+                    onClick={() => {
+                      const nextBillable = !rowDraft.billable;
+                      setTaskDrafts((current) => ({
+                        ...current,
+                        [task.id]: { ...current[task.id], billable: nextBillable },
+                      }));
+                      void onUpdateTask(task.id, { billable: nextBillable });
+                    }}
+                  >
+                    <DollarSign className="icon-sm" />
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 px-0"
-                  onClick={() => setExpandedTaskId(detailsOpen ? "" : task.id)}
-                >
-                  {detailsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="btn--sq"
+                    onClick={() => setExpandedTaskId(detailsOpen ? "" : task.id)}
+                  >
+                    {detailsOpen ? (
+                      <ChevronDown className="icon-sm" />
+                    ) : (
+                      <ChevronRight className="icon-sm" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               {detailsOpen ? (
-                <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 md:grid-cols-4">
-                  <Input
-                    type="date"
-                    value={rowDraft.deadline}
-                    onChange={(event) =>
-                      setTaskDrafts((current) => ({
-                        ...current,
-                        [task.id]: {
-                          ...current[task.id],
-                          deadline: event.target.value,
-                        },
-                      }))
-                    }
-                    onBlur={() => {
-                      void commitTask(task.id);
-                    }}
-                  />
-                  <select
-                    className={inputClassName}
-                    value={rowDraft.projectId}
-                    onChange={(event) => {
-                      setTaskDrafts((current) => ({
-                        ...current,
-                        [task.id]: {
-                          ...current[task.id],
-                          projectId: event.target.value,
-                        },
-                      }));
-                      void onUpdateTask(task.id, {
-                        projectId: event.target.value || undefined,
-                      });
-                    }}
-                  >
-                    <option value="">No project</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className={inputClassName}
-                    value={rowDraft.workstream}
-                    onChange={(event) => {
-                      const nextWorkstream = event.target
-                        .value as Task["workstream"];
-                      setTaskDrafts((current) => ({
-                        ...current,
-                        [task.id]: {
-                          ...current[task.id],
-                          workstream: nextWorkstream,
-                        },
-                      }));
-                      void onUpdateTask(task.id, {
-                        workstream: nextWorkstream,
-                      });
-                    }}
-                  >
-                    <option value="client">Client</option>
-                    <option value="admin">Admin</option>
-                    <option value="internal">Internal</option>
-                  </select>
-                  <div className="flex items-center gap-2">
+                <div className="task-row__details">
+                  <div className="field">
+                    <Label>Deadline</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={rowDraft.estimateHours}
+                      type="date"
+                      value={rowDraft.deadline}
                       onChange={(event) =>
                         setTaskDrafts((current) => ({
                           ...current,
-                          [task.id]: {
-                            ...current[task.id],
-                            estimateHours: Number(event.target.value) || 0,
-                          },
+                          [task.id]: { ...current[task.id], deadline: event.target.value },
                         }))
                       }
-                      onBlur={() => {
-                        void commitTask(task.id);
-                      }}
-                      placeholder="Hours"
+                      onBlur={() => { void commitTask(task.id); }}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-10 w-10 px-0 text-slate-500"
-                      onClick={() => {
-                        void onDeleteTask(task.id);
+                  </div>
+                  <div className="field">
+                    <Label>Project</Label>
+                    <select
+                      className={inputClassName}
+                      value={rowDraft.projectId}
+                      onChange={(event) => {
+                        setTaskDrafts((current) => ({
+                          ...current,
+                          [task.id]: { ...current[task.id], projectId: event.target.value },
+                        }));
+                        void onUpdateTask(task.id, { projectId: event.target.value || undefined });
                       }}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <option value="">No project</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <Label>Workstream</Label>
+                    <select
+                      className={inputClassName}
+                      value={rowDraft.workstream}
+                      onChange={(event) => {
+                        const nextWorkstream = event.target.value as Task["workstream"];
+                        setTaskDrafts((current) => ({
+                          ...current,
+                          [task.id]: { ...current[task.id], workstream: nextWorkstream },
+                        }));
+                        void onUpdateTask(task.id, { workstream: nextWorkstream });
+                      }}
+                    >
+                      <option value="client">Client</option>
+                      <option value="admin">Admin</option>
+                      <option value="internal">Internal</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <Label>Hours</Label>
+                    <div style={{display:"flex",gap:"var(--sp-2)",alignItems:"center"}}>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={rowDraft.estimateHours}
+                        onChange={(event) =>
+                          setTaskDrafts((current) => ({
+                            ...current,
+                            [task.id]: { ...current[task.id], estimateHours: Number(event.target.value) || 0 },
+                          }))
+                        }
+                        onBlur={() => { void commitTask(task.id); }}
+                        placeholder="Hours"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="btn--sq"
+                        onClick={() => { void onDeleteTask(task.id); }}
+                      >
+                        <Trash2 className="icon-sm" />
+                      </Button>
+                    </div>
                   </div>
                   {rowDraft.projectId ? (
-                    <p className="md:col-span-4 text-xs text-slate-500">
-                      Linked project:{" "}
-                      {projectNameById[rowDraft.projectId] || "Unknown project"}
+                    <p className="t-caption" style={{color:"var(--c-ink-3)"}}>
+                      Linked project: {projectNameById[rowDraft.projectId] || "Unknown project"}
                     </p>
                   ) : null}
                 </div>
@@ -590,53 +644,47 @@ export function MemberTaskBoards({
       </div>
 
       {completedTasks.length ? (
-        <div className="grid gap-2">
+        <div>
           <button
             type="button"
-            className="inline-flex w-fit items-center gap-2 text-sm text-slate-500"
+            className="completed-toggle"
             onClick={() => setShowCompleted((current) => !current)}
           >
             {showCompleted ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="icon-sm" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="icon-sm" />
             )}
             Completed tasks ({completedTasks.length})
           </button>
 
           {showCompleted ? (
-            <div className="grid gap-1">
+            <div className="task-list">
               {completedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500"
-                >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 px-0 text-emerald-600"
-                    onClick={() => {
-                      void onUpdateTask(task.id, {
-                        status: "todo",
-                        archived: false,
-                      });
-                    }}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                  </Button>
-                  <span className="flex-1 line-through">{task.title}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 px-0"
-                    onClick={() => {
-                      void onDeleteTask(task.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div key={task.id} className="task-row" data-done="true">
+                  <div className="task-row__main">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="btn--sq btn--billable"
+                      onClick={() => {
+                        void onUpdateTask(task.id, { status: "todo", archived: false });
+                      }}
+                    >
+                      <CheckCircle2 className="icon-sm" />
+                    </Button>
+                    <span className="task-row__title">{task.title}</span>
+                    <div className="task-row__actions">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="btn--sq"
+                        onClick={() => { void onDeleteTask(task.id); }}
+                      >
+                        <Trash2 className="icon-sm" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

@@ -2,6 +2,7 @@ export const SHARED_PASSWORD = "cooperative";
 export const ADMIN_PASSWORD = "admin";
 const WORKSPACE_ACCESS_SESSION_KEY = "coassembly-workspace-access-granted";
 const ADMIN_ACCESS_SESSION_KEY = "coassembly-admin-access-granted";
+const WORKSPACE_ACCESS_EVENT = "coassembly-workspace-access-change";
 const ADMIN_ACCESS_EVENT = "coassembly-admin-access-change";
 
 type PasswordCredentialConstructor = new (data: {
@@ -28,6 +29,7 @@ export function grantWorkspaceAccess(): void {
         return;
     }
     window.sessionStorage.setItem(WORKSPACE_ACCESS_SESSION_KEY, "true");
+    dispatchBrowserEvent(WORKSPACE_ACCESS_EVENT);
 }
 
 export function revokeWorkspaceAccess(): void {
@@ -35,6 +37,22 @@ export function revokeWorkspaceAccess(): void {
         return;
     }
     window.sessionStorage.removeItem(WORKSPACE_ACCESS_SESSION_KEY);
+    dispatchBrowserEvent(WORKSPACE_ACCESS_EVENT);
+}
+
+export function subscribeWorkspaceAccess(callback: () => void): () => void {
+    if (typeof window === "undefined") {
+        return () => undefined;
+    }
+
+    const onChange = () => callback();
+    window.addEventListener("storage", onChange);
+    window.addEventListener(WORKSPACE_ACCESS_EVENT, onChange);
+
+    return () => {
+        window.removeEventListener("storage", onChange);
+        window.removeEventListener(WORKSPACE_ACCESS_EVENT, onChange);
+    };
 }
 
 export function hasAdminAccess(): boolean {

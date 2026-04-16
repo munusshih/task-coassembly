@@ -53,9 +53,10 @@ export function subscribeNotes(onData: (items: MeetingNote[]) => void): () => vo
     });
 }
 
-export async function createMember(payload: Omit<Member, "id">): Promise<void> {
+export async function createMember(payload: Omit<Member, "id">): Promise<string> {
     const membersRef = collection(getDb(), "members");
-    await addDoc(membersRef, payload);
+    const member = await addDoc(membersRef, payload);
+    return member.id;
 }
 
 export async function updateMember(id: string, payload: Partial<Omit<Member, "id">>): Promise<void> {
@@ -66,9 +67,10 @@ export async function deleteMember(id: string): Promise<void> {
     await deleteDoc(doc(getDb(), "members", id));
 }
 
-export async function createProject(payload: Omit<Project, "id">): Promise<void> {
+export async function createProject(payload: Omit<Project, "id">): Promise<string> {
     const projectsRef = collection(getDb(), "projects");
-    await addDoc(projectsRef, payload);
+    const project = await addDoc(projectsRef, payload);
+    return project.id;
 }
 
 export async function updateProject(id: string, payload: Partial<Omit<Project, "id">>): Promise<void> {

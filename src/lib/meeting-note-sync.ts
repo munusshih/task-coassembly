@@ -24,7 +24,7 @@ export async function syncMeetingNoteMarkdown(
     note: Pick<MeetingNote, "title" | "content" | "meetingDate" | "localPath">,
     projectName: string,
 ): Promise<void> {
-    await fetch("/api/meeting-notes", {
+    const response = await fetch("/api/meeting-notes", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -39,4 +39,28 @@ export async function syncMeetingNoteMarkdown(
                 buildMeetingNotePath(projectName, note.meetingDate, note.title),
         }),
     });
+
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+        throw new Error(payload?.error || "Unable to mirror note to local markdown.");
+    }
+}
+
+export async function deleteMeetingNoteMarkdown(localPath: string): Promise<void> {
+    const response = await fetch("/api/meeting-notes", {
+        method: "DELETE",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ localPath }),
+    });
+
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+        throw new Error(payload?.error || "Unable to delete mirrored note file.");
+    }
 }

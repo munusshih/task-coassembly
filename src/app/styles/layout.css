@@ -1,0 +1,46 @@
+/* ═══ PAGE SHELL ══════════════════════════════════════════════════════════════ */
+.app-page {
+  min-height: 100vh;
+  padding-inline: clamp(var(--sp-3), 2vw, var(--sp-6));
+  padding-block:  clamp(var(--sp-3), 2vw, var(--sp-5));
+}
+
+.app-container {
+  margin-inline: auto;
+  width: min(100%, 112rem);
+  display: grid;
+  gap: clamp(var(--sp-3), 1.5vw, var(--sp-5));
+}
+
+/* ═══ PANEL ═══════════════════════════════════════════════════════════════════
+   4px border creates a clear structural chapter-rule (Swiss grid principle).
+   Each section opens with this rule — stronger than 2px without being heavy.
+   ════════════════════════════════════════════════════════════════════════════ */
+.panel {
+  background: var(--c-bg);
+  border-top: 4px solid var(--c-border);
+  padding: clamp(var(--sp-4), 1.5vw, var(--sp-6));
+}
+
+.panel--flush {
+  background: var(--c-bg);
+  border-top: 4px solid var(--c-border);
+}
+
+.panel--inset {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  padding: var(--sp-4);
+}
+
+/* Toolbar panel: surface tint + black rule — separates it from white header */
+.panel.toolbar {
+  background: var(--c-surface);
+  border-top-color: var(--c-ink);
+}
+
+/* ═══ WORKSPACE SHELL ═════════════════════════════════════════════════════════ */
+.ws-main {
+  display: grid;
+  gap: var(--sp-4);
+}

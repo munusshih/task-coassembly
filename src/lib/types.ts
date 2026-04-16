@@ -1,4 +1,11 @@
 export type ProjectRoleSlot = "leadId" | "doerId" | "consultantId";
+export type ProjectTeamRole = "lead" | "doer" | "consultant";
+export type ProjectBudgetCurrency = "TWD" | "USD";
+export type ProjectEngagementType =
+    | "commissioned"
+    | "selfFunded"
+    | "grant"
+    | "passThrough";
 export type MemberCategory =
     | "workerOwner"
     | "associate"
@@ -14,6 +21,22 @@ export interface ProjectOffering {
     id: string;
     name: string;
     completed: boolean;
+}
+
+export interface ProjectStaffingAssignment {
+    id: string;
+    memberId: string;
+    roles: ProjectTeamRole[];
+    maxHours: number;
+}
+
+export interface ProjectStagePlan {
+    id: string;
+    name: string;
+    weeks: number;
+    delayWeeks: number;
+    perspectiveHours: number;
+    order: number;
 }
 
 export interface Member {
@@ -46,16 +69,24 @@ export interface Project {
     proposalLink?: string;
     contractLink?: string;
     projectType?: string;
-    stage?: "discovery" | "design" | "delivery" | "support";
+    projectTypes?: string[];
+    engagementType?: ProjectEngagementType;
+    stage?: string;
+    stages?: string[];
+    stagePlans?: ProjectStagePlan[];
     priority?: "low" | "medium" | "high";
     startDate?: string;
     dueDate?: string;
     timelineSummary?: string;
+    budgetAmount?: number;
+    budgetCurrency?: ProjectBudgetCurrency;
+    budgetTwd?: number;
     budgetUsd?: number;
     successMetric?: string;
     risks?: string;
     collaboratorCount: number;
     offerings?: ProjectOffering[];
+    staffing?: ProjectStaffingAssignment[];
     leadId?: string;
     doerId?: string;
     consultantId?: string;

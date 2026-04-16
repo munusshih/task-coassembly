@@ -1,73 +1,175 @@
 "use client";
 
 import { Dispatch, SetStateAction } from "react";
-import { FileText, ListTodo } from "lucide-react";
+import { FileText, FolderOpen, ListTodo } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { inputClassName } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { Project } from "@/lib/types";
 
 interface WorkspaceToolbarProps {
   projects: Project[];
+  selectedProject?: Project;
   selectedProjectId: string;
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   workspaceView: "project" | "notes";
   setWorkspaceView: Dispatch<SetStateAction<"project" | "notes">>;
 }
 
+function formatProjectTypeLabel(value: string): string {
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatStageLabel(value: string): string {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function WorkspaceToolbar({
   projects,
+  selectedProject,
   selectedProjectId,
   setSelectedProjectId,
   workspaceView,
   setWorkspaceView,
 }: WorkspaceToolbarProps) {
+  const hasProjects = projects.length > 0;
+  const projectTypes = selectedProject?.projectTypes?.length
+    ? selectedProject.projectTypes
+    : String(selectedProject?.projectType || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+  const engagementLabels: Record<
+    NonNullable<Project["engagementType"]>,
+    string
+  > = {
+    commissioned: "Commissioned Work",
+    selfFunded: "Self-funded Project",
+    grant: "Grant Project",
+    passThrough: "Pass-through Work",
+  };
+  const engagementLabel = selectedProject?.engagementType
+    ? engagementLabels[selectedProject.engagementType]
+    : null;
+  const staffedCount = selectedProject
+    ? new Set(
+        (selectedProject.staffing || [])
+          .filter((assignment) => assignment.memberId)
+          .map((assignment) => assignment.memberId),
+      ).size ||
+      selectedProject.collaboratorCount ||
+      0
+    : 0;
+  const configuredStages = (selectedProject?.stages || []).filter(Boolean);
+
   return (
-    <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-      <div className="grid gap-2">
-        <Label htmlFor="project-id">Project workspace</Label>
-        <select
-          id="project-id"
-          className={cn(inputClassName, "min-w-56")}
-          value={selectedProjectId}
-          onChange={(event) => setSelectedProjectId(event.target.value)}
-        >
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
+    <div className="panel toolbar">
+      <div className="toolbar__main">
+        <div className="field">
+          <Label htmlFor="project-id">Active project</Label>
+          <select
+            id="project-id"
+            className={inputClassName}
+            value={selectedProjectId}
+            onChange={(event) => setSelectedProjectId(event.target.value)}
+          >
+            <option value="">
+              {hasProjects ? "Select a project" : "No projects available yet"}
             </option>
-          ))}
-        </select>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+          <p className="toolbar__hint">
+            {hasProjects
+              ? "Pick a project before working in project to-dos or meeting notes."
+              : "Create a project in Admin Control first."}
+          </p>
+        </div>
+
+        <div className="field">
+          <Label>Workspace view</Label>
+          <div className="segment">
+            <button
+              type="button"
+              className="segment__btn"
+              data-active={workspaceView === "project"}
+              onClick={() => setWorkspaceView("project")}
+            >
+              <ListTodo className="icon-sm" />
+              Project to-dos
+            </button>
+            <button
+              type="button"
+              className="segment__btn"
+              data-active={workspaceView === "notes"}
+              onClick={() => setWorkspaceView("notes")}
+            >
+              <FileText className="icon-sm" />
+              Meeting notes
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={cn(
-            "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors",
-            workspaceView === "project"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200",
-          )}
-          onClick={() => setWorkspaceView("project")}
-        >
-          <ListTodo className="h-4 w-4" />
-          Project to-dos
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors",
-            workspaceView === "notes"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200",
-          )}
-          onClick={() => setWorkspaceView("notes")}
-        >
-          <FileText className="h-4 w-4" />
-          Meeting notes
-        </button>
-      </div>
+      {selectedProject ? (
+        <div className="field">
+          <div className="toolbar__meta">
+            <span className="toolbar__meta-item">
+              <FolderOpen className="icon-sm" />
+              {selectedProject.name}
+            </span>
+            {selectedProject.clientName ? (
+              <span className="toolbar__meta-item">
+                {selectedProject.clientName}
+              </span>
+            ) : null}
+            {engagementLabel ? (
+              <span className="toolbar__meta-item">{engagementLabel}</span>
+            ) : null}
+            <span className="toolbar__meta-item">
+              {selectedProject.stage
+                ? `${formatStageLabel(selectedProject.stage)} stage`
+                : "Stage not set"}
+            </span>
+            {configuredStages.length ? (
+              <span className="toolbar__meta-item">
+                {configuredStages.length} stages configured
+              </span>
+            ) : null}
+            <span className="toolbar__meta-item">
+              {selectedProject.priority
+                ? `${selectedProject.priority[0].toUpperCase()}${selectedProject.priority.slice(1)} priority`
+                : "Priority not set"}
+            </span>
+            <span className="toolbar__meta-item">{staffedCount} staffed</span>
+          </div>
+          {projectTypes.length ? (
+            <div className="toolbar__meta">
+              {projectTypes.map((typeValue) => (
+                <span key={typeValue} className="toolbar__meta-item">
+                  {formatProjectTypeLabel(typeValue)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="empty">
+          {hasProjects
+            ? "No project is selected. Choose one above to open notes and project work."
+            : "No projects exist yet. Add one in Admin Control to unlock project work."}
+        </div>
+      )}
     </div>
   );
 }

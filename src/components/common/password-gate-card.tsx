@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button, buttonBaseClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 interface PasswordGateCardProps {
   kicker?: string;
@@ -37,18 +36,14 @@ export function PasswordGateCard({
   backLabel,
 }: PasswordGateCardProps) {
   return (
-    <Card className="mx-auto mt-16 w-full max-w-md">
-      <CardHeader>
-        {kicker ? (
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-            {kicker}
-          </p>
-        ) : null}
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-3" autoComplete="on">
+    <div className="auth-gate">
+      <div className="card__header">
+        {kicker ? <p className="app-header__kicker">{kicker}</p> : null}
+        <h2 className="card__title">{title}</h2>
+        <p className="card__desc">{description}</p>
+      </div>
+      <div className="card__content auth-gate__content">
+        <form onSubmit={onSubmit} className="auth-gate__form" autoComplete="on">
           <Input
             type="text"
             name="username"
@@ -59,27 +54,28 @@ export function PasswordGateCard({
             tabIndex={-1}
             className="sr-only"
           />
-          <Input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            placeholder={placeholder}
-            value={password}
-            onChange={(event) => onPasswordChange(event.target.value)}
-            required
-          />
+          <div className="auth-gate__field">
+            <Label htmlFor="password-gate-input">Password</Label>
+            <Input
+              id="password-gate-input"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder={placeholder}
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              required
+            />
+          </div>
           <Button type="submit">{submitLabel}</Button>
         </form>
-        {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+        {error ? <p className="auth-gate__error">{error}</p> : null}
         {backHref && backLabel ? (
-          <Link
-            className={cn(buttonBaseClass, "mt-3 h-10 border border-slate-200 bg-white px-4 py-2 text-slate-900 hover:bg-slate-50")}
-            href={backHref}
-          >
+          <Link className="btn btn--outline" href={backHref}>
             {backLabel}
           </Link>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

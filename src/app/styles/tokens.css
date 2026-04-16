@@ -1,0 +1,54 @@
+/* ═══ DESIGN TOKENS ══════════════════════════════════════════════════════════ */
+:root {
+  /* Surface */
+  --c-bg:      #ffffff;
+  --c-surface: #f7f7f7;
+
+  /* Ink */
+  --c-ink:   #0a0a0a;
+  --c-ink-2: #525252;
+  --c-ink-3: #a3a3a3;
+
+  /* Borders */
+  --c-border:   #d4d4d4;
+  --c-hairline: #ebebeb;
+
+  /* Accent palette */
+  --c-red:      #e8251a;
+  --c-red-bg:   #fef2f2;
+  --c-blue:     #1a55d6;
+  --c-blue-bg:  #eff4ff;
+  --c-amber:    #c97800;
+  --c-amber-bg: #fffbeb;
+  --c-green:    #16a34a;
+  --c-green-bg: #f0fdf4;
+
+  /* Spacing */
+  --sp-1:  .25rem;
+  --sp-2:  .5rem;
+  --sp-3:  .75rem;
+  --sp-4:  1rem;
+  --sp-5:  1.25rem;
+  --sp-6:  1.5rem;
+  --sp-8:  2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+
+  /* Type scale */
+  --t-display: clamp(2.25rem, 5vw,   4rem);
+  --t-h1:      clamp(1.75rem, 3.5vw, 2.5rem);
+  --t-h2:      clamp(1.25rem, 2.5vw, 1.75rem);
+  --t-h3:      1.125rem;
+  --t-h4:      1rem;
+  --t-b1:      1rem;
+  --t-b2:      .875rem;
+  --t-caption: .75rem;
+  --t-label:   .6875rem;
+}
+
+@theme inline {
+  --color-background: var(--c-bg);
+  --color-foreground: var(--c-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}

@@ -1,0 +1,79 @@
+/* ═══ STATUS CHIP ═════════════════════════════════════════════════════════════ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--t-caption);
+  font-family: inherit;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--c-ink-2);
+}
+
+.chip--saving {
+  border-color: var(--c-amber);
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+}
+
+.chip--synced {
+  border-color: var(--c-green);
+  color: var(--c-green);
+  background: var(--c-green-bg);
+}
+
+.chip--error {
+  border-color: var(--c-red);
+  color: var(--c-red);
+  background: var(--c-red-bg);
+}
+
+/* ═══ TAG ═════════════════════════════════════════════════════════════════════ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--t-caption);
+  color: var(--c-ink-2);
+  border-bottom: 1px solid var(--c-hairline);
+  padding-block-end: 1px;
+}
+
+.tag--accent {
+  color: var(--c-ink);
+}
+
+/* ═══ ROW / EMPTY ═════════════════════════════════════════════════════════════ */
+.row {
+  border-top: 1px solid var(--c-hairline);
+  background: var(--c-bg);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.empty {
+  background: var(--c-bg);
+  border: 1px dashed var(--c-border);
+  padding: var(--sp-4) var(--sp-5);
+  font-size: var(--t-b2);
+  color: var(--c-ink-2);
+}
+
+.empty--tall {
+  padding-block: var(--sp-8);
+}
+
+/* ═══ ICON SIZES ══════════════════════════════════════════════════════════════ */
+.icon-xs {
+  width: .875rem;
+  height: .875rem;
+  display: block;
+  flex-shrink: 0;
+}
+
+.icon-sm {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  flex-shrink: 0;
+}

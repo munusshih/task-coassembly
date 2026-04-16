@@ -1,0 +1,65 @@
+/* ═══ TYPE SCALE ══════════════════════════════════════════════════════════════
+   Every text element on the site should reference one of these classes.
+   Do not set font-size, font-weight, or line-height ad-hoc in components.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.t-display {
+  font-size: var(--t-display);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -.02em;
+}
+
+.t-h1 {
+  font-size: var(--t-h1);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.015em;
+}
+
+/* Weight bumped to 700 and tracking tightened for stronger visual contrast */
+.t-h2 {
+  font-size: var(--t-h2);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.015em;
+}
+
+.t-h3 {
+  font-size: var(--t-h3);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.t-h4 {
+  font-size: var(--t-h4);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Generous line heights for reading comfort */
+.t-b1 {
+  font-size: var(--t-b1);
+  line-height: 1.7;
+}
+
+.t-b2 {
+  font-size: var(--t-b2);
+  line-height: 1.65;
+}
+
+.t-caption {
+  font-size: var(--t-caption);
+  line-height: 1.45;
+  color: var(--c-ink-2);
+}
+
+/* Kicker / label — all-caps editorial marker */
+.t-label {
+  font-size: var(--t-label);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--c-ink-2);
+}

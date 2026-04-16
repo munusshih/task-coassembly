@@ -1,9 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, Eye, FileText } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import {
+  Bold,
+  Heading1,
+  Heading2,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  Quote,
+  Redo2,
+  Undo2,
+} from "lucide-react";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import StarterKit from "@tiptap/starter-kit";
+import { EditorContent, useEditor } from "@tiptap/react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface MarkdownEditorProps {
@@ -13,48 +27,108 @@ interface MarkdownEditorProps {
   className?: string;
 }
 
-// Simple markdown-to-html converter for preview
-function renderMarkdown(markdown: string): string {
-  let html = markdown
-    // Headers
-    .replace(/^### (.*?)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.*?)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.*?)$/gm, "<h1>$1</h1>")
-    // Bold
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/__( .*?)__/g, "<strong>$1</strong>")
-    // Italic
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/_( .*?)_/g, "<em>$1</em>")
-    // Lists
-    .replace(/^\* (.*)$/gm, "<li>$1</li>")
-    .replace(/^\- (.*)$/gm, "<li>$1</li>")
-    // Links
-    .replace(
-      /\[(.*?)\]\((.*?)\)/g,
-      '<a href="$2" class="text-blue-600 hover:underline">$1</a>',
-    )
-    // Code blocks
-    .replace(
-      /```([\s\S]*?)```/g,
-      '<pre class="bg-slate-100 p-2 rounded text-xs overflow-x-auto"><code>$1</code></pre>',
-    )
-    // Inline code
-    .replace(
-      /`(.*?)`/g,
-      '<code class="bg-slate-100 px-1 rounded text-xs">$1</code>',
-    )
-    // Blockquotes
-    .replace(
-      /^> (.*?)$/gm,
-      '<blockquote class="border-l-4 border-slate-300 pl-4 italic">$1</blockquote>',
-    )
-    // Line breaks
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br />");
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
-  html = `<p>${html}</p>`;
-  return html;
+function legacyMarkdownToHtml(markdown: string): string {
+  const lines = markdown.split(/\r?\n/);
+  const html: string[] = [];
+  let inList = false;
+
+  function closeList() {
+    if (inList) {
+      html.push("</ul>");
+      inList = false;
+    }
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const safe = escapeHtml(line.trim());
+
+    if (!safe) {
+      closeList();
+      continue;
+    }
+
+    if (safe.startsWith("### ")) {
+      closeList();
+      html.push(`<h3>${safe.slice(4)}</h3>`);
+      continue;
+    }
+
+    if (safe.startsWith("## ")) {
+      closeList();
+      html.push(`<h2>${safe.slice(3)}</h2>`);
+      continue;
+    }
+
+    if (safe.startsWith("# ")) {
+      closeList();
+      html.push(`<h1>${safe.slice(2)}</h1>`);
+      continue;
+    }
+
+    if (safe.startsWith("- ")) {
+      if (!inList) {
+        html.push("<ul>");
+        inList = true;
+      }
+      html.push(`<li>${safe.slice(2)}</li>`);
+      continue;
+    }
+
+    closeList();
+    html.push(`<p>${safe}</p>`);
+  }
+
+  closeList();
+  return html.join("");
+}
+
+function normalizeInitialContent(value: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "<p></p>";
+  }
+
+  if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return legacyMarkdownToHtml(trimmed);
+}
+
+function ToolbarButton({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? "default" : "ghost"}
+      className="h-8 min-w-8 px-2"
+      onClick={onClick}
+      title={title}
+    >
+      {children}
+    </Button>
+  );
 }
 
 export function MarkdownEditor({
@@ -63,98 +137,156 @@ export function MarkdownEditor({
   placeholder,
   className,
 }: MarkdownEditorProps) {
-  const [mode, setMode] = useState<"edit" | "preview">("edit");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const normalizedValue = useMemo(
+    () => normalizeInitialContent(value),
+    [value],
+  );
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2] },
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        defaultProtocol: "https",
+      }),
+      Placeholder.configure({
+        placeholder: placeholder || "Start writing notes...",
+      }),
+    ],
+    content: normalizedValue,
+    editorProps: {
+      attributes: {
+        class: "rich-editor-content",
+      },
+    },
+    onUpdate: ({ editor: nextEditor }) => {
+      onChange(nextEditor.getHTML());
+    },
+  });
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (editor.getHTML() !== normalizedValue) {
+      editor.commands.setContent(normalizedValue, { emitUpdate: false });
+    }
+  }, [editor, normalizedValue]);
+
+  function setLink() {
+    if (!editor) {
+      return;
+    }
+
+    const previousUrl = editor.getAttributes("link").href as string | undefined;
+    const nextUrl = window.prompt("Enter link URL", previousUrl || "https://");
+
+    if (nextUrl === null) {
+      return;
+    }
+
+    const trimmedUrl = nextUrl.trim();
+    if (!trimmedUrl) {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange("link")
+      .setLink({ href: trimmedUrl })
+      .run();
+  }
 
   return (
     <div
-      className={cn("grid gap-2 rounded-lg border border-slate-200", className)}
-    >
-      <div className="flex gap-1 border-b border-slate-200 p-2">
-        <Button
-          size="sm"
-          variant={mode === "edit" ? "default" : "outline"}
-          onClick={() => setMode("edit")}
-          className="h-8 gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant={mode === "preview" ? "default" : "outline"}
-          onClick={() => setMode("preview")}
-          className="h-8 gap-2"
-        >
-          <Eye className="h-4 w-4" />
-          Preview
-        </Button>
-      </div>
-
-      {mode === "edit" ? (
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-          rows={16}
-        />
-      ) : (
-        <div
-          className="prose prose-sm max-w-none p-4 text-slate-900"
-          dangerouslySetInnerHTML={{
-            __html: renderMarkdown(value),
-          }}
-          style={{
-            fontSize: "0.875rem",
-          }}
-        />
+      className={cn(
+        "grid gap-0 rounded-md border border-slate-300 bg-white",
+        className,
       )}
-
-      <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
-        <details className="cursor-pointer">
-          <summary className="font-medium">Markdown help</summary>
-          <div className="mt-2 grid grid-cols-2 gap-2 rounded bg-slate-50 p-2">
-            <div>
-              <code className="text-xs">**bold**</code>
-            </div>
-            <div>
-              <strong>bold</strong>
-            </div>
-            <div>
-              <code className="text-xs">*italic*</code>
-            </div>
-            <div>
-              <em>italic</em>
-            </div>
-            <div>
-              <code className="text-xs"># Heading</code>
-            </div>
-            <div>
-              <h3 className="text-xs font-bold">Heading</h3>
-            </div>
-            <div>
-              <code className="text-xs">- List item</code>
-            </div>
-            <div>Bullet point</div>
-            <div>
-              <code className="text-xs">[Link](url)</code>
-            </div>
-            <div>
-              <a href="#" className="text-blue-600 text-xs">
-                Link
-              </a>
-            </div>
-            <div>
-              <code className="text-xs">`code`</code>
-            </div>
-            <div>
-              <code className="bg-slate-100 px-1 text-xs">code</code>
-            </div>
-          </div>
-        </details>
+    >
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-2">
+        <ToolbarButton
+          title="Undo"
+          onClick={() => editor?.chain().focus().undo().run()}
+        >
+          <Undo2 className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Redo"
+          onClick={() => editor?.chain().focus().redo().run()}
+        >
+          <Redo2 className="h-4 w-4" />
+        </ToolbarButton>
+        <span className="mx-1 h-5 w-px bg-slate-200" />
+        <ToolbarButton
+          active={editor?.isActive("heading", { level: 1 })}
+          title="Heading 1"
+          onClick={() =>
+            editor?.chain().focus().toggleHeading({ level: 1 }).run()
+          }
+        >
+          <Heading1 className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("heading", { level: 2 })}
+          title="Heading 2"
+          onClick={() =>
+            editor?.chain().focus().toggleHeading({ level: 2 }).run()
+          }
+        >
+          <Heading2 className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("bold")}
+          title="Bold"
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+        >
+          <Bold className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("italic")}
+          title="Italic"
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+        >
+          <Italic className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("bulletList")}
+          title="Bullet list"
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+        >
+          <List className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("orderedList")}
+          title="Numbered list"
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+        >
+          <ListOrdered className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("blockquote")}
+          title="Blockquote"
+          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+        >
+          <Quote className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor?.isActive("link")}
+          title="Link"
+          onClick={setLink}
+        >
+          <Link2 className="h-4 w-4" />
+        </ToolbarButton>
       </div>
+      <EditorContent editor={editor} />
     </div>
   );
 }

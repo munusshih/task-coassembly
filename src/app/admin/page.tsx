@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
-import { MemberDirectoryPanel } from "@/components/admin/member-directory-panel";
-import { MemberFormPanel } from "@/components/admin/member-form-panel";
-import { ProjectSummaryPanel } from "@/components/admin/project-summary-panel";
+import { FolderCog, Radio } from "lucide-react";
+import { AdminWorkspace } from "@/components/admin/admin-workspace";
 import { AppHeader } from "@/components/common/app-header";
 import { PasswordGateCard } from "@/components/common/password-gate-card";
+import { ViewerPresence } from "@/components/common/viewer-presence";
 import { Button, buttonBaseClass } from "@/components/ui/button";
 import {
   Card,
@@ -22,50 +22,29 @@ import {
   revokeAdminAccess,
   subscribeAdminAccess,
 } from "@/lib/access";
-import { cn } from "@/lib/utils";
 import { firebaseReady } from "@/lib/firebase";
 import {
   createMember,
+  createProject,
   deleteMember,
   deleteProject,
-  createProject,
   subscribeMembers,
   subscribeProjects,
   updateMember,
   updateProject,
 } from "@/lib/firestore";
-import {
-  Member,
-  Project,
-} from "@/lib/types";
-
-function createEmptyMemberDraft(): Omit<Member, "id"> {
-  return {
-    name: "",
-    email: "",
-    role: "",
-    pronouns: [],
-    phone: "",
-    location: "",
-    category: "member",
-    active: true,
-    monthlyRole: "none",
-    status: "active",
-    workerOwner: false,
-    capacityPerWeek: 0,
-    vacationDays: 0,
-    notes: "",
-  };
-}
+import { Member, Project } from "@/lib/types";
+import { useViewerPresence } from "@/lib/use-viewer-presence";
+import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [accessError, setAccessError] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [newMember, setNewMember] = useState<Omit<Member, "id">>(() =>
-    createEmptyMemberDraft(),
-  );
+  const { presenceAvailable, viewerCount, viewerSeeds } =
+    useViewerPresence("admin");
+
   const isUnlocked = useSyncExternalStore(
     subscribeAdminAccess,
     hasAdminAccess,
@@ -76,61 +55,40 @@ export default function AdminPage() {
     if (!isUnlocked) {
       return;
     }
-    const unsubMembers = subscribeMembers(setMembers);
-    const unsubProjects = subscribeProjects(setProjects);
+
+    const unsubscribeMembers = subscribeMembers(setMembers);
+    const unsubscribeProjects = subscribeProjects(setProjects);
+
     return () => {
-      unsubMembers();
-      unsubProjects();
+      unsubscribeMembers();
+      unsubscribeProjects();
     };
   }, [isUnlocked]);
-
 
   function onUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAccessError("");
+
     const enteredPassword = password.trim();
     if (enteredPassword !== ADMIN_PASSWORD) {
       setAccessError("Incorrect admin password.");
       return;
     }
+
     void rememberPasswordCredential("admin@coassembly.local", enteredPassword);
     grantAdminAccess();
     setPassword("");
   }
 
-  async function handleCreateMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const monthlyRole = newMember.monthlyRole || "none";
-    const active = Boolean(newMember.active);
-
-    await createMember({
-      ...newMember,
-      name: newMember.name.trim(),
-      email: newMember.email.trim(),
-      role: monthlyRole !== "none" ? monthlyRole : "",
-      pronouns: newMember.pronouns ?? [],
-      phone: String(newMember.phone || "").trim(),
-      location: String(newMember.location || "").trim(),
-      workerOwner: newMember.category === "workerOwner",
-      active,
-      status: active ? "active" : "inactive",
-      capacityPerWeek: Number(newMember.capacityPerWeek) || 0,
-      vacationDays: Number(newMember.vacationDays) || 0,
-      notes: String(newMember.notes || "").trim(),
-    });
-
-    setNewMember(createEmptyMemberDraft());
-  }
-
   if (!firebaseReady) {
     return (
-      <main className="min-h-screen px-4 py-8 md:px-6">
+      <main className="app-page">
         <Card className="mx-auto mt-16 w-full max-w-md">
           <CardHeader>
             <CardTitle>Firebase configuration needed</CardTitle>
             <CardDescription>
-              Add all NEXT_PUBLIC_FIREBASE_* variables before using the backend.
+              Add all `NEXT_PUBLIC_FIREBASE_*` variables before using the
+              backend.
             </CardDescription>
           </CardHeader>
           <div className="p-6 pt-0">
@@ -151,10 +109,10 @@ export default function AdminPage() {
 
   if (!isUnlocked) {
     return (
-      <main className="min-h-screen px-4 py-8 md:px-6">
+      <main className="app-page">
         <PasswordGateCard
           title="Admin Control"
-          description="Enter the admin password to add or remove system data."
+          description="Enter the admin password to manage members and projects."
           credentialId="admin@coassembly.local"
           password={password}
           error={accessError}
@@ -170,12 +128,31 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 md:px-6">
-      <div className="mx-auto grid w-full max-w-5xl gap-6">
+    <main className="app-page">
+      <div className="app-container">
         <AppHeader
           kicker="CoAssembly"
           title="Admin Control"
-          description="Manage members and projects."
+          description="Manage the people and projects behind the workspace from one coherent control panel."
+          meta={
+            <>
+              <span className="swiss-tag inline-flex items-center gap-2 text-slate-700">
+                <Radio className="h-4 w-4" />
+                Live Firestore sync
+              </span>
+              {presenceAvailable ? (
+                <ViewerPresence
+                  count={viewerCount}
+                  seeds={viewerSeeds}
+                  label="viewing admin"
+                />
+              ) : null}
+              <span className="swiss-tag inline-flex items-center gap-2 text-slate-700">
+                <FolderCog className="h-4 w-4 text-slate-400" />
+                {members.length} members · {projects.length} projects
+              </span>
+            </>
+          }
           actions={
             <>
               <Link
@@ -199,101 +176,16 @@ export default function AdminPage() {
           }
         />
 
-        <div className="grid gap-6">
-          <MemberFormPanel
-            memberName={newMember.name}
-            onMemberNameChange={(value) =>
-              setNewMember((current) => ({ ...current, name: value }))
-            }
-            memberEmail={newMember.email}
-            onMemberEmailChange={(value) =>
-              setNewMember((current) => ({ ...current, email: value }))
-            }
-            memberCategory={newMember.category}
-            onMemberCategoryChange={(value) =>
-              setNewMember((current) => ({
-                ...current,
-                category: value,
-                workerOwner: value === "workerOwner",
-              }))
-            }
-            memberPronouns={newMember.pronouns ?? []}
-            onMemberPronounsChange={(value) =>
-              setNewMember((current) => ({ ...current, pronouns: value }))
-            }
-            memberPhone={newMember.phone || ""}
-            onMemberPhoneChange={(value) =>
-              setNewMember((current) => ({ ...current, phone: value }))
-            }
-            memberLocation={newMember.location || ""}
-            onMemberLocationChange={(value) =>
-              setNewMember((current) => ({ ...current, location: value }))
-            }
-            memberActive={newMember.active}
-            onMemberActiveChange={(value) =>
-              setNewMember((current) => ({
-                ...current,
-                active: value,
-                status: value ? "active" : "inactive",
-              }))
-            }
-            memberMonthlyRole={newMember.monthlyRole || "none"}
-            onMemberMonthlyRoleChange={(value) =>
-              setNewMember((current) => ({
-                ...current,
-                monthlyRole: value,
-                role: value === "none" ? "" : value,
-              }))
-            }
-            memberCapacityPerWeek={newMember.capacityPerWeek ?? 0}
-            onMemberCapacityPerWeekChange={(value) =>
-              setNewMember((current) => ({
-                ...current,
-                capacityPerWeek: value,
-              }))
-            }
-            memberVacationDays={newMember.vacationDays ?? 0}
-            onMemberVacationDaysChange={(value) =>
-              setNewMember((current) => ({
-                ...current,
-                vacationDays: value,
-              }))
-            }
-            memberNotes={newMember.notes || ""}
-            onMemberNotesChange={(value) =>
-              setNewMember((current) => ({ ...current, notes: value }))
-            }
-            onSubmit={(event) => {
-              void handleCreateMember(event);
-            }}
-          />
-
-          <MemberDirectoryPanel
-            members={members}
-            onUpdateMember={updateMember}
-            onDeleteMember={deleteMember}
-          />
-
-          <ProjectSummaryPanel
-            projects={projects}
-            onUpdate={async (project, updates) => {
-              await updateProject(project.id, updates);
-            }}
-            onDelete={(p) => void deleteProject(p.id)}
-            onAddNew={() =>
-              void createProject({
-                name: "New Project",
-                purpose: "Define project purpose",
-                description: "",
-                stage: "discovery",
-                priority: "medium",
-                collaboratorCount: 1,
-                createdAt: Date.now(),
-              })
-            }
-          />
-        </div>
-
+        <AdminWorkspace
+          members={members}
+          projects={projects}
+          onCreateMember={createMember}
+          onUpdateMember={updateMember}
+          onDeleteMember={deleteMember}
+          onCreateProject={createProject}
+          onUpdateProject={updateProject}
+          onDeleteProject={deleteProject}
+        />
       </div>
     </main>
   );

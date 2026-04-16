@@ -6,6 +6,7 @@ interface AppHeaderProps {
   kicker: string;
   title: string;
   description: string;
+  meta?: ReactNode;
   actions: ReactNode;
 }
 
@@ -13,20 +14,22 @@ export function AppHeader({
   kicker,
   title,
   description,
+  meta,
   actions,
 }: AppHeaderProps) {
   return (
-    <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-          {kicker}
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
-          {title}
-        </h1>
-        <p className="max-w-2xl text-sm text-slate-500">{description}</p>
+    <header className="app-header">
+      <div className="app-header__inner">
+        <div className="app-header__body">
+          <p className="app-header__kicker">{kicker}</p>
+          <div className="app-header__heading">
+            <h1 className="t-h1">{title}</h1>
+            <p className="app-header__desc">{description}</p>
+          </div>
+          {meta ? <div className="app-header__meta">{meta}</div> : null}
+        </div>
+        <div className="app-header__actions">{actions}</div>
       </div>
-      <div className="flex flex-wrap gap-2">{actions}</div>
     </header>
   );
 }

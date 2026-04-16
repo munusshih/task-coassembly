@@ -1,12 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  Activity,
+  Coins,
+  FileText,
+  FolderOpen,
+  Radio,
+  Users,
+} from "lucide-react";
 import { AppHeader } from "@/components/common/app-header";
 import { PasswordGateCard } from "@/components/common/password-gate-card";
+import { ViewerPresence } from "@/components/common/viewer-presence";
 import { Button, buttonBaseClass } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -21,16 +37,19 @@ import {
   rememberPasswordCredential,
   revokeWorkspaceAccess,
   SHARED_PASSWORD,
+  subscribeWorkspaceAccess,
 } from "@/lib/access";
 import { firebaseReady } from "@/lib/firebase";
 import {
   buildMeetingNotePath,
+  deleteMeetingNoteMarkdown,
   syncMeetingNoteMarkdown,
 } from "@/lib/meeting-note-sync";
 import {
   createCard,
   createNote,
   createTask,
+  deleteNote,
   deleteTask,
   subscribeKanban,
   subscribeMembers,
@@ -49,7 +68,8 @@ import {
   Project,
   Task,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { useViewerPresence } from "@/lib/use-viewer-presence";
+import { cn, formatMoney, getBudgetSnapshot } from "@/lib/utils";
 
 const KANBAN_COLUMNS: KanbanColumn[] = [
   "backlog",
@@ -57,6 +77,62 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   "review",
   "done",
 ];
+
+const KANBAN_DRAFTS_STORAGE_KEY = "coassembly:kanban-drafts";
+
+interface KanbanDraft {
+  title: string;
+  description: string;
+  column: KanbanColumn;
+  ownerId: string;
+}
+
+function defaultKanbanDraft(): KanbanDraft {
+  return {
+    title: "",
+    description: "",
+    column: "backlog",
+    ownerId: "",
+  };
+}
+
+function readStoredKanbanDrafts(): Record<string, KanbanDraft> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(KANBAN_DRAFTS_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, Partial<KanbanDraft>>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([projectId, draft]) => [
+        projectId,
+        {
+          ...defaultKanbanDraft(),
+          title: String(draft.title || ""),
+          description: String(draft.description || ""),
+          column:
+            draft.column === "inProgress" ||
+            draft.column === "review" ||
+            draft.column === "done"
+              ? draft.column
+              : "backlog",
+          ownerId: String(draft.ownerId || ""),
+        },
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function subscribeNoop() {
+  return () => undefined;
+}
 
 function roleName(id: string | undefined, members: Member[]): string {
   if (!id) {
@@ -66,8 +142,6 @@ function roleName(id: string | undefined, members: Member[]): string {
 }
 
 export default function Home() {
-  const [authReady, setAuthReady] = useState(() => !firebaseReady);
-  const [isUnlocked, setIsUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
 
@@ -82,73 +156,118 @@ export default function Home() {
     "notes",
   );
 
-  const [cardTitle, setCardTitle] = useState("");
-  const [cardDescription, setCardDescription] = useState("");
-  const [cardColumn, setCardColumn] = useState<KanbanColumn>("backlog");
-  const [cardOwnerId, setCardOwnerId] = useState("");
+  const [kanbanDrafts, setKanbanDrafts] = useState<Record<string, KanbanDraft>>(
+    () => readStoredKanbanDrafts(),
+  );
 
-  useEffect(() => {
-    if (!firebaseReady) {
-      return;
-    }
-    setIsUnlocked(hasWorkspaceAccess());
-    setAuthReady(true);
-  }, []);
+  const isUnlocked = useSyncExternalStore(
+    subscribeWorkspaceAccess,
+    hasWorkspaceAccess,
+    () => false,
+  );
+
+  const browserReady = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => !firebaseReady,
+  );
+
+  const { presenceAvailable, viewerCount, viewerSeeds } =
+    useViewerPresence("workspace");
 
   useEffect(() => {
     if (!isUnlocked) {
       return;
     }
 
-    const unsubMembers = subscribeMembers(setMembers);
-    const unsubProjects = subscribeProjects(setProjects);
-    const unsubTasks = subscribeTasks(setTasks);
-    const unsubCards = subscribeKanban(setCards);
-    const unsubNotes = subscribeNotes(setNotes);
+    const unsubscribeMembers = subscribeMembers(setMembers);
+    const unsubscribeProjects = subscribeProjects(setProjects);
+    const unsubscribeTasks = subscribeTasks(setTasks);
+    const unsubscribeCards = subscribeKanban(setCards);
+    const unsubscribeNotes = subscribeNotes(setNotes);
 
     return () => {
-      unsubMembers();
-      unsubProjects();
-      unsubTasks();
-      unsubCards();
-      unsubNotes();
+      unsubscribeMembers();
+      unsubscribeProjects();
+      unsubscribeTasks();
+      unsubscribeCards();
+      unsubscribeNotes();
     };
   }, [isUnlocked]);
 
-  const resolvedProjectId = selectedProjectId || projects[0]?.id || "";
+  const resolvedProjectId = projects.some(
+    (project) => project.id === selectedProjectId,
+  )
+    ? selectedProjectId
+    : "";
+  const currentKanbanDraft = resolvedProjectId
+    ? kanbanDrafts[resolvedProjectId] || defaultKanbanDraft()
+    : defaultKanbanDraft();
+
+  function updateKanbanDraft(patch: Partial<KanbanDraft>) {
+    if (!resolvedProjectId) {
+      return;
+    }
+
+    setKanbanDrafts((current) => ({
+      ...current,
+      [resolvedProjectId]: {
+        ...(current[resolvedProjectId] || defaultKanbanDraft()),
+        ...patch,
+      },
+    }));
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      KANBAN_DRAFTS_STORAGE_KEY,
+      JSON.stringify(kanbanDrafts),
+    );
+  }, [kanbanDrafts]);
+
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === resolvedProjectId),
     [projects, resolvedProjectId],
   );
 
   const projectCards = useMemo(
-    () => cards.filter((card) => card.projectId === resolvedProjectId),
-    [cards, resolvedProjectId],
+    () =>
+      selectedProject
+        ? cards.filter((card) => card.projectId === selectedProject.id)
+        : [],
+    [cards, selectedProject],
   );
 
   const projectNotes = useMemo(
-    () => notes.filter((note) => note.projectId === resolvedProjectId),
-    [notes, resolvedProjectId],
+    () =>
+      selectedProject
+        ? notes.filter((note) => note.projectId === selectedProject.id)
+        : [],
+    [notes, selectedProject],
   );
-
-  function onUnlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthError("");
-
-    const enteredPassword = password.trim();
-    if (enteredPassword !== SHARED_PASSWORD) {
-      setAuthError("Incorrect dashboard password.");
-      return;
-    }
-
-    void rememberPasswordCredential(
-      "dashboard@coassembly.local",
-      enteredPassword,
-    );
-    grantWorkspaceAccess();
-    setIsUnlocked(true);
-    setPassword("");
-  }
+  const selectedProjectStaffedCount = selectedProject
+    ? new Set(
+        (selectedProject.staffing || [])
+          .filter((assignment) => assignment.memberId)
+          .map((assignment) => assignment.memberId),
+      ).size ||
+      selectedProject.collaboratorCount ||
+      0
+    : 0;
+  const selectedProjectBudget = getBudgetSnapshot(selectedProject);
+  const selectedProjectHourlyRateTwd = selectedProject?.maxBillableHours
+    ? selectedProjectBudget.budgetTwd / Number(selectedProject.maxBillableHours)
+    : 0;
+  const selectedProjectHourlyRateUsd = selectedProject?.maxBillableHours
+    ? selectedProjectBudget.budgetUsd / Number(selectedProject.maxBillableHours)
+    : 0;
+  const activeTaskCount = tasks.filter(
+    (task) => task.status !== "done" && !task.archived,
+  ).length;
 
   async function addTask(payload: Omit<Task, "id" | "createdAt">) {
     await createTask({
@@ -159,33 +278,39 @@ export default function Home() {
 
   async function addCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!resolvedProjectId || !cardTitle.trim()) {
+    if (!selectedProject || !currentKanbanDraft.title.trim()) {
       return;
     }
 
     await createCard({
-      projectId: resolvedProjectId,
-      title: cardTitle.trim(),
-      description: cardDescription.trim(),
-      column: cardColumn,
-      ownerId: cardOwnerId || undefined,
+      projectId: selectedProject.id,
+      title: currentKanbanDraft.title.trim(),
+      description: currentKanbanDraft.description.trim(),
+      column: currentKanbanDraft.column,
+      ownerId: currentKanbanDraft.ownerId || undefined,
       createdAt: Date.now(),
     });
-    setCardTitle("");
-    setCardDescription("");
-    setCardOwnerId("");
+    setKanbanDrafts((current) => {
+      const nextDrafts = { ...current };
+      delete nextDrafts[selectedProject.id];
+      return nextDrafts;
+    });
   }
 
   async function createMeetingNote(
     payload: Omit<MeetingNote, "id" | "createdAt">,
   ): Promise<string> {
+    if (!selectedProject) {
+      throw new Error("Select a project before creating notes.");
+    }
+
     const normalizedPayload = {
       ...payload,
       title: payload.title.trim() || "Meeting notes",
       localPath:
         payload.localPath ||
         buildMeetingNotePath(
-          selectedProject?.name || "workspace",
+          selectedProject.name || "workspace",
           payload.meetingDate,
           payload.title,
         ),
@@ -193,12 +318,14 @@ export default function Home() {
       updatedAt: Date.now(),
     };
     const noteId = await createNote(normalizedPayload);
+
     await syncMeetingNoteMarkdown(
       normalizedPayload,
-      selectedProject?.name || "workspace",
+      selectedProject.name,
     ).catch(() => {
-      // Local markdown sync is best-effort when the app runs in non-persistent environments.
+      // Initial local sync is best-effort; Firebase remains the source of truth.
     });
+
     return noteId;
   }
 
@@ -223,28 +350,55 @@ export default function Home() {
     await syncMeetingNoteMarkdown(
       mergedNote,
       selectedProject?.name || "workspace",
-    ).catch(() => {
-      // Local markdown sync is best-effort when the app runs in non-persistent environments.
-    });
+    );
   }
 
-  if (!authReady) {
-    return (
-      <main className="min-h-screen px-4 py-8 md:px-6">
-        Loading CoAssembly...
-      </main>
+  async function deleteMeetingNote(id: string) {
+    const existingNote = notes.find((note) => note.id === id);
+    if (!existingNote) {
+      return;
+    }
+
+    await deleteNote(id);
+
+    if (existingNote.localPath) {
+      await deleteMeetingNoteMarkdown(existingNote.localPath).catch(() => {
+        // Firestore remains the source of truth if the local mirror cannot be removed.
+      });
+    }
+  }
+
+  function onUnlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError("");
+
+    const enteredPassword = password.trim();
+    if (enteredPassword !== SHARED_PASSWORD) {
+      setAuthError("Incorrect dashboard password.");
+      return;
+    }
+
+    void rememberPasswordCredential(
+      "dashboard@coassembly.local",
+      enteredPassword,
     );
+    grantWorkspaceAccess();
+    setPassword("");
+  }
+
+  if (!browserReady) {
+    return <main className="app-page">Loading CoAssembly...</main>;
   }
 
   if (!firebaseReady) {
     return (
-      <main className="min-h-screen px-4 py-8 md:px-6">
+      <main className="app-page">
         <Card className="mx-auto mt-16 w-full max-w-md">
           <CardHeader>
             <CardTitle>Firebase configuration needed</CardTitle>
             <CardDescription>
-              Add all NEXT_PUBLIC_FIREBASE_* variables to run CoAssembly locally
-              or on Vercel.
+              Add all `NEXT_PUBLIC_FIREBASE_*` variables to run CoAssembly
+              locally or on Vercel.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -254,7 +408,7 @@ export default function Home() {
 
   if (!isUnlocked) {
     return (
-      <main className="min-h-screen px-4 py-8 md:px-6">
+      <main className="app-page">
         <PasswordGateCard
           kicker="CoAssembly"
           title="Designer Cooperative Workspace"
@@ -272,12 +426,32 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-6 md:px-6 md:py-8">
-      <div className="mx-auto grid w-full max-w-7xl gap-6">
+    <main className="app-page">
+      <div className="app-container swiss-shell">
         <AppHeader
           kicker="CoAssembly"
           title="Shared workspace"
-          description="Personal tasks stay primary. Project to-dos and meeting notes stay focused in one secondary workspace pane."
+          description="Tasks, project to-dos, and meeting notes stay in sync through Firebase with one shared operating surface."
+          meta={
+            <>
+              <span className="swiss-tag">
+                <Radio className="h-4 w-4" />
+                Live Firestore sync
+              </span>
+              {presenceAvailable ? (
+                <ViewerPresence
+                  count={viewerCount}
+                  seeds={viewerSeeds}
+                  label="viewing workspace"
+                />
+              ) : null}
+              <span className="swiss-tag">
+                <FolderOpen className="h-4 w-4" />
+                {projects.length}{" "}
+                {projects.length === 1 ? "project" : "projects"}
+              </span>
+            </>
+          }
           actions={
             <>
               <Link
@@ -293,7 +467,6 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   revokeWorkspaceAccess();
-                  setIsUnlocked(false);
                 }}
               >
                 Log out
@@ -304,41 +477,97 @@ export default function Home() {
 
         <WorkspaceToolbar
           projects={projects}
+          selectedProject={selectedProject}
           selectedProjectId={resolvedProjectId}
           setSelectedProjectId={setSelectedProjectId}
           workspaceView={workspaceView}
           setWorkspaceView={setWorkspaceView}
         />
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.95fr)] xl:items-start">
-          <MemberTaskBoards
-            members={members}
-            projects={projects}
-            tasks={tasks}
-            onCreateTask={addTask}
-            onUpdateTask={async (id, payload) => {
-              await updateTask(id, payload);
-            }}
-            onDeleteTask={async (id) => {
-              await deleteTask(id);
-            }}
-          />
+        {selectedProject ? (
+          <div className="swiss-shell__metrics grid sm:grid-cols-2 xl:grid-cols-3">
+            <Card className="metric-card">
+              <CardContent className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="t-label">Active tasks</p>
+                  <p className="t-h2 mt-2 text-slate-950">{activeTaskCount}</p>
+                  <p className="t-b2 mt-1 text-slate-500">
+                    Across all member boards right now
+                  </p>
+                </div>
+                <div className="p-2 text-slate-700">
+                  <Users className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="metric-card">
+              <CardContent className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="t-label">Selected project</p>
+                  <p className="t-h2 mt-2 text-slate-950">
+                    {selectedProjectStaffedCount} staffed
+                  </p>
+                  <p className="t-b2 mt-1 text-slate-500">
+                    {selectedProject.clientName ||
+                      "Internal or self-run project"}
+                  </p>
+                </div>
+                <div className="p-2 text-slate-700">
+                  <FolderOpen className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="metric-card">
+              <CardContent className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="t-label">Live project details</p>
+                  <p className="t-h2 mt-2 text-slate-950">
+                    {selectedProjectHourlyRateTwd
+                      ? `${formatMoney(selectedProjectHourlyRateTwd, "TWD")}/hr`
+                      : `${projectNotes.length} notes`}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {selectedProjectHourlyRateTwd
+                      ? `${formatMoney(selectedProjectHourlyRateUsd, "USD")}/hr · ${projectCards.length} to-dos · ${projectNotes.length} meeting notes`
+                      : "Add budget and billable hours to model rate"}
+                  </p>
+                </div>
+                <div className="p-2 text-slate-700">
+                  {selectedProjectHourlyRateTwd ? (
+                    <Coins className="h-5 w-5" />
+                  ) : (
+                    <FileText className="h-5 w-5" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
-          <section className="grid gap-5 xl:sticky xl:top-6">
+        <div className="swiss-shell__main">
+          <section className="grid gap-4">
             {selectedProject ? (
               workspaceView === "project" ? (
                 <KanbanPanel
                   selectedProject={selectedProject}
                   members={members}
                   columns={KANBAN_COLUMNS}
-                  cardTitle={cardTitle}
-                  onCardTitleChange={setCardTitle}
-                  cardDescription={cardDescription}
-                  onCardDescriptionChange={setCardDescription}
-                  cardColumn={cardColumn}
-                  onCardColumnChange={setCardColumn}
-                  cardOwnerId={cardOwnerId}
-                  onCardOwnerChange={setCardOwnerId}
+                  cardTitle={currentKanbanDraft.title}
+                  onCardTitleChange={(value) =>
+                    updateKanbanDraft({ title: value })
+                  }
+                  cardDescription={currentKanbanDraft.description}
+                  onCardDescriptionChange={(value) =>
+                    updateKanbanDraft({ description: value })
+                  }
+                  cardColumn={currentKanbanDraft.column}
+                  onCardColumnChange={(value) =>
+                    updateKanbanDraft({ column: value })
+                  }
+                  cardOwnerId={currentKanbanDraft.ownerId}
+                  onCardOwnerChange={(value) =>
+                    updateKanbanDraft({ ownerId: value })
+                  }
                   projectCards={projectCards}
                   onSubmitCard={addCard}
                   onUpdateCard={(cardId, payload) => {
@@ -368,15 +597,58 @@ export default function Home() {
                   projectNotes={projectNotes}
                   onCreateNote={createMeetingNote}
                   onUpdateNote={updateMeetingNote}
+                  onDeleteNote={deleteMeetingNote}
                 />
               )
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-8 text-sm text-slate-500">
-                Add a project in Admin Control to start using the project
-                workspace.
-              </div>
+              <Card>
+                <CardHeader className="gap-3">
+                  <div className="inline-flex h-10 w-10 items-center justify-center border border-slate-300 text-slate-700">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <CardTitle>
+                    {projects.length
+                      ? "Select a project to continue"
+                      : "Add a project to start the workspace"}
+                  </CardTitle>
+                  <CardDescription>
+                    {projects.length
+                      ? "Choose a project from the toolbar above to open project to-dos or meeting notes."
+                      : "The workspace is connected to Firebase, but it needs at least one project record before project tools can be used."}
+                  </CardDescription>
+                </CardHeader>
+                <div className="flex flex-wrap gap-2 px-6 pb-6">
+                  {projects.length ? (
+                    <span className="swiss-tag">
+                      No project currently selected
+                    </span>
+                  ) : null}
+                  <Link
+                    className={cn(
+                      buttonBaseClass,
+                      "h-10 border border-slate-200 bg-white px-4 py-2 text-slate-900 hover:bg-slate-50",
+                    )}
+                    href="/admin"
+                  >
+                    Open Admin Control
+                  </Link>
+                </div>
+              </Card>
             )}
           </section>
+
+          <MemberTaskBoards
+            members={members}
+            projects={projects}
+            tasks={tasks}
+            onCreateTask={addTask}
+            onUpdateTask={async (id, payload) => {
+              await updateTask(id, payload);
+            }}
+            onDeleteTask={async (id) => {
+              await deleteTask(id);
+            }}
+          />
         </div>
       </div>
     </main>

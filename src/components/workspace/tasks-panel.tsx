@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, inputClassName } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { Member, Task } from "@/lib/types";
 
 interface TasksPanelProps {
@@ -40,10 +39,10 @@ export function TasksPanel({
   roleName,
 }: TasksPanelProps) {
   return (
-    <Card>
+    <Card className="workspace-panel-tight">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle>Shared task board</CardTitle>
-        <Label className="inline-flex items-center gap-2 font-normal">
+        <Label className="swiss-check font-normal">
           <input
             type="checkbox"
             checked={showArchived}
@@ -52,8 +51,8 @@ export function TasksPanel({
           Show archived
         </Label>
       </CardHeader>
-      <CardContent className="grid gap-4">
-        <form className="grid gap-3 md:grid-cols-4" onSubmit={onSubmitTask}>
+      <CardContent className="grid gap-3 pt-0">
+        <form className="grid gap-2.5 md:grid-cols-4" onSubmit={onSubmitTask}>
           <Input
             value={taskTitle}
             onChange={(event) => onTaskTitleChange(event.target.value)}
@@ -65,7 +64,9 @@ export function TasksPanel({
             min={0}
             step={0.5}
             value={taskEstimate}
-            onChange={(event) => onTaskEstimateChange(Number(event.target.value))}
+            onChange={(event) =>
+              onTaskEstimateChange(Number(event.target.value))
+            }
             placeholder="Hours"
           />
           <select
@@ -84,30 +85,40 @@ export function TasksPanel({
           <Button type="submit">Add task</Button>
         </form>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2.5 md:grid-cols-2">
           {Object.entries(tasksByOwner).map(([ownerId, ownerTasks]) => (
-            <Card key={ownerId} className="bg-slate-50/60">
+            <Card key={ownerId} className="workspace-panel-tight">
               <CardHeader>
                 <CardTitle className="text-base">
-                  {roleName(ownerId === "unassigned" ? undefined : ownerId, members)} board
+                  {roleName(
+                    ownerId === "unassigned" ? undefined : ownerId,
+                    members,
+                  )}{" "}
+                  board
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <ul className="grid gap-2">
                   {ownerTasks.map((task) => (
                     <li
                       key={task.id}
-                      className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white p-3"
+                      className="swiss-item-row flex items-start justify-between gap-3"
                     >
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{task.title}</p>
-                        <p className="text-xs text-slate-500">{task.estimateHours}h estimate</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {task.title}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {task.estimateHours}h estimate
+                        </p>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => onToggleArchiveTask(task.id, task.archived)}
+                        onClick={() =>
+                          onToggleArchiveTask(task.id, task.archived)
+                        }
                       >
                         {task.archived ? "Unarchive" : "Archive"}
                       </Button>
