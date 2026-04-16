@@ -7,7 +7,7 @@ import { AdminWorkspace } from "@/components/admin/admin-workspace";
 import { AppHeader } from "@/components/common/app-header";
 import { PasswordGateCard } from "@/components/common/password-gate-card";
 import { ViewerPresence } from "@/components/common/viewer-presence";
-import { Button, buttonBaseClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -35,7 +35,6 @@ import {
 } from "@/lib/firestore";
 import { Member, Project } from "@/lib/types";
 import { useViewerPresence } from "@/lib/use-viewer-presence";
-import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -83,7 +82,7 @@ export default function AdminPage() {
   if (!firebaseReady) {
     return (
       <main className="app-page">
-        <Card className="mx-auto mt-16 w-full max-w-md">
+        <Card className="auth-gate">
           <CardHeader>
             <CardTitle>Firebase configuration needed</CardTitle>
             <CardDescription>
@@ -91,14 +90,8 @@ export default function AdminPage() {
               backend.
             </CardDescription>
           </CardHeader>
-          <div className="p-6 pt-0">
-            <Link
-              className={cn(
-                buttonBaseClass,
-                "h-10 bg-slate-900 px-4 py-2 text-white hover:bg-slate-800",
-              )}
-              href="/"
-            >
+          <div className="card__actions">
+            <Link className="btn btn--primary" href="/">
               Back to workspace
             </Link>
           </div>
@@ -155,13 +148,7 @@ export default function AdminPage() {
           }
           actions={
             <>
-              <Link
-                className={cn(
-                  buttonBaseClass,
-                  "h-10 border border-slate-200 bg-white px-4 py-2 text-slate-900 hover:bg-slate-50",
-                )}
-                href="/"
-              >
+              <Link className="btn btn--outline" href="/">
                 Back to dashboard
               </Link>
               <Button

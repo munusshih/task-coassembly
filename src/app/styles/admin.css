@@ -1,0 +1,43 @@
+/* ═══ ADMIN SUMMARY GRID ══════════════════════════════════════════════════════ */
+.summary-grid {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+/* 4px colored top border — same weight as metric cards for data consistency */
+.summary-card {
+    border-top: 4px solid var(--c-border);
+    background: var(--c-bg);
+    padding: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+}
+
+.summary-card--members {
+    border-top-color: var(--c-blue);
+}
+
+.summary-card--projects {
+    border-top-color: var(--c-red);
+}
+
+.summary-card--budget {
+    border-top-color: var(--c-green);
+}
+
+.summary-card--tasks {
+    border-top-color: var(--c-amber);
+}
+
+@media (min-width: 40rem) {
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 80rem) {
+    .summary-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

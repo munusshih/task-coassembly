@@ -237,7 +237,10 @@ export function MemberTaskBoards({
       <section className="panel board">
         <div>
           <h2 className="t-h3">Task board</h2>
-          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+          <p
+            className="t-b2"
+            style={{ color: "var(--c-ink-2)", marginTop: "var(--sp-1)" }}
+          >
             Add members in Admin Control to start assigning work.
           </p>
         </div>
@@ -254,8 +257,8 @@ export function MemberTaskBoards({
           <h2 className="t-h3">Task board</h2>
         </div>
         <p className="board__hours">
-          <strong>{activeHours.toFixed(1)}h</strong>{" "}
-          active for {selectedMember.name}
+          <strong>{activeHours.toFixed(1)}h</strong> active for{" "}
+          {selectedMember.name}
         </p>
       </div>
 
@@ -302,22 +305,37 @@ export function MemberTaskBoards({
       <div className="board-metrics">
         <div className="metric metric--active">
           <p className="t-label">Active tasks</p>
-          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{activeTasks.length}</p>
-          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+          <p className="t-h3" style={{ marginTop: "var(--sp-2)" }}>
+            {activeTasks.length}
+          </p>
+          <p
+            className="t-b2"
+            style={{ color: "var(--c-ink-2)", marginTop: "var(--sp-1)" }}
+          >
             In progress for {selectedMember.name}
           </p>
         </div>
         <div className="metric metric--review">
           <p className="t-label">In review</p>
-          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{reviewTasks.length}</p>
-          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+          <p className="t-h3" style={{ marginTop: "var(--sp-2)" }}>
+            {reviewTasks.length}
+          </p>
+          <p
+            className="t-b2"
+            style={{ color: "var(--c-ink-2)", marginTop: "var(--sp-1)" }}
+          >
             Tasks waiting on a pass or follow-up
           </p>
         </div>
         <div className="metric metric--done">
           <p className="t-label">Completed</p>
-          <p className="t-h3" style={{marginTop:"var(--sp-2)"}}>{completedTasks.length}</p>
-          <p className="t-b2" style={{color:"var(--c-ink-2)",marginTop:"var(--sp-1)"}}>
+          <p className="t-h3" style={{ marginTop: "var(--sp-2)" }}>
+            {completedTasks.length}
+          </p>
+          <p
+            className="t-b2"
+            style={{ color: "var(--c-ink-2)", marginTop: "var(--sp-1)" }}
+          >
             Finished tasks kept below for reference
           </p>
         </div>
@@ -472,7 +490,10 @@ export function MemberTaskBoards({
                   variant="ghost"
                   className="btn--sq"
                   onClick={() => {
-                    void onUpdateTask(task.id, { status: "done", archived: true });
+                    void onUpdateTask(task.id, {
+                      status: "done",
+                      archived: true,
+                    });
                   }}
                 >
                   <Circle className="icon-sm" />
@@ -483,10 +504,15 @@ export function MemberTaskBoards({
                   onChange={(event) =>
                     setTaskDrafts((current) => ({
                       ...current,
-                      [task.id]: { ...current[task.id], title: event.target.value },
+                      [task.id]: {
+                        ...current[task.id],
+                        title: event.target.value,
+                      },
                     }))
                   }
-                  onBlur={() => { void commitTask(task.id); }}
+                  onBlur={() => {
+                    void commitTask(task.id);
+                  }}
                   className="task-row__title"
                 />
 
@@ -522,12 +548,18 @@ export function MemberTaskBoards({
                   <Button
                     type="button"
                     variant="ghost"
-                    className={cn("btn--sq", rowDraft.billable && "btn--billable")}
+                    className={cn(
+                      "btn--sq",
+                      rowDraft.billable && "btn--billable",
+                    )}
                     onClick={() => {
                       const nextBillable = !rowDraft.billable;
                       setTaskDrafts((current) => ({
                         ...current,
-                        [task.id]: { ...current[task.id], billable: nextBillable },
+                        [task.id]: {
+                          ...current[task.id],
+                          billable: nextBillable,
+                        },
                       }));
                       void onUpdateTask(task.id, { billable: nextBillable });
                     }}
@@ -539,7 +571,9 @@ export function MemberTaskBoards({
                     type="button"
                     variant="ghost"
                     className="btn--sq"
-                    onClick={() => setExpandedTaskId(detailsOpen ? "" : task.id)}
+                    onClick={() =>
+                      setExpandedTaskId(detailsOpen ? "" : task.id)
+                    }
                   >
                     {detailsOpen ? (
                       <ChevronDown className="icon-sm" />
@@ -560,10 +594,15 @@ export function MemberTaskBoards({
                       onChange={(event) =>
                         setTaskDrafts((current) => ({
                           ...current,
-                          [task.id]: { ...current[task.id], deadline: event.target.value },
+                          [task.id]: {
+                            ...current[task.id],
+                            deadline: event.target.value,
+                          },
                         }))
                       }
-                      onBlur={() => { void commitTask(task.id); }}
+                      onBlur={() => {
+                        void commitTask(task.id);
+                      }}
                     />
                   </div>
                   <div className="field">
@@ -574,14 +613,21 @@ export function MemberTaskBoards({
                       onChange={(event) => {
                         setTaskDrafts((current) => ({
                           ...current,
-                          [task.id]: { ...current[task.id], projectId: event.target.value },
+                          [task.id]: {
+                            ...current[task.id],
+                            projectId: event.target.value,
+                          },
                         }));
-                        void onUpdateTask(task.id, { projectId: event.target.value || undefined });
+                        void onUpdateTask(task.id, {
+                          projectId: event.target.value || undefined,
+                        });
                       }}
                     >
                       <option value="">No project</option>
                       {projects.map((project) => (
-                        <option key={project.id} value={project.id}>{project.name}</option>
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -591,12 +637,18 @@ export function MemberTaskBoards({
                       className={inputClassName}
                       value={rowDraft.workstream}
                       onChange={(event) => {
-                        const nextWorkstream = event.target.value as Task["workstream"];
+                        const nextWorkstream = event.target
+                          .value as Task["workstream"];
                         setTaskDrafts((current) => ({
                           ...current,
-                          [task.id]: { ...current[task.id], workstream: nextWorkstream },
+                          [task.id]: {
+                            ...current[task.id],
+                            workstream: nextWorkstream,
+                          },
                         }));
-                        void onUpdateTask(task.id, { workstream: nextWorkstream });
+                        void onUpdateTask(task.id, {
+                          workstream: nextWorkstream,
+                        });
                       }}
                     >
                       <option value="client">Client</option>
@@ -606,7 +658,13 @@ export function MemberTaskBoards({
                   </div>
                   <div className="field">
                     <Label>Hours</Label>
-                    <div style={{display:"flex",gap:"var(--sp-2)",alignItems:"center"}}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "var(--sp-2)",
+                        alignItems: "center",
+                      }}
+                    >
                       <Input
                         type="number"
                         min={0}
@@ -615,25 +673,36 @@ export function MemberTaskBoards({
                         onChange={(event) =>
                           setTaskDrafts((current) => ({
                             ...current,
-                            [task.id]: { ...current[task.id], estimateHours: Number(event.target.value) || 0 },
+                            [task.id]: {
+                              ...current[task.id],
+                              estimateHours: Number(event.target.value) || 0,
+                            },
                           }))
                         }
-                        onBlur={() => { void commitTask(task.id); }}
+                        onBlur={() => {
+                          void commitTask(task.id);
+                        }}
                         placeholder="Hours"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         className="btn--sq"
-                        onClick={() => { void onDeleteTask(task.id); }}
+                        onClick={() => {
+                          void onDeleteTask(task.id);
+                        }}
                       >
                         <Trash2 className="icon-sm" />
                       </Button>
                     </div>
                   </div>
                   {rowDraft.projectId ? (
-                    <p className="t-caption" style={{color:"var(--c-ink-3)"}}>
-                      Linked project: {projectNameById[rowDraft.projectId] || "Unknown project"}
+                    <p
+                      className="t-caption"
+                      style={{ color: "var(--c-ink-3)" }}
+                    >
+                      Linked project:{" "}
+                      {projectNameById[rowDraft.projectId] || "Unknown project"}
                     </p>
                   ) : null}
                 </div>
@@ -668,7 +737,10 @@ export function MemberTaskBoards({
                       variant="ghost"
                       className="btn--sq btn--billable"
                       onClick={() => {
-                        void onUpdateTask(task.id, { status: "todo", archived: false });
+                        void onUpdateTask(task.id, {
+                          status: "todo",
+                          archived: false,
+                        });
                       }}
                     >
                       <CheckCircle2 className="icon-sm" />
@@ -679,7 +751,9 @@ export function MemberTaskBoards({
                         type="button"
                         variant="ghost"
                         className="btn--sq"
-                        onClick={() => { void onDeleteTask(task.id); }}
+                        onClick={() => {
+                          void onDeleteTask(task.id);
+                        }}
                       >
                         <Trash2 className="icon-sm" />
                       </Button>

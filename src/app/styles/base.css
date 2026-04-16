@@ -2,32 +2,32 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html {
-  min-height: 100%;
+    min-height: 100%;
 }
 
 body {
-  min-height: 100vh;
-  overflow-x: hidden;
-  margin: 0;
-  background: var(--c-bg);
-  color: var(--c-ink);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: var(--t-b2);
-  /* Increased from 1.5 — better reading comfort */
-  line-height: 1.65;
-  -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+    margin: 0;
+    background: var(--c-bg);
+    color: var(--c-ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: var(--t-b2);
+    /* Increased from 1.5 — better reading comfort */
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
 }
 
 button,
 input,
 select,
 textarea {
-  min-width: 0;
-  font-family: inherit;
+    min-width: 0;
+    font-family: inherit;
 }
 
 button:not(:disabled),
@@ -35,16 +35,16 @@ button:not(:disabled),
 a[href],
 summary,
 select:not(:disabled) {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 button:disabled,
 select:disabled,
 [aria-disabled="true"] {
-  cursor: not-allowed;
+    cursor: not-allowed;
 }
 
 :where(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--c-blue);
-  outline-offset: 2px;
+    outline: 2px solid var(--c-blue);
+    outline-offset: 2px;
 }

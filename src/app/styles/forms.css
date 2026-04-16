@@ -1,47 +1,47 @@
 /* ═══ INPUT ═══════════════════════════════════════════════════════════════════ */
 .input {
-  display: flex;
-  height: 2.75rem;
-  width: 100%;
-  padding: 0 var(--sp-3);
-  font-size: var(--t-b2);
-  font-family: inherit;
-  color: var(--c-ink);
-  background: var(--c-bg);
-  border: 1px solid var(--c-border);
-  transition: border-color 120ms, box-shadow 120ms;
-  appearance: none;
+    display: flex;
+    height: 2.75rem;
+    width: 100%;
+    padding: 0 var(--sp-3);
+    font-size: var(--t-b2);
+    font-family: inherit;
+    color: var(--c-ink);
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    transition: border-color 120ms, box-shadow 120ms;
+    appearance: none;
 }
 
 .input::placeholder {
-  color: var(--c-ink-3);
+    color: var(--c-ink-3);
 }
 
 .input:focus-visible {
-  outline: none;
-  border-color: var(--c-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-blue) 15%, transparent);
+    outline: none;
+    border-color: var(--c-blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-blue) 15%, transparent);
 }
 
 .input:disabled {
-  cursor: default;
-  border-color: transparent;
-  background: transparent;
-  padding-left: 0;
-  opacity: 1;
+    cursor: default;
+    border-color: transparent;
+    background: transparent;
+    padding-left: 0;
+    opacity: 1;
 }
 
 /* ═══ LABEL ═══════════════════════════════════════════════════════════════════ */
 .label {
-  display: block;
-  font-size: var(--t-caption);
-  font-weight: 500;
-  color: var(--c-ink-2);
-  line-height: 1.4;
+    display: block;
+    font-size: var(--t-caption);
+    font-weight: 500;
+    color: var(--c-ink-2);
+    line-height: 1.4;
 }
 
 /* ═══ FIELD ═══════════════════════════════════════════════════════════════════ */
 .field {
-  display: grid;
-  gap: var(--sp-2);
+    display: grid;
+    gap: var(--sp-2);
 }

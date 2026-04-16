@@ -19,7 +19,7 @@ import {
 import { AppHeader } from "@/components/common/app-header";
 import { PasswordGateCard } from "@/components/common/password-gate-card";
 import { ViewerPresence } from "@/components/common/viewer-presence";
-import { Button, buttonBaseClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -393,7 +393,7 @@ export default function Home() {
   if (!firebaseReady) {
     return (
       <main className="app-page">
-        <Card className="mx-auto mt-16 w-full max-w-md">
+        <Card className="auth-gate">
           <CardHeader>
             <CardTitle>Firebase configuration needed</CardTitle>
             <CardDescription>
@@ -435,7 +435,7 @@ export default function Home() {
           meta={
             <>
               <span className="swiss-tag">
-                <Radio className="h-4 w-4" />
+                <Radio className="icon-xs" />
                 Live Firestore sync
               </span>
               {presenceAvailable ? (
@@ -446,7 +446,7 @@ export default function Home() {
                 />
               ) : null}
               <span className="swiss-tag">
-                <FolderOpen className="h-4 w-4" />
+                <FolderOpen className="icon-xs" />
                 {projects.length}{" "}
                 {projects.length === 1 ? "project" : "projects"}
               </span>
@@ -454,13 +454,7 @@ export default function Home() {
           }
           actions={
             <>
-              <Link
-                className={cn(
-                  buttonBaseClass,
-                  "h-10 border border-slate-200 bg-white px-4 py-2 text-slate-900 hover:bg-slate-50",
-                )}
-                href="/admin"
-              >
+              <Link className="btn btn--outline" href="/admin">
                 Admin Control
               </Link>
               <Button
@@ -485,58 +479,58 @@ export default function Home() {
         />
 
         {selectedProject ? (
-          <div className="swiss-shell__metrics grid sm:grid-cols-2 xl:grid-cols-3">
+          <div className="ws-metrics">
             <Card className="metric-card">
-              <CardContent className="flex items-start justify-between gap-4">
+              <CardContent className="card__content--row">
                 <div>
                   <p className="t-label">Active tasks</p>
-                  <p className="t-h2 mt-2 text-slate-950">{activeTaskCount}</p>
-                  <p className="t-b2 mt-1 text-slate-500">
+                  <p className="metric__value">{activeTaskCount}</p>
+                  <p className="metric__desc">
                     Across all member boards right now
                   </p>
                 </div>
-                <div className="p-2 text-slate-700">
-                  <Users className="h-5 w-5" />
+                <div className="card__icon">
+                  <Users className="icon-sm" />
                 </div>
               </CardContent>
             </Card>
             <Card className="metric-card">
-              <CardContent className="flex items-start justify-between gap-4">
+              <CardContent className="card__content--row">
                 <div>
                   <p className="t-label">Selected project</p>
-                  <p className="t-h2 mt-2 text-slate-950">
+                  <p className="metric__value">
                     {selectedProjectStaffedCount} staffed
                   </p>
-                  <p className="t-b2 mt-1 text-slate-500">
+                  <p className="metric__desc">
                     {selectedProject.clientName ||
                       "Internal or self-run project"}
                   </p>
                 </div>
-                <div className="p-2 text-slate-700">
-                  <FolderOpen className="h-5 w-5" />
+                <div className="card__icon">
+                  <FolderOpen className="icon-sm" />
                 </div>
               </CardContent>
             </Card>
             <Card className="metric-card">
-              <CardContent className="flex items-start justify-between gap-4">
+              <CardContent className="card__content--row">
                 <div>
                   <p className="t-label">Live project details</p>
-                  <p className="t-h2 mt-2 text-slate-950">
+                  <p className="metric__value">
                     {selectedProjectHourlyRateTwd
                       ? `${formatMoney(selectedProjectHourlyRateTwd, "TWD")}/hr`
                       : `${projectNotes.length} notes`}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="metric__desc">
                     {selectedProjectHourlyRateTwd
                       ? `${formatMoney(selectedProjectHourlyRateUsd, "USD")}/hr · ${projectCards.length} to-dos · ${projectNotes.length} meeting notes`
                       : "Add budget and billable hours to model rate"}
                   </p>
                 </div>
-                <div className="p-2 text-slate-700">
+                <div className="card__icon">
                   {selectedProjectHourlyRateTwd ? (
-                    <Coins className="h-5 w-5" />
+                    <Coins className="icon-sm" />
                   ) : (
-                    <FileText className="h-5 w-5" />
+                    <FileText className="icon-sm" />
                   )}
                 </div>
               </CardContent>
@@ -544,8 +538,8 @@ export default function Home() {
           </div>
         ) : null}
 
-        <div className="swiss-shell__main">
-          <section className="grid gap-4">
+        <div className="ws-main">
+          <section>
             {selectedProject ? (
               workspaceView === "project" ? (
                 <KanbanPanel
@@ -602,9 +596,9 @@ export default function Home() {
               )
             ) : (
               <Card>
-                <CardHeader className="gap-3">
-                  <div className="inline-flex h-10 w-10 items-center justify-center border border-slate-300 text-slate-700">
-                    <Activity className="h-5 w-5" />
+                <CardHeader>
+                  <div className="card__icon-block">
+                    <Activity className="icon-sm" />
                   </div>
                   <CardTitle>
                     {projects.length
@@ -617,19 +611,13 @@ export default function Home() {
                       : "The workspace is connected to Firebase, but it needs at least one project record before project tools can be used."}
                   </CardDescription>
                 </CardHeader>
-                <div className="flex flex-wrap gap-2 px-6 pb-6">
+                <div className="card__actions">
                   {projects.length ? (
                     <span className="swiss-tag">
                       No project currently selected
                     </span>
                   ) : null}
-                  <Link
-                    className={cn(
-                      buttonBaseClass,
-                      "h-10 border border-slate-200 bg-white px-4 py-2 text-slate-900 hover:bg-slate-50",
-                    )}
-                    href="/admin"
-                  >
+                  <Link className="btn btn--outline" href="/admin">
                     Open Admin Control
                   </Link>
                 </div>

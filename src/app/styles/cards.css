@@ -2,71 +2,71 @@
    3px border — heavier than before for stronger structural presence.
    ════════════════════════════════════════════════════════════════════════════ */
 .card {
-  background: var(--c-bg);
-  border-top: 3px solid var(--c-border);
-  color: var(--c-ink);
+    background: var(--c-bg);
+    border-top: 3px solid var(--c-border);
+    color: var(--c-ink);
 }
 
 .card__header {
-  padding: var(--sp-5) var(--sp-4) var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
 }
 
 .card__title {
-  font-size: var(--t-h3);
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--c-ink);
+    font-size: var(--t-h3);
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--c-ink);
 }
 
 .card__desc {
-  font-size: var(--t-b2);
-  color: var(--c-ink-2);
-  line-height: 1.6;
+    font-size: var(--t-b2);
+    color: var(--c-ink-2);
+    line-height: 1.6;
 }
 
 .card__content {
-  padding: var(--sp-4);
+    padding: var(--sp-4);
 }
 
 /* Row variant: icon on right side (used inside metric cards) */
 .card__content--row {
-  padding: var(--sp-5) var(--sp-4);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-4);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--sp-4);
 }
 
 /* Icon container: muted, fixed-size, no background clutter */
 .card__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--sp-2);
-  color: var(--c-ink-3);
-  flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-2);
+    color: var(--c-ink-3);
+    flex-shrink: 0;
 }
 
 .card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  padding: 0 var(--sp-4) var(--sp-5);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-4) var(--sp-5);
 }
 
 /* Icon block: square with border — uses the card grid concept */
 .card__icon-block {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--c-border);
-  color: var(--c-ink-2);
-  flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--c-border);
+    color: var(--c-ink-2);
+    flex-shrink: 0;
 }
 
 /* ═══ METRIC ══════════════════════════════════════════════════════════════════
@@ -74,34 +74,51 @@
    to its semantic category. Numbers are large — they are the content.
    ════════════════════════════════════════════════════════════════════════════ */
 .metric {
-  background: var(--c-bg);
-  border-top: 4px solid var(--c-border);
-  padding: var(--sp-5) var(--sp-4);
+    background: var(--c-bg);
+    border-top: 4px solid var(--c-border);
+    padding: var(--sp-5) var(--sp-4);
 }
 
-.metric--tasks   { border-top-color: var(--c-blue);  }
-.metric--project { border-top-color: var(--c-red);   }
-.metric--finance { border-top-color: var(--c-green); }
-.metric--active  { border-top-color: var(--c-blue);  }
-.metric--review  { border-top-color: var(--c-amber); }
-.metric--done    { border-top-color: var(--c-green); }
+.metric--tasks {
+    border-top-color: var(--c-blue);
+}
+
+.metric--project {
+    border-top-color: var(--c-red);
+}
+
+.metric--finance {
+    border-top-color: var(--c-green);
+}
+
+.metric--active {
+    border-top-color: var(--c-blue);
+}
+
+.metric--review {
+    border-top-color: var(--c-amber);
+}
+
+.metric--done {
+    border-top-color: var(--c-green);
+}
 
 /* Large numeric display — the primary signal in a metric card */
 .metric__value {
-  font-size: clamp(1.875rem, 3.5vw, 2.625rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -.025em;
-  color: var(--c-ink);
-  margin-top: var(--sp-3);
+    font-size: clamp(1.875rem, 3.5vw, 2.625rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.025em;
+    color: var(--c-ink);
+    margin-top: var(--sp-3);
 }
 
 /* Supporting label — muted, readable, visually subordinate to value */
 .metric__desc {
-  font-size: var(--t-b2);
-  color: var(--c-ink-2);
-  line-height: 1.55;
-  margin-top: var(--sp-2);
+    font-size: var(--t-b2);
+    color: var(--c-ink-2);
+    line-height: 1.55;
+    margin-top: var(--sp-2);
 }
 
 /* ═══ WS METRICS GRID ═════════════════════════════════════════════════════════
@@ -109,20 +126,20 @@
    Tight gap creates a table-like density rather than a card carousel.
    ════════════════════════════════════════════════════════════════════════════ */
 .ws-metrics {
-  display: grid;
-  gap: var(--sp-3);
-  background: var(--c-surface);
-  padding: var(--sp-4);
+    display: grid;
+    gap: var(--sp-3);
+    background: var(--c-surface);
+    padding: var(--sp-4);
 }
 
 @media (min-width: 40rem) {
-  .ws-metrics {
-    grid-template-columns: repeat(2, 1fr);
-  }
+    .ws-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 @media (min-width: 80rem) {
-  .ws-metrics {
-    grid-template-columns: repeat(3, 1fr);
-  }
+    .ws-metrics {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
