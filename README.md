@@ -42,6 +42,26 @@ npm run dev
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
+## Dashboard password gate
+
+The app now requires login before entering the dashboard.
+
+- Default password: `solidarity`
+- Login route: `/login`
+- Session uses a signed, `HttpOnly` cookie.
+
+Recommended env vars:
+
+- `DASHBOARD_PASSWORD` (override default password)
+- `AUTH_COOKIE_SECRET` (required in production; long random string)
+
+Example:
+
+```bash
+DASHBOARD_PASSWORD=solidarity
+AUTH_COOKIE_SECRET=your-long-random-secret
+```
+
 ## Notes
 
 - The page currently shows these collections by default:

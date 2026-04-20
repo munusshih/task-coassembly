@@ -45,6 +45,7 @@ const STAFFING_ROLES = [
 ];
 
 const USD_TO_TWD = 32;
+const DONATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 const EMPTY_FORM = {
   name: "",
@@ -52,6 +53,7 @@ const EMPTY_FORM = {
   status: "",
   budget: "",
   budgetCurrency: "TWD",
+  donationPercent: "20",
   maxHours: "",
   startDate: "",
   // stagePlans: [{id, name, weeks, perspectiveHours, delayWeeks, order}]
@@ -76,6 +78,12 @@ function fmtTWD(amount) {
 function fmtUSD(amount) {
   if (amount == null) return null;
   return "$" + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(amount);
+}
+
+function donationAmount(amountTWD, donationPercent) {
+  if (amountTWD == null) return null;
+  const pct = Number(donationPercent) || 0;
+  return Math.round((amountTWD * pct) / 100);
 }
 
 function fmtH(h) {
@@ -338,6 +346,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     status:         d.status         || "",
     budget:         d.budget != null ? String(d.budget) : "",
     budgetCurrency: d.budgetCurrency || "TWD",
+    donationPercent: d.donationPercent != null ? String(d.donationPercent) : "20",
     maxHours:       d.maxHours != null ? String(d.maxHours) : "",
     startDate:      d.startDate      || "",
     stagePlans:     normalizeStagePlans(d.stagePlans),
@@ -378,6 +387,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       status:         form.status         || null,
       budget:         form.budget         ? Number(form.budget) : null,
       budgetCurrency: form.budgetCurrency,
+      donationPercent: Number(form.donationPercent) || 0,
       maxHours:       form.maxHours       ? Number(form.maxHours) : null,
       startDate:      form.startDate      || null,
       stagePlans,
@@ -390,14 +400,19 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   const hours     = assignedHours(allTasks, project.id);
   const maxH      = d.maxHours ? Number(d.maxHours) : null;
   const budgTWD   = budgetToTWD(d.budget, d.budgetCurrency);
-  const hourly    = (budgTWD && maxH) ? Math.round(budgTWD / maxH) : null;
+  const donationPct = Number(d.donationPercent) || 0;
+  const donationTWD = donationAmount(budgTWD, donationPct);
+  const effectiveBudgetTWD = budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
+  const hourly    = (effectiveBudgetTWD != null && maxH && maxH > 0)
+    ? Math.round(effectiveBudgetTWD / maxH)
+    : null;
   const remainingHours = maxH != null ? Math.max(0, maxH - hours) : null;
   const twks      = totalWeeks(d.stagePlans);
   const statusSt  = d.status ? (STATUS_STYLE[d.status] || {}) : {};
   const stagePlannedHours = Array.isArray(d.stagePlans)
     ? d.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0)
     : 0;
-  const stageAssignableLeft = maxH != null ? Math.max(0, maxH - hours) : null;
+  const stageAssignableLeft = maxH != null ? maxH - stagePlannedHours : null;
 
   // Resolve staffing entries to member objects
   const staffingResolved = useMemo(() => {
@@ -427,21 +442,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     return d.staffing.reduce((s, entry) => s + assignedHoursForMember(allTasks, project.id, entry.memberId), 0);
   }, [d.staffing, allTasks, project.id]);
 
-  const stagePreview = sortedStagePlans
-    .map((sp) => sp.name)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" · ");
-
-  const teamPreview = staffingResolved
-    .map((s) => s.member?.data?.name || s.memberId)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(", ");
-
   if (editing) {
     const formStagePlannedHours = form.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0);
-    const formStageAssignableLeft = form.maxHours ? Math.max(0, Number(form.maxHours) - hours) : null;
+    const formStageAssignableLeft = form.maxHours ? Number(form.maxHours) - formStagePlannedHours : null;
     const formStaffingHours = form.staffing.reduce((s, entry) => s + (Number(entry.maxHours) || 0), 0);
     const formStaffingUnassigned = form.maxHours ? Math.max(0, Number(form.maxHours) - formStaffingHours) : null;
 
@@ -508,6 +511,18 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               </div>
             </div>
             <label className="edit-field-group">
+              <span className="edit-field-label">Donation %</span>
+              <select
+                className="project-field"
+                value={form.donationPercent}
+                onChange={(e) => setField("donationPercent", e.target.value)}
+              >
+                {DONATION_OPTIONS.map((pct) => (
+                  <option key={pct} value={pct}>{pct}%</option>
+                ))}
+              </select>
+            </label>
+            <label className="edit-field-group">
               <span className="edit-field-label">Max billable hours</span>
               <input
                 className="project-field"
@@ -526,7 +541,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             <summary className="edit-disclosure-summary">
               <span className="project-edit-label">Stage plan</span>
               <span className="project-edit-metric">
-                Estimate: {fmtH(formStagePlannedHours)} · Left to assign: {formStageAssignableLeft != null ? fmtH(formStageAssignableLeft) : "Set max hours"}
+                Equation: {form.maxHours ? `${fmtH(Number(form.maxHours) || 0)} - ${fmtH(formStagePlannedHours)} = ${fmtH(formStageAssignableLeft)}` : "Set max hours"}
               </span>
             </summary>
             <div className="edit-disclosure-body">
@@ -593,6 +608,10 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           {budgTWD != null ? (
             <>
               <span className="project-row-budget-twd">{fmtTWD(budgTWD)}</span>
+              <span className="project-row-budget-orig">
+                Donation {donationPct}%
+                {donationTWD != null ? ` · ${fmtTWD(donationTWD)}` : ""}
+              </span>
               {d.budgetCurrency === "USD" && d.budget && (
                 <span className="project-row-budget-orig">{fmtUSD(d.budget)} USD</span>
               )}
@@ -627,7 +646,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           <div className="condensed-phase-meta">
             {d.status && <span className="condensed-status" style={{ background: statusSt.bg, color: statusSt.color }}>{d.status}</span>}
             <span className="condensed-value condensed-value--highlight">
-              {stageAssignableLeft != null ? `${fmtH(stageAssignableLeft)} left` : "Set max hours"}
+              {remainingHours != null ? `${fmtH(remainingHours)} task hours left` : "Set max hours"}
             </span>
           </div>
         </div>
@@ -642,54 +661,75 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         )}
 
         <div className="condensed-chip-row">
-          <span className="condensed-chip"><strong>Stages</strong> {stagePreview || "Not set"}{sortedStagePlans.length > 3 ? ` +${sortedStagePlans.length - 3}` : ""}</span>
-          <span className="condensed-chip"><strong>Team</strong> {teamPreview || "Unassigned"}{staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}</span>
-          {remainingHours != null && <span className="condensed-chip condensed-chip--warn"><strong>Unassigned</strong> {fmtH(remainingHours)}</span>}
+          <span className="condensed-chip"><strong>Stages</strong> {sortedStagePlans.length || 0}</span>
+          <span className="condensed-chip"><strong>Team</strong> {staffingResolved.length || 0}</span>
+          {stageAssignableLeft != null && (
+            <span className="condensed-chip condensed-chip--warn"><strong>Stage plan left</strong> {fmtH(Math.max(0, stageAssignableLeft))}</span>
+          )}
         </div>
       </div>
 
       {/* Expanded detail panel */}
       {open && (
         <div className="project-detail">
-          {/* ── Stats bar ── */}
-          <div className="detail-stats">
-            {d.startDate && (
-              <div className="detail-stat">
-                <span className="detail-stat-label">Start</span>
-                <span className="detail-stat-val">{fmtDate(d.startDate)}</span>
-              </div>
-            )}
-            {twks > 0 && (
-              <div className="detail-stat">
-                <span className="detail-stat-label">Duration</span>
-                <span className="detail-stat-val">{twks} wk{twks !== 1 ? "s" : ""}</span>
-                {d.startDate && <span className="detail-stat-sub">ends ~{addWeeks(d.startDate, twks)}</span>}
-              </div>
-            )}
-            {maxH && (
-              <div className="detail-stat">
-                <span className="detail-stat-label">Max hours</span>
-                <span className="detail-stat-val">{fmtH(maxH)}</span>
-              </div>
-            )}
-            {remainingHours != null && (
-              <div className="detail-stat">
-                <span className="detail-stat-label">Unassigned work</span>
-                <span className="detail-stat-val">{fmtH(remainingHours)}</span>
-              </div>
-            )}
-            {hourly != null && (
-              <div className="detail-stat">
-                <span className="detail-stat-label">Rate</span>
-                <span className="detail-stat-val">{fmtTWD(hourly)}/h</span>
-              </div>
-            )}
-            <div className="detail-stat">
-              <span className="detail-stat-label">Hours left to assign</span>
-              <span className="detail-stat-val">{stageAssignableLeft != null ? fmtH(stageAssignableLeft) : "Set max hours"}</span>
-              <span className="detail-stat-sub">{maxH != null ? `${fmtH(maxH)} max vs ${fmtH(hours)} assigned` : `${fmtH(stagePlannedHours)} stage estimate`}</span>
+          <div className="detail-kpi-grid">
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Task assigned</span>
+              <span className="detail-kpi-value">{fmtH(hours)}</span>
+              {maxH != null && <span className="detail-kpi-sub">of {fmtH(maxH)}</span>}
+            </div>
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Company donation</span>
+              <span className="detail-kpi-value">{donationPct}%</span>
+              <span className="detail-kpi-sub">{donationTWD != null ? fmtTWD(donationTWD) : "—"}</span>
+            </div>
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Task hours left</span>
+              <span className="detail-kpi-value">{remainingHours != null ? fmtH(remainingHours) : "—"}</span>
+              <span className="detail-kpi-sub">max − assigned tasks</span>
+            </div>
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Stage planned</span>
+              <span className="detail-kpi-value">{fmtH(stagePlannedHours)}</span>
+              <span className="detail-kpi-sub">{stageAssignableLeft != null ? `${fmtH(Math.max(0, stageAssignableLeft))} left` : "set max hours"}</span>
+            </div>
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Team capacity</span>
+              <span className="detail-kpi-value">{fmtH(teamMaxHours)}</span>
+              <span className="detail-kpi-sub">{unassignedTeamHours != null ? `${fmtH(unassignedTeamHours)} unassigned` : ""}</span>
+            </div>
+            <div className="detail-kpi-card">
+              <span className="detail-kpi-label">Budget after donation</span>
+              <span className="detail-kpi-value">{effectiveBudgetTWD != null ? fmtTWD(effectiveBudgetTWD) : "—"}</span>
+              <span className="detail-kpi-sub">used for hourly estimate</span>
             </div>
           </div>
+
+          {maxH != null && (
+            <div className="detail-allocation-bars">
+              <div className="allocation-row">
+                <span className="allocation-label">Tasks</span>
+                <div className="allocation-track">
+                  <div className="allocation-fill allocation-fill--tasks" style={{ width: `${Math.max(0, Math.min(100, Math.round((hours / Math.max(1, maxH)) * 100)))}%` }} />
+                </div>
+                <span className="allocation-value">{fmtH(hours)}</span>
+              </div>
+              <div className="allocation-row">
+                <span className="allocation-label">Stage plan</span>
+                <div className="allocation-track">
+                  <div className="allocation-fill allocation-fill--stage" style={{ width: `${Math.max(0, Math.min(100, Math.round((stagePlannedHours / Math.max(1, maxH)) * 100)))}%` }} />
+                </div>
+                <span className="allocation-value">{fmtH(stagePlannedHours)}</span>
+              </div>
+              <div className="allocation-row">
+                <span className="allocation-label">Team cap</span>
+                <div className="allocation-track">
+                  <div className="allocation-fill allocation-fill--team" style={{ width: `${Math.max(0, Math.min(100, Math.round((teamMaxHours / Math.max(1, maxH)) * 100)))}%` }} />
+                </div>
+                <span className="allocation-value">{fmtH(teamMaxHours)}</span>
+              </div>
+            </div>
+          )}
 
           {/* ── Stage timeline ── */}
           {sortedStagePlans.length > 0 && (
@@ -808,6 +848,7 @@ export default function ProjectsPage() {
         status:         form.status         || null,
         budget:         form.budget         ? Number(form.budget) : null,
         budgetCurrency: form.budgetCurrency,
+        donationPercent: Number(form.donationPercent) || 0,
         maxHours:       form.maxHours       ? Number(form.maxHours) : null,
         startDate:      form.startDate      || null,
         stagePlans:     [],
@@ -847,13 +888,37 @@ export default function ProjectsPage() {
     [projects]
   );
 
+  const totalCompanyPoolTWD = useMemo(() =>
+    projects.reduce((s, p) => {
+      const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
+      return s + (donationAmount(budget, p.data.donationPercent) || 0);
+    }, 0),
+    [projects]
+  );
+
+  const totalMemberDistributableTWD = useMemo(() =>
+    projects.reduce((s, p) => {
+      const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
+      const donation = donationAmount(budget, p.data.donationPercent) || 0;
+      if (budget == null) return s;
+      return s + Math.max(0, budget - donation);
+    }, 0),
+    [projects]
+  );
+
   return (
     <div className="projects-page">
       <div className="members-header">
         <h2 className="section-title">Projects</h2>
         <p className="section-subtitle">
           {projects.length} project{projects.length !== 1 ? "s" : ""}
-          {totalBudgetTWD > 0 && <> &middot; NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalBudgetTWD)} total</>}
+          {totalBudgetTWD > 0 && (
+            <>
+              {" "}&middot; NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalBudgetTWD)} total
+              {" "}&middot; Pool NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalCompanyPoolTWD)}
+              {" "}&middot; Member budget NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalMemberDistributableTWD)}
+            </>
+          )}
         </p>
       </div>
 
@@ -889,6 +954,16 @@ export default function ProjectsPage() {
             <option value="USD">USD</option>
           </select>
         </div>
+        <select
+          className="project-field project-field--donation"
+          value={form.donationPercent}
+          onChange={(e) => setField("donationPercent", e.target.value)}
+          title="Company donation percentage"
+        >
+          {DONATION_OPTIONS.map((pct) => (
+            <option key={pct} value={pct}>{pct}% donation</option>
+          ))}
+        </select>
         <button type="submit" className="btn btn--primary" disabled={saving || !form.name.trim()}>
           Add project
         </button>

@@ -13,14 +13,7 @@ import { firebaseReady } from "../../firebase";
 
 const TODO_TYPE = "memberTodo";
 
-const TIME_OPTIONS = [
-  { units: 1,  label: "15m" },  { units: 2,  label: "30m" },
-  { units: 3,  label: "45m" },  { units: 4,  label: "1h" },
-  { units: 6,  label: "1h 30m" }, { units: 8,  label: "2h" },
-  { units: 12, label: "3h" },   { units: 16, label: "4h" },
-  { units: 20, label: "5h" },   { units: 24, label: "6h" },
-  { units: 32, label: "8h" },
-];
+const UNIT_OPTIONS = Array.from({ length: 40 }, (_, i) => i + 1);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
 
@@ -30,6 +23,20 @@ function formatTimeUnits(units) {
   const h = Math.floor(m / 60);
   const rem = m % 60;
   return h === 0 ? `${rem}m` : rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+}
+
+function formatUnitOption(units) {
+  return `${units} unit${units !== 1 ? "s" : ""} · ${formatTimeUnits(units)}`;
+}
+
+function formatHourAmount(hours) {
+  if (hours == null) return "—";
+  const totalMinutes = Math.max(0, Math.round(hours * 60));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 function formatDeadline(dateStr) {
@@ -120,12 +127,15 @@ function sortTodos(items) {
 
 // ─── TaskItem ─────────────────────────────────────────────────────────────────────────────────
 
-function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditChange, onEditSave, onEditCancel, onToggle, onDelete, onFieldChange, onOvertimeSave }) {
+function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditChange, onEditSave, onEditCancel, onToggle, onDelete, onFieldChange, onOvertimeSave, getProjectRemaining }) {
   const isEditing = editingId === todo.id;
   const [showOT, setShowOT] = useState(false);
   const [otUnits, setOtUnits] = useState("");
   const { completed, timeUnits, projectId, deadline, title, overtimeUnits } = todo.data;
   const projectName = projects.find((p) => p.id === projectId)?.data?.name;
+  const remainingHint = projectId
+    ? getProjectRemaining?.(todo.data.memberId, projectId, todo.id)
+    : null;
 
   function handleCheck(checked) {
     onToggle(todo, checked);
@@ -167,9 +177,9 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
               value={timeUnits ?? ""}
               onChange={(e) => onFieldChange(todo, "timeUnits", e.target.value ? Number(e.target.value) : null)}
             >
-              <option value="">time</option>
-              {TIME_OPTIONS.map((o) => (
-                <option key={o.units} value={o.units}>{o.label}</option>
+              <option value="">units</option>
+              {UNIT_OPTIONS.map((units) => (
+                <option key={units} value={units}>{formatUnitOption(units)}</option>
               ))}
             </select>
             <select
@@ -182,6 +192,7 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
                 <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
               ))}
             </select>
+            {remainingHint ? <span className="meta-helper-chip">{remainingHint}</span> : null}
             <input
               type="date"
               className="meta-date"
@@ -236,8 +247,8 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
             autoFocus
           >
             <option value="">none</option>
-            {TIME_OPTIONS.map((o) => (
-              <option key={o.units} value={o.units}>{o.label}</option>
+            {UNIT_OPTIONS.map((units) => (
+              <option key={units} value={units}>{formatUnitOption(units)}</option>
             ))}
           </select>
           <button type="button" className="btn btn--primary btn--small" onClick={submitOT}>Save</button>
@@ -344,7 +355,7 @@ function ArchiveSection({ archivedTodos, projects }) {
 
 // ─── MemberCard ───────────────────────────────────────────────────────────────────────────────
 
-function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, onDelete, onFieldChange, onArchiveAll, onOvertimeSave, selectedWeek }) {
+function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, onDelete, onFieldChange, onArchiveAll, onOvertimeSave, onProjectRemaining, selectedWeek }) {
   const [addActive,   setAddActive]   = useState(false);
   const [addTitle,    setAddTitle]    = useState("");
   const [addTime,     setAddTime]     = useState("");
@@ -372,6 +383,9 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
   const snapshotMin = snapshotTodos.reduce(
     (s, t) => s + ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) * 15, 0
   );
+  const addRemainingHint = addProject
+    ? onProjectRemaining?.(member.id, addProject, null)
+    : null;
 
   const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(todos));
 
@@ -441,6 +455,7 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                 onDelete={onDelete}
                 onFieldChange={onFieldChange}
                 onOvertimeSave={onOvertimeSave}
+                getProjectRemaining={onProjectRemaining}
               />
             ))}
           </ul>
@@ -476,9 +491,9 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                 <span />
                 <div className="notepad-add-fields">
                   <select className="meta-select" value={addTime} onChange={(e) => setAddTime(e.target.value)}>
-                    <option value="">time</option>
-                    {TIME_OPTIONS.map((o) => (
-                      <option key={o.units} value={o.units}>{o.label}</option>
+                    <option value="">units</option>
+                    {UNIT_OPTIONS.map((units) => (
+                      <option key={units} value={units}>{formatUnitOption(units)}</option>
                     ))}
                   </select>
                   <select className="meta-select" value={addProject} onChange={(e) => setAddProject(e.target.value)}>
@@ -487,6 +502,7 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                       <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
                     ))}
                   </select>
+                  {addRemainingHint ? <span className="meta-helper-chip">{addRemainingHint}</span> : null}
                   <input
                     type="date"
                     className="meta-date"
@@ -649,6 +665,26 @@ export default function MembersPage() {
     } catch (e) { addToast(e.message || "Could not archive", true); }
   }
 
+  function projectRemainingHint(memberId, projectId, excludeTaskId = null) {
+    if (!projectId || !memberId) return null;
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || !Array.isArray(project.data?.staffing)) return null;
+
+    const memberStaffing = project.data.staffing.find((s) => s.memberId === memberId);
+    if (!memberStaffing) return "Not assigned in this project's staffing";
+
+    const capacityHours = Number(memberStaffing.maxHours) || 0;
+    const assignedHours = allTasks
+      .filter((t) => t.id !== excludeTaskId)
+      .filter((t) => !t.data.archived)
+      .filter((t) => t.data.memberId === memberId)
+      .filter((t) => t.data.projectId === projectId)
+      .reduce((sum, t) => sum + (Number(t.data.timeUnits) || 0) * 0.25, 0);
+
+    const remaining = Math.max(0, capacityHours - assignedHours);
+    return `Project remaining: ${formatHourAmount(remaining)} of ${formatHourAmount(capacityHours)}`;
+  }
+
   return (
     <div className="members-page">
       <div className="members-week-bar">
@@ -688,6 +724,7 @@ export default function MembersPage() {
             onFieldChange={handleFieldChange}
             onArchiveAll={handleArchiveAll}
             onOvertimeSave={handleOvertimeSave}
+            onProjectRemaining={projectRemainingHint}
             selectedWeek={selectedWeek}
           />
         ))}
