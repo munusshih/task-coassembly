@@ -42,25 +42,38 @@ npm run dev
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
-## Dashboard password gate
+## Dashboard login
 
 The app now requires login before entering the dashboard.
 
-- Default password: `solidarity`
 - Login route: `/login`
 - Session uses a signed, `HttpOnly` cookie.
+- Passwords are verified using PBKDF2-SHA256 hashes from env vars (not plaintext in code).
 
 Recommended env vars:
 
-- `DASHBOARD_PASSWORD` (override default password)
 - `AUTH_COOKIE_SECRET` (required in production; long random string)
+- `DASHBOARD_ACCOUNTS_JSON` (JSON object of `username -> pbkdf2 hash record`)
 
-Example:
+Generate account hashes:
 
 ```bash
-DASHBOARD_PASSWORD=solidarity
-AUTH_COOKIE_SECRET=your-long-random-secret
+npm run auth:hash -- munus:solidarity mor:solidarity tzu:solidarity
 ```
+
+The command prints:
+- Raw JSON for Vercel env vars
+- Escaped `DASHBOARD_ACCOUNTS_JSON='...'` for local `.env.local` (important: `$` must be escaped locally)
+
+Add both vars:
+
+```bash
+AUTH_COOKIE_SECRET=your-long-random-secret
+DASHBOARD_ACCOUNTS_JSON='{\"munus\":\"pbkdf2_sha256$...\",\"mor\":\"pbkdf2_sha256$...\",\"tzu\":\"pbkdf2_sha256$...\"}'
+```
+
+For Vercel deployment, set these in Project Settings -> Environment Variables.
+They remain server-side only (do not use `NEXT_PUBLIC_` prefix).
 
 ## Notes
 

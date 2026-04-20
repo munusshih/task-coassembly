@@ -3,7 +3,8 @@ import {
   COOKIE_NAME,
   createAuthCookieValue,
   getAuthCookieOptions,
-  validatePassword,
+  normalizeUsername,
+  validateCredentials,
 } from "../../../../lib/auth";
 
 function sanitizeNextPath(nextParam) {
@@ -15,12 +16,12 @@ function sanitizeNextPath(nextParam) {
 
 export async function POST(req) {
   const formData = await req.formData();
-  const username = String(formData.get("username") || "");
+  const username = normalizeUsername(formData.get("username"));
   const password = String(formData.get("password") || "");
   const nextParam = String(formData.get("next") || "/");
   const safeNext = sanitizeNextPath(nextParam);
 
-  if (!(await validatePassword(password))) {
+  if (!(await validateCredentials(username, password))) {
     const url = new URL("/login", req.url);
     url.searchParams.set("error", "1");
     if (safeNext && safeNext !== "/") {

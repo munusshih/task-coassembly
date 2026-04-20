@@ -8,12 +8,22 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
+import IconButton from "./IconButton";
+import { DELETE_ICON, EDIT_ICON } from "./icons";
 
 const DEFAULT_CATEGORIES = ["general", "admin", "projects", "finance", "others"];
 
 function normalizeCategory(value) {
   const next = (value || "").trim().toLowerCase();
   return next || "general";
+}
+
+function toLinkHref(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "#";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
 }
 
 export default function ResourcesPage() {
@@ -138,22 +148,29 @@ export default function ResourcesPage() {
         <ul className="resources-list">
           {categoryLinks.map((link) => (
             <li key={link.id} className="resource-item">
-              <div 
-                className="resource-row"
-                onClick={() => {
-                  if (editingId !== link.id) {
-                    window.open(link.data.url, "_blank");
-                  }
-                }}
-              >
+              <div className="resource-row">
                 <div className="resource-content-col">
-                  <span className="resource-name" style={{ cursor: "pointer" }}>{link.data.name}</span>
-                  <span className="resource-url">{link.data.url}</span>
+                  <a
+                    className="resource-name resource-link"
+                    href={toLinkHref(link.data.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={link.data.url}
+                  >
+                    {link.data.name}
+                  </a>
+                  <a
+                    className="resource-url"
+                    href={toLinkHref(link.data.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={link.data.url}
+                  >
+                    {link.data.url}
+                  </a>
                 </div>
                 <div className="resource-actions-row">
-                  <button
-                    type="button"
-                    className="icon-btn"
+                  <IconButton
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -168,13 +185,13 @@ export default function ResourcesPage() {
                     }}
                     title="Edit"
                   >
-                    ✎
-                  </button>
+                    {EDIT_ICON}
+                  </IconButton>
                   {pendingDeleteId === link.id ? (
                     <>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--small"
+                      <Button
+                        variant="ghost"
+                        size="small"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -182,10 +199,10 @@ export default function ResourcesPage() {
                         }}
                       >
                         Confirm
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--small"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="small"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -193,12 +210,11 @@ export default function ResourcesPage() {
                         }}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      className="icon-btn icon-btn--delete"
+                    <IconButton
+                      variant="delete"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -206,8 +222,8 @@ export default function ResourcesPage() {
                       }}
                       title="Delete link"
                     >
-                      ×
-                    </button>
+                      {DELETE_ICON}
+                    </IconButton>
                   )}
                 </div>
               </div>
@@ -262,21 +278,20 @@ export default function ResourcesPage() {
                     )}
                   </div>
                   <div className="resource-editor-actions">
-                    <button
-                      className="btn btn--primary"
+                    <Button
                       onClick={() => handleSaveEdit(link.id, editData)}
                     >
                       Save
-                    </button>
-                    <button
-                      className="btn btn--ghost"
+                    </Button>
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         setEditingId(null);
                         setEditCustomCategory("");
                       }}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -335,13 +350,12 @@ export default function ResourcesPage() {
             />
           )}
         </div>
-        <button
-          className="btn btn--primary"
+        <Button
           onClick={handleCreateLink}
           disabled={!newLink.name.trim() || !newLink.url.trim()}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       <div className="search-row">
@@ -353,12 +367,13 @@ export default function ResourcesPage() {
           className="search-input"
         />
         {searchQuery && (
-          <button
-            className="btn btn--ghost btn--small"
+          <Button
+            variant="ghost"
+            size="small"
             onClick={() => setSearchQuery("")}
           >
             Clear
-          </button>
+          </Button>
         )}
       </div>
 

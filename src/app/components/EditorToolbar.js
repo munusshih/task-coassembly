@@ -1,6 +1,6 @@
 "use client";
 
-export default function EditorToolbar({ editor }) {
+export default function EditorToolbar({ editor, showDateObjectButton = false, onInsertDateObject }) {
   if (!editor) return null;
 
   const ButtonGroup = ({ children }) => (
@@ -78,6 +78,13 @@ export default function EditorToolbar({ editor }) {
       </ButtonGroup>
 
       <ButtonGroup>
+        {showDateObjectButton && (
+          <ToolBtn
+            icon="Date"
+            label="Insert date object"
+            onClick={() => onInsertDateObject?.()}
+          />
+        )}
         <ToolBtn
           icon="↶"
           title="Undo"

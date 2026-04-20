@@ -12,10 +12,165 @@ import { firebaseReady } from "../../firebase";
 // ─── Constants ───────────────────────────────────────────────────────────────────────────────
 
 const TODO_TYPE = "memberTodo";
-
 const UNIT_OPTIONS = Array.from({ length: 40 }, (_, i) => i + 1);
 
+const TASK_BOARD_CACHE_KEY = "coassembly-task-board-cache-v1";
+const TASK_BOARD_WEEK_KEY = "coassembly-task-board-week-v1";
+const MEMBER_DRAFT_PREFIX = "coassembly-member-draft-v1";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
+
+function readLocalJSON(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJSON(key, value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+function readTaskBoardCache() {
+  const fallback = { members: [], tasks: [], projects: [] };
+  const parsed = readLocalJSON(TASK_BOARD_CACHE_KEY, fallback);
+  if (!parsed || typeof parsed !== "object") return fallback;
+  return {
+    members: Array.isArray(parsed.members) ? parsed.members : [],
+    tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+    projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+  };
+}
+
+function memberDraftKey(memberId) {
+  return `${MEMBER_DRAFT_PREFIX}:${memberId}`;
+}
+
+function normalizeTaskSubtaskList(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((item) => {
+      if (typeof item === "string") {
+        const text = item.trim();
+        return text ? { text, completed: false } : null;
+      }
+      if (!item || typeof item !== "object") return null;
+      const text = typeof item.text === "string" ? item.text.trim() : "";
+      if (!text) return null;
+      return { text, completed: Boolean(item.completed) };
+    })
+    .filter(Boolean);
+}
+
+function normalizeTaskLinkList(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((item) => {
+      if (typeof item === "string") {
+        const url = item.trim();
+        return url ? { name: "", url } : null;
+      }
+      if (!item || typeof item !== "object") return null;
+      const url = typeof item.url === "string" ? item.url.trim() : "";
+      if (!url) return null;
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      return { name, url };
+    })
+    .filter(Boolean);
+}
+
+function toLinkHref(rawUrl) {
+  const trimmed = (rawUrl || "").trim();
+  if (!trimmed) return "";
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function formatLinkLabel(rawUrl) {
+  const href = toLinkHref(rawUrl);
+  if (!href) return rawUrl;
+  try {
+    const parsed = new URL(href);
+    const host = parsed.hostname.replace(/^www\./i, "");
+    const path = parsed.pathname === "/" ? "" : parsed.pathname;
+    const value = `${host}${path}`;
+    return value.length > 36 ? `${value.slice(0, 33)}...` : value;
+  } catch {
+    return rawUrl;
+  }
+}
+
+function emptyEditDraft() {
+  return {
+    title: "",
+    timeUnits: "",
+    projectId: "",
+    deadline: "",
+    subtasks: [],
+    links: [],
+  };
+}
+
+function normalizeEditDraft(raw) {
+  if (!raw || typeof raw !== "object") return emptyEditDraft();
+  return {
+    title: typeof raw.title === "string" ? raw.title : "",
+    timeUnits: raw.timeUnits != null ? String(raw.timeUnits) : "",
+    projectId: typeof raw.projectId === "string" ? raw.projectId : "",
+    deadline: typeof raw.deadline === "string" ? raw.deadline : "",
+    subtasks: normalizeTaskSubtaskList(raw.subtasks),
+    links: normalizeTaskLinkList(raw.links),
+  };
+}
+
+function makeEditDraftFromTodo(todoData) {
+  return {
+    title: typeof todoData.title === "string" ? todoData.title : "",
+    timeUnits: todoData.timeUnits != null ? String(todoData.timeUnits) : "",
+    projectId: typeof todoData.projectId === "string" ? todoData.projectId : "",
+    deadline: typeof todoData.deadline === "string" ? todoData.deadline : "",
+    subtasks: normalizeTaskSubtaskList(todoData.subtasks),
+    links: normalizeTaskLinkList(todoData.links),
+  };
+}
+
+function loadMemberDraft(memberId) {
+  const raw = readLocalJSON(memberDraftKey(memberId), null);
+  if (!raw || typeof raw !== "object") {
+    return {
+      addActive: false,
+      addTitle: "",
+      addTime: "",
+      addProject: "",
+      addDeadline: "",
+      addSubtasks: [],
+      addLinks: [],
+      editingId: null,
+      editDraft: emptyEditDraft(),
+    };
+  }
+
+  return {
+    addActive: Boolean(raw.addActive),
+    addTitle: typeof raw.addTitle === "string" ? raw.addTitle : "",
+    addTime: raw.addTime != null ? String(raw.addTime) : "",
+    addProject: typeof raw.addProject === "string" ? raw.addProject : "",
+    addDeadline: typeof raw.addDeadline === "string" ? raw.addDeadline : "",
+    addSubtasks: normalizeTaskSubtaskList(raw.addSubtasks),
+    addLinks: normalizeTaskLinkList(raw.addLinks),
+    editingId: typeof raw.editingId === "string" ? raw.editingId : null,
+    editDraft: normalizeEditDraft(raw.editDraft),
+  };
+}
 
 function formatTimeUnits(units) {
   if (!units) return null;
@@ -81,17 +236,8 @@ function weekLabel(mondayDate) {
   return `${fmt(mondayDate)}–${fmt(friday)}${yearSuffix}`;
 }
 
-function currentWeekLabel() {
-  const monday = getMondayOf(Date.now());
-  return weekLabel(monday);
-}
-
 function currentWeekKey() {
   return weekKey(Date.now());
-}
-
-function getQuarter(date) {
-  return Math.floor(date.getMonth() / 3) + 1;
 }
 
 function quarterLabel(weekKeyStr) {
@@ -116,26 +262,71 @@ function relativeWeekTitle(weekKeyStr) {
 
 function sortTodos(items) {
   return [...items].sort((a, b) => {
-    const dd = Number(a.data.completed) - Number(b.data.completed);
-    if (dd !== 0) return dd;
-    return (
-      (Number(b.data.updatedAt || b.data.createdAt) || 0) -
-      (Number(a.data.updatedAt || a.data.createdAt) || 0)
-    );
+    const left = Number(a.data.orderIndex ?? a.data.createdAt) || 0;
+    const right = Number(b.data.orderIndex ?? b.data.createdAt) || 0;
+    if (right !== left) return right - left;
+    return String(a.id || "").localeCompare(String(b.id || ""));
   });
+}
+
+function isMemberAssignedToProject(project, memberId) {
+  if (!project || !memberId) return false;
+  const staffing = Array.isArray(project.data?.staffing) ? project.data.staffing : [];
+  return staffing.some((entry) => entry?.memberId === memberId);
+}
+
+function getAssignableProjects(projects, memberId) {
+  return (projects || []).filter((project) => isMemberAssignedToProject(project, memberId));
+}
+
+function isProjectIdAssignable(projects, memberId, projectId) {
+  if (!projectId) return true;
+  const project = (projects || []).find((item) => item.id === projectId);
+  return isMemberAssignedToProject(project, memberId);
 }
 
 // ─── TaskItem ─────────────────────────────────────────────────────────────────────────────────
 
-function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditChange, onEditSave, onEditCancel, onToggle, onDelete, onFieldChange, onOvertimeSave, getProjectRemaining }) {
+function TaskItem({
+  todo,
+  projects,
+  assignableProjects,
+  editingId,
+  editDraft,
+  onEditStart,
+  onEditFieldChange,
+  onEditSubtaskChange,
+  onEditSubtaskAdd,
+  onEditSubtaskRemove,
+  onEditLinkChange,
+  onEditLinkAdd,
+  onEditLinkRemove,
+  onEditSave,
+  onEditCancel,
+  onToggle,
+  onToggleSubtask,
+  onDelete,
+  onOvertimeSave,
+  getProjectRemaining,
+}) {
   const isEditing = editingId === todo.id;
   const [showOT, setShowOT] = useState(false);
   const [otUnits, setOtUnits] = useState("");
+
   const { completed, timeUnits, projectId, deadline, title, overtimeUnits } = todo.data;
+  const memberId = todo.data.memberId;
+  const draft = editDraft || emptyEditDraft();
+  const draftProjectId = isEditing ? draft.projectId : projectId;
+  const editProjects = Array.isArray(assignableProjects) ? assignableProjects : getAssignableProjects(projects, memberId);
+  const selectedProject = (projects || []).find((p) => p.id === draftProjectId);
+  const showUnassignedSelectedProject = Boolean(draftProjectId) && !isProjectIdAssignable(projects, memberId, draftProjectId);
   const projectName = projects.find((p) => p.id === projectId)?.data?.name;
-  const remainingHint = projectId
-    ? getProjectRemaining?.(todo.data.memberId, projectId, todo.id)
+  const remainingHint = draftProjectId
+    ? getProjectRemaining?.(memberId, draftProjectId, todo.id)
     : null;
+
+  const subtasks = normalizeTaskSubtaskList(todo.data.subtasks);
+  const links = normalizeTaskLinkList(todo.data.links);
 
   function handleCheck(checked) {
     onToggle(todo, checked);
@@ -162,20 +353,19 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
         <div className="todo-edit-form">
           <input
             className="todo-edit-input"
-            value={editValue}
+            value={draft.title}
             autoFocus
-            onChange={(e) => onEditChange(e.target.value)}
+            onChange={(e) => onEditFieldChange("title", e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); onEditSave(todo, editValue); }
               if (e.key === "Escape") onEditCancel();
             }}
-            onBlur={() => { if (editValue.trim()) onEditSave(todo, editValue); else onEditCancel(); }}
           />
+
           <div className="todo-edit-meta">
             <select
               className="meta-select"
-              value={timeUnits ?? ""}
-              onChange={(e) => onFieldChange(todo, "timeUnits", e.target.value ? Number(e.target.value) : null)}
+              value={draft.timeUnits}
+              onChange={(e) => onEditFieldChange("timeUnits", e.target.value)}
             >
               <option value="">units</option>
               {UNIT_OPTIONS.map((units) => (
@@ -184,21 +374,114 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
             </select>
             <select
               className="meta-select"
-              value={projectId ?? ""}
-              onChange={(e) => onFieldChange(todo, "projectId", e.target.value || null)}
+              value={draft.projectId}
+              onChange={(e) => onEditFieldChange("projectId", e.target.value)}
             >
               <option value="">project</option>
-              {projects.map((p) => (
+              {editProjects.map((p) => (
                 <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
               ))}
+              {showUnassignedSelectedProject && (
+                <option value={draftProjectId} disabled>
+                  {(selectedProject?.data?.name || draftProjectId) + " (not assigned)"}
+                </option>
+              )}
             </select>
             {remainingHint ? <span className="meta-helper-chip">{remainingHint}</span> : null}
             <input
               type="date"
               className="meta-date"
-              value={deadline ?? ""}
-              onChange={(e) => onFieldChange(todo, "deadline", e.target.value || null)}
+              value={draft.deadline}
+              onChange={(e) => onEditFieldChange("deadline", e.target.value)}
             />
+          </div>
+
+          <details className="todo-edit-disclosure" open={draft.subtasks.length > 0}>
+            <summary className="todo-edit-disclosure-summary">
+              <span className="todo-edit-section-title">Subtasks ({draft.subtasks.length})</span>
+              <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); onEditSubtaskAdd(); }}>+ Add</button>
+            </summary>
+            <div className="todo-edit-section">
+              {draft.subtasks.length === 0 ? (
+                <p className="todo-edit-empty">No subtasks</p>
+              ) : (
+                <div className="todo-edit-list">
+                  {draft.subtasks.map((subtask, idx) => (
+                    <div key={`subtask-${idx}`} className="todo-edit-row">
+                      <input
+                        type="checkbox"
+                        className="todo-edit-row-check"
+                        checked={Boolean(subtask.completed)}
+                        onChange={(e) => onEditSubtaskChange(idx, "completed", e.target.checked)}
+                      />
+                      <input
+                        className="todo-edit-row-input"
+                        value={subtask.text}
+                        placeholder="Subtask"
+                        onChange={(e) => onEditSubtaskChange(idx, "text", e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn--delete"
+                        title="Remove subtask"
+                        onClick={() => onEditSubtaskRemove(idx)}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <details className="todo-edit-disclosure" open={draft.links.length > 0}>
+            <summary className="todo-edit-disclosure-summary">
+              <span className="todo-edit-section-title">Links ({draft.links.length})</span>
+              <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); onEditLinkAdd(); }}>+ Add</button>
+            </summary>
+            <div className="todo-edit-section">
+              {draft.links.length === 0 ? (
+                <p className="todo-edit-empty">No links</p>
+              ) : (
+                <div className="todo-edit-list">
+                  {draft.links.map((link, idx) => (
+                    <div key={`link-${idx}`} className="todo-edit-row todo-edit-row--link">
+                      <div className="todo-edit-row-fields">
+                        <input
+                          className="todo-edit-row-input"
+                          value={link.name}
+                          placeholder="Link name"
+                          onChange={(e) => onEditLinkChange(idx, "name", e.target.value)}
+                        />
+                        <input
+                          className="todo-edit-row-input todo-edit-row-input--url"
+                          value={link.url}
+                          placeholder="https://..."
+                          onChange={(e) => onEditLinkChange(idx, "url", e.target.value)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn--delete"
+                        title="Remove link"
+                        onClick={() => onEditLinkRemove(idx)}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <div className="todo-edit-actions">
+            <button
+              type="button"
+              className="btn btn--primary btn--small"
+              onClick={() => onEditSave(todo)}
+              disabled={!draft.title.trim()}
+            >
+              Save
+            </button>
+            <button type="button" className="btn btn--ghost btn--small" onClick={onEditCancel}>Cancel</button>
           </div>
         </div>
       </li>
@@ -231,6 +514,50 @@ function TaskItem({ todo, projects, editingId, editValue, onEditStart, onEditCha
               {projectName && <span className="chip">{projectName}</span>}
               {deadline && <span className="chip">{formatDeadline(deadline)}</span>}
             </div>
+          )}
+          {(subtasks.length > 0 || links.length > 0) && (
+            <details className="todo-inline-details" onClick={(e) => e.stopPropagation()}>
+              <summary className="todo-inline-details-summary">
+                Details
+                {subtasks.length > 0 ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}` : ""}
+                {links.length > 0 ? ` · ${links.length} link${links.length > 1 ? "s" : ""}` : ""}
+              </summary>
+              {subtasks.length > 0 && (
+                <ul className="todo-subtasks">
+                  {subtasks.map((subtask, idx) => (
+                    <li key={`view-subtask-${idx}`} className="todo-subtask-item">
+                      <label className="todo-subtask-label">
+                        <input
+                          type="checkbox"
+                          className="todo-subtask-check"
+                          checked={Boolean(subtask.completed)}
+                          onChange={(e) => onToggleSubtask(todo, idx, e.target.checked)}
+                        />
+                        <span className={subtask.completed ? "todo-subtask-text todo-subtask-text--done" : "todo-subtask-text"}>
+                          {subtask.text}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {links.length > 0 && (
+                <div className="todo-links">
+                  {links.map((link, idx) => (
+                    <a
+                      key={`view-link-${idx}`}
+                      className="todo-link"
+                      href={toLinkHref(link.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={link.url}
+                    >
+                      {link.name || formatLinkLabel(link.url)}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </details>
           )}
         </div>
         <div className="todo-actions">
@@ -355,83 +682,211 @@ function ArchiveSection({ archivedTodos, projects }) {
 
 // ─── MemberCard ───────────────────────────────────────────────────────────────────────────────
 
-function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, onDelete, onFieldChange, onArchiveAll, onOvertimeSave, onProjectRemaining, selectedWeek }) {
-  const [addActive,   setAddActive]   = useState(false);
-  const [addTitle,    setAddTitle]    = useState("");
-  const [addTime,     setAddTime]     = useState("");
-  const [addProject,  setAddProject]  = useState("");
-  const [addDeadline, setAddDeadline] = useState("");
-  const [editingId,   setEditingId]   = useState(null);
-  const [editValue,   setEditValue]   = useState("");
+function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubtask, onSaveEdit, onDelete, onArchiveAll, onOvertimeSave, onProjectRemaining, selectedWeek }) {
+  const [ui, setUi] = useState(() => loadMemberDraft(member.id));
   const addInputRef = useRef(null);
 
   const isCurrentWeek = !selectedWeek || selectedWeek === currentWeekKey();
 
-  const activeTodos   = sortTodos(todos.filter((t) => !t.data.archived));
+  const activeTodos = sortTodos(todos.filter((t) => !t.data.archived));
   const archivedTodos = todos
     .filter((t) => t.data.archived)
     .sort((a, b) => (Number(b.data.archivedAt) || 0) - (Number(a.data.archivedAt) || 0));
 
+  const {
+    addActive,
+    addTitle,
+    addTime,
+    addProject,
+    addDeadline,
+    addSubtasks,
+    addLinks,
+    editingId,
+    editDraft,
+  } = ui;
+
   // For past-week snapshot: only tasks archived in that week
   const snapshotTodos = !isCurrentWeek
     ? archivedTodos.filter((t) => {
-        const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
-        return ts && weekKey(ts) === selectedWeek;
-      })
+      const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
+      return ts && weekKey(ts) === selectedWeek;
+    })
     : [];
 
   const snapshotMin = snapshotTodos.reduce(
     (s, t) => s + ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) * 15, 0
   );
+  const activeCount = activeTodos.length;
+  const archivedCount = archivedTodos.length;
+
   const addRemainingHint = addProject
     ? onProjectRemaining?.(member.id, addProject, null)
     : null;
+  const assignableProjects = useMemo(
+    () => getAssignableProjects(projects, member.id),
+    [projects, member.id],
+  );
 
   const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(todos));
 
+  useEffect(() => {
+    writeLocalJSON(memberDraftKey(member.id), ui);
+  }, [member.id, ui]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    const stillExists = activeTodos.some((todo) => todo.id === editingId);
+    if (!stillExists) {
+      setUi((prev) => ({ ...prev, editingId: null, editDraft: emptyEditDraft() }));
+    }
+  }, [editingId, activeTodos]);
+
+  useEffect(() => {
+    if (!addProject) return;
+    if (isProjectIdAssignable(projects, member.id, addProject)) return;
+    setUi((prev) => ({ ...prev, addProject: "" }));
+  }, [addProject, projects, member.id]);
+
+  function patchUi(patch) {
+    setUi((prev) => ({ ...prev, ...patch }));
+  }
+
+  function patchEditDraft(patch) {
+    setUi((prev) => ({ ...prev, editDraft: { ...prev.editDraft, ...patch } }));
+  }
+
   function activateAdd() {
-    setAddActive(true);
+    patchUi({ addActive: true });
     requestAnimationFrame(() => addInputRef.current?.focus());
   }
 
   function cancelAdd() {
-    setAddActive(false);
-    setAddTitle(""); setAddTime(""); setAddProject(""); setAddDeadline("");
+    patchUi({
+      addActive: false,
+      addTitle: "",
+      addTime: "",
+      addProject: "",
+      addDeadline: "",
+      addSubtasks: [],
+      addLinks: [],
+    });
   }
 
-  function submitAdd() {
+  async function submitAdd() {
     if (!addTitle.trim()) return;
-    void onCreate(member.id, {
+    const created = await onCreate(member.id, {
       title: addTitle.trim(),
       timeUnits: addTime ? Number(addTime) : null,
       projectId: addProject || null,
-      deadline:  addDeadline || null,
+      deadline: addDeadline || null,
+      subtasks: normalizeTaskSubtaskList(addSubtasks),
+      links: normalizeTaskLinkList(addLinks),
     });
-    setAddTitle(""); setAddTime(""); setAddProject(""); setAddDeadline("");
+    if (!created) return;
+    patchUi({
+      addTitle: "",
+      addTime: "",
+      addProject: "",
+      addDeadline: "",
+      addSubtasks: [],
+      addLinks: [],
+    });
     requestAnimationFrame(() => addInputRef.current?.focus());
   }
 
-  function startEdit(todo) {
-    setEditingId(todo.id);
-    setEditValue(todo.data.title || "");
+  function setAddSubtask(index, field, value) {
+    const next = [...addSubtasks];
+    next[index] = { ...next[index], [field]: value };
+    patchUi({ addSubtasks: next });
   }
 
-  function cancelEdit() { setEditingId(null); setEditValue(""); }
+  function addAddSubtask() {
+    patchUi({ addSubtasks: [...addSubtasks, { text: "", completed: false }] });
+  }
 
-  // Wrap onSaveEdit so edit mode exits after save
-  async function doSaveEdit(todo, newTitle) {
-    await onSaveEdit(todo, newTitle);
-    cancelEdit();
+  function removeAddSubtask(index) {
+    const next = addSubtasks.filter((_, idx) => idx !== index);
+    patchUi({ addSubtasks: next });
+  }
+
+  function setAddLink(index, field, value) {
+    const next = [...addLinks];
+    next[index] = { ...next[index], [field]: value };
+    patchUi({ addLinks: next });
+  }
+
+  function addAddLink() {
+    patchUi({ addLinks: [...addLinks, { name: "", url: "" }] });
+  }
+
+  function removeAddLink(index) {
+    const next = addLinks.filter((_, idx) => idx !== index);
+    patchUi({ addLinks: next });
+  }
+
+  function startEdit(todo) {
+    patchUi({
+      editingId: todo.id,
+      editDraft: makeEditDraftFromTodo(todo.data),
+    });
+  }
+
+  function cancelEdit() {
+    patchUi({ editingId: null, editDraft: emptyEditDraft() });
+  }
+
+  function setEditField(field, value) {
+    patchEditDraft({ [field]: value });
+  }
+
+  function setEditSubtask(index, field, value) {
+    const next = [...editDraft.subtasks];
+    next[index] = { ...next[index], [field]: value };
+    patchEditDraft({ subtasks: next });
+  }
+
+  function addEditSubtask() {
+    patchEditDraft({ subtasks: [...editDraft.subtasks, { text: "", completed: false }] });
+  }
+
+  function removeEditSubtask(index) {
+    const next = editDraft.subtasks.filter((_, idx) => idx !== index);
+    patchEditDraft({ subtasks: next });
+  }
+
+  function setEditLink(index, field, value) {
+    const next = [...editDraft.links];
+    next[index] = { ...next[index], [field]: value };
+    patchEditDraft({ links: next });
+  }
+
+  function addEditLink() {
+    patchEditDraft({ links: [...editDraft.links, { name: "", url: "" }] });
+  }
+
+  function removeEditLink(index) {
+    const next = editDraft.links.filter((_, idx) => idx !== index);
+    patchEditDraft({ links: next });
+  }
+
+  async function doSaveEdit(todo) {
+    const saved = await onSaveEdit(todo, editDraft);
+    if (saved) cancelEdit();
   }
 
   return (
     <article className="member-card">
       <div className="member-card-header">
-        <h3 className="card-name">{member.data.name || "Unnamed"}</h3>
-        {isCurrentWeek
-          ? <span className="member-week-time">{weeklyLabel || "no tasks"}</span>
-          : <span className="member-week-time">{formatWeeklyTime(snapshotMin) || "—"}</span>
-        }
+        <div className="member-card-head-main">
+          <h3 className="card-name">{member.data.name || "Unnamed"}</h3>
+          <div className="member-card-meta">
+            <span className="member-card-meta-chip">{activeCount} active</span>
+            <span className="member-card-meta-chip">{archivedCount} archived</span>
+          </div>
+        </div>
+        <span className="member-week-time">
+          {isCurrentWeek ? (weeklyLabel || "no tasks") : (formatWeeklyTime(snapshotMin) || "—")}
+        </span>
       </div>
 
       {isCurrentWeek ? (
@@ -445,15 +900,22 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                 key={todo.id}
                 todo={todo}
                 projects={projects}
+                assignableProjects={assignableProjects}
                 editingId={editingId}
-                editValue={editValue}
+                editDraft={editingId === todo.id ? editDraft : null}
                 onEditStart={startEdit}
-                onEditChange={setEditValue}
+                onEditFieldChange={setEditField}
+                onEditSubtaskChange={setEditSubtask}
+                onEditSubtaskAdd={addEditSubtask}
+                onEditSubtaskRemove={removeEditSubtask}
+                onEditLinkChange={setEditLink}
+                onEditLinkAdd={addEditLink}
+                onEditLinkRemove={removeEditLink}
                 onEditSave={doSaveEdit}
                 onEditCancel={cancelEdit}
                 onToggle={onToggle}
+                onToggleSubtask={onToggleSubtask}
                 onDelete={onDelete}
-                onFieldChange={onFieldChange}
                 onOvertimeSave={onOvertimeSave}
                 getProjectRemaining={onProjectRemaining}
               />
@@ -468,21 +930,14 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
           ) : (
             <div className="notepad-add-active">
               <div className="notepad-add-main">
-                <button
-                  type="button"
-                  className={"notepad-add-plus notepad-add-plus--submit" + (addTitle.trim() ? " notepad-add-plus--ready" : "")}
-                  onClick={submitAdd}
-                  disabled={!addTitle.trim()}
-                  title="Add task"
-                >+</button>
+                <span className="notepad-add-plus">+</span>
                 <input
                   ref={addInputRef}
                   className="notepad-add-input"
                   value={addTitle}
                   placeholder="Task title…"
-                  onChange={(e) => setAddTitle(e.target.value)}
+                  onChange={(e) => patchUi({ addTitle: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); submitAdd(); }
                     if (e.key === "Escape") cancelAdd();
                   }}
                 />
@@ -490,15 +945,15 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  <select className="meta-select" value={addTime} onChange={(e) => setAddTime(e.target.value)}>
+                  <select className="meta-select" value={addTime} onChange={(e) => patchUi({ addTime: e.target.value })}>
                     <option value="">units</option>
                     {UNIT_OPTIONS.map((units) => (
                       <option key={units} value={units}>{formatUnitOption(units)}</option>
                     ))}
                   </select>
-                  <select className="meta-select" value={addProject} onChange={(e) => setAddProject(e.target.value)}>
+                  <select className="meta-select" value={addProject} onChange={(e) => patchUi({ addProject: e.target.value })}>
                     <option value="">project</option>
-                    {projects.map((p) => (
+                    {assignableProjects.map((p) => (
                       <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
                     ))}
                   </select>
@@ -507,15 +962,106 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                     type="date"
                     className="meta-date"
                     value={addDeadline}
-                    onChange={(e) => setAddDeadline(e.target.value)}
+                    onChange={(e) => patchUi({ addDeadline: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="notepad-add-sections">
+                <details className="todo-edit-disclosure" open={addSubtasks.length > 0}>
+                  <summary className="todo-edit-disclosure-summary">
+                    <span className="todo-edit-section-title">Subtasks ({addSubtasks.length})</span>
+                    <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); addAddSubtask(); }}>+ Add</button>
+                  </summary>
+                  <div className="todo-edit-section">
+                    {addSubtasks.length === 0 ? (
+                      <p className="todo-edit-empty">No subtasks</p>
+                    ) : (
+                      <div className="todo-edit-list">
+                        {addSubtasks.map((subtask, idx) => (
+                          <div key={`add-subtask-${idx}`} className="todo-edit-row">
+                            <input
+                              type="checkbox"
+                              className="todo-edit-row-check"
+                              checked={Boolean(subtask.completed)}
+                              onChange={(e) => setAddSubtask(idx, "completed", e.target.checked)}
+                            />
+                            <input
+                              className="todo-edit-row-input"
+                              value={subtask.text}
+                              placeholder="Subtask"
+                              onChange={(e) => setAddSubtask(idx, "text", e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn--delete"
+                              title="Remove subtask"
+                              onClick={() => removeAddSubtask(idx)}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </details>
+
+                <details className="todo-edit-disclosure" open={addLinks.length > 0}>
+                  <summary className="todo-edit-disclosure-summary">
+                    <span className="todo-edit-section-title">Links ({addLinks.length})</span>
+                    <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); addAddLink(); }}>+ Add</button>
+                  </summary>
+                  <div className="todo-edit-section">
+                    {addLinks.length === 0 ? (
+                      <p className="todo-edit-empty">No links</p>
+                    ) : (
+                      <div className="todo-edit-list">
+                        {addLinks.map((link, idx) => (
+                          <div key={`add-link-${idx}`} className="todo-edit-row todo-edit-row--link">
+                            <div className="todo-edit-row-fields">
+                              <input
+                                className="todo-edit-row-input"
+                                value={link.name}
+                                placeholder="Link name"
+                                onChange={(e) => setAddLink(idx, "name", e.target.value)}
+                              />
+                              <input
+                                className="todo-edit-row-input todo-edit-row-input--url"
+                                value={link.url}
+                                placeholder="https://..."
+                                onChange={(e) => setAddLink(idx, "url", e.target.value)}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn--delete"
+                              title="Remove link"
+                              onClick={() => removeAddLink(idx)}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              </div>
+
+              <div className="notepad-add-actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--small"
+                  onClick={submitAdd}
+                  disabled={!addTitle.trim()}
+                >
+                  Save
+                </button>
+                <button type="button" className="btn btn--ghost btn--small" onClick={cancelAdd}>
+                  Cancel
+                </button>
               </div>
             </div>
           )}
         </div>
       ) : (
-        /* Past-week snapshot */
         <div className="lined-paper">
           {snapshotTodos.length === 0 ? (
             <p className="todo-empty">No tasks completed this week.</p>
@@ -527,7 +1073,7 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
                 const ot = Number(todo.data.overtimeUnits) || 0;
                 return (
                   <li key={todo.id} className="todo-item snapshot-item">
-                    <div className="snapshot-check">\u2713</div>
+                    <div className="snapshot-check">✓</div>
                     <div className="todo-content">
                       <span className="todo-text todo-text--done">{todo.data.title || "Untitled"}</span>
                       <div className="todo-chips">
@@ -557,23 +1103,47 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onSaveEdit, o
   );
 }
 
-// Placeholder so the old code block can be cleanly removed
 // ─── MembersPage ────────────────────────────────────────────────────────────────────────────────
 
 export default function MembersPage() {
-  const [members,  setMembers]  = useState([]);
+  const [members, setMembers] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [toasts,   setToasts]   = useState([]);
+  const [toasts, setToasts] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
 
   useEffect(() => {
+    const cached = readTaskBoardCache();
+    if (cached.members.length) setMembers(cached.members);
+    if (cached.tasks.length) setAllTasks(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE));
+    if (cached.projects.length) setProjects(cached.projects);
+
+    const storedWeek = readLocalJSON(TASK_BOARD_WEEK_KEY, null);
+    if (typeof storedWeek === "string") {
+      setSelectedWeek(storedWeek);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!firebaseReady) return;
-    const u1 = subscribeCollection("members",  setMembers);
-    const u2 = subscribeCollection("tasks",    (items) => setAllTasks(items.filter((i) => i.data.type === TODO_TYPE)));
+    const u1 = subscribeCollection("members", setMembers);
+    const u2 = subscribeCollection("tasks", (items) => setAllTasks(items.filter((i) => i.data.type === TODO_TYPE)));
     const u3 = subscribeCollection("projects", setProjects);
     return () => { u1(); u2(); u3(); };
   }, []);
+
+  useEffect(() => {
+    writeLocalJSON(TASK_BOARD_CACHE_KEY, {
+      members,
+      tasks: allTasks,
+      projects,
+      cachedAt: Date.now(),
+    });
+  }, [members, allTasks, projects]);
+
+  useEffect(() => {
+    writeLocalJSON(TASK_BOARD_WEEK_KEY, selectedWeek);
+  }, [selectedWeek]);
 
   const tasksByMember = useMemo(() => {
     const g = {};
@@ -598,6 +1168,13 @@ export default function MembersPage() {
     return [...weeks].sort().reverse(); // newest first
   }, [allTasks]);
 
+  useEffect(() => {
+    if (!availableWeeks.length) return;
+    if (!availableWeeks.includes(selectedWeek)) {
+      setSelectedWeek(availableWeeks[0]);
+    }
+  }, [availableWeeks, selectedWeek]);
+
   function addToast(msg, isError = false) {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message: msg, isError }]);
@@ -606,18 +1183,34 @@ export default function MembersPage() {
 
   async function handleCreate(memberId, taskData) {
     const now = Date.now();
+    const nextProjectId = taskData.projectId || null;
+    if (nextProjectId && !isProjectIdAssignable(projects, memberId, nextProjectId)) {
+      addToast("Project is not assigned to this member", true);
+      return false;
+    }
+
     try {
       await createDocument("tasks", {
-        type: TODO_TYPE, memberId,
-        title:     taskData.title,
+        type: TODO_TYPE,
+        memberId,
+        title: taskData.title,
         timeUnits: taskData.timeUnits || null,
         projectId: taskData.projectId || null,
-        deadline:  taskData.deadline  || null,
-        completed: false, archived: false,
-        createdAt: now, updatedAt: now,
+        deadline: taskData.deadline || null,
+        subtasks: normalizeTaskSubtaskList(taskData.subtasks),
+        links: normalizeTaskLinkList(taskData.links),
+        completed: false,
+        archived: false,
+        orderIndex: now,
+        createdAt: now,
+        updatedAt: now,
       });
       addToast("Task added");
-    } catch (e) { addToast(e.message || "Could not add task", true); }
+      return true;
+    } catch (e) {
+      addToast(e.message || "Could not add task", true);
+      return false;
+    }
   }
 
   async function handleToggle(task, checked) {
@@ -626,23 +1219,65 @@ export default function MembersPage() {
     } catch (e) { addToast(e.message || "Could not update", true); }
   }
 
-  async function handleSaveEdit(task, newTitle) {
-    const t = (newTitle || "").trim();
-    if (!t) return;
+  async function handleToggleSubtask(task, subtaskIndex, checked) {
+    const subtasks = normalizeTaskSubtaskList(task.data.subtasks);
+    if (subtaskIndex < 0 || subtaskIndex >= subtasks.length) return;
+
+    subtasks[subtaskIndex] = {
+      ...subtasks[subtaskIndex],
+      completed: Boolean(checked),
+    };
+
     try {
-      await replaceDocument("tasks", task.id, { ...task.data, title: t, updatedAt: Date.now() });
-    } catch (e) { addToast(e.message || "Could not save", true); }
+      await replaceDocument("tasks", task.id, {
+        ...task.data,
+        subtasks,
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      addToast(e.message || "Could not update subtask", true);
+    }
+  }
+
+  async function handleSaveEdit(task, draft) {
+    const title = (draft.title || "").trim();
+    if (!title) return false;
+    const memberId = task.data.memberId;
+    const nextProjectId = draft.projectId || null;
+    if (
+      nextProjectId &&
+      nextProjectId !== (task.data.projectId || null) &&
+      !isProjectIdAssignable(projects, memberId, nextProjectId)
+    ) {
+      addToast("Project is not assigned to this member", true);
+      return false;
+    }
+
+    const parsedUnits = Number(draft.timeUnits);
+    const nextTimeUnits = Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
+
+    try {
+      await replaceDocument("tasks", task.id, {
+        ...task.data,
+        title,
+        timeUnits: nextTimeUnits,
+        projectId: draft.projectId || null,
+        deadline: draft.deadline || null,
+        subtasks: normalizeTaskSubtaskList(draft.subtasks),
+        links: normalizeTaskLinkList(draft.links),
+        updatedAt: Date.now(),
+      });
+      addToast("Task updated");
+      return true;
+    } catch (e) {
+      addToast(e.message || "Could not save", true);
+      return false;
+    }
   }
 
   async function handleDelete(task) {
     try { await deleteDocument("tasks", task.id); addToast("Deleted"); }
     catch (e) { addToast(e.message || "Could not delete", true); }
-  }
-
-  async function handleFieldChange(task, field, value) {
-    try {
-      await replaceDocument("tasks", task.id, { ...task.data, [field]: value, updatedAt: Date.now() });
-    } catch (e) { addToast(e.message || "Could not update", true); }
   }
 
   async function handleOvertimeSave(task, otUnits) {
@@ -719,9 +1354,9 @@ export default function MembersPage() {
             projects={projects}
             onCreate={handleCreate}
             onToggle={handleToggle}
+            onToggleSubtask={handleToggleSubtask}
             onSaveEdit={handleSaveEdit}
             onDelete={handleDelete}
-            onFieldChange={handleFieldChange}
             onArchiveAll={handleArchiveAll}
             onOvertimeSave={handleOvertimeSave}
             onProjectRemaining={projectRemainingHint}

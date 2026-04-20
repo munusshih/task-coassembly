@@ -4,6 +4,7 @@ import { COOKIE_NAME, verifyAuthCookieValue } from "./src/lib/auth";
 function isPublicPath(pathname) {
   if (pathname === "/login") return true;
   if (pathname.startsWith("/api/auth/login")) return true;
+  if (pathname.startsWith("/api/auth/session")) return true;
   if (pathname.startsWith("/_next/")) return true;
   if (pathname === "/favicon.ico") return true;
   return false;
@@ -33,5 +34,5 @@ export async function proxy(req) {
 }
 
 export const config = {
-  matcher: ["/", "/((?!api/auth/login|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/", "/((?!api/auth/login|api/auth/session|_next/static|_next/image|favicon.ico).*)"],
 };

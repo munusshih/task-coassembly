@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }) {
     <main className="login-page">
       <section className="login-card">
         <h1 className="login-title">Dashboard Login</h1>
-        <p className="login-subtitle">Enter password to continue.</p>
+        <p className="login-subtitle">Sign in as munus, mor, or tzu.</p>
 
         <form method="post" action="/api/auth/login" className="login-form">
           <input type="hidden" name="next" value={next} />
@@ -34,7 +34,7 @@ export default async function LoginPage({ searchParams }) {
             type="text"
             autoComplete="username"
             className="login-input"
-            defaultValue="dashboard"
+            placeholder="munus / mor / tzu"
             required
           />
 
@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }) {
             required
           />
 
-          {showError && <p className="login-error">Incorrect password. Try again.</p>}
+          {showError && <p className="login-error">Incorrect username or password. Try again.</p>}
 
           <button type="submit" className="login-submit">Enter Dashboard</button>
         </form>

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "auth:hash": "node scripts/generate-auth-accounts.mjs"
   },
   "dependencies": {
     "@tiptap/extension-mention": "^3.22.4",

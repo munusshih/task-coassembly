@@ -2,9 +2,10 @@
 
 const TABS = [
   { key: "members", label: "Member To-do" },
+  { key: "memberDirectory", label: "Members" },
   { key: "projects", label: "Projects" },
   { key: "finance", label: "Finance" },
-  { key: "meetingNotes", label: "Meeting Notes" },
+  { key: "meetingNotes", label: "Notes / doc" },
   { key: "resources", label: "Resources" },
 ];
 

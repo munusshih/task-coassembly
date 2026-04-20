@@ -8,20 +8,43 @@ import Mention from "@tiptap/extension-mention";
 import { useMemo } from "react";
 import EditorToolbar from "./EditorToolbar";
 
+function normalizeMentionAttr(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (text.toLowerCase() === "null" || text.toLowerCase() === "undefined") return "";
+  return text;
+}
+
+function mentionAttrsFromNode(node, fallbackKind = "member") {
+  if (!(node instanceof HTMLElement)) return false;
+
+  const rawType = normalizeMentionAttr(node.getAttribute("data-type"));
+  const rawKind = normalizeMentionAttr(node.getAttribute("data-kind"));
+  const textLabel = normalizeMentionAttr(node.textContent?.replace(/^@/, ""));
+  const idAttr = normalizeMentionAttr(node.getAttribute("data-id"));
+  const labelAttr = normalizeMentionAttr(node.getAttribute("data-label"));
+
+  const kind = rawKind || (rawType && rawType !== "mention" ? rawType : "") || fallbackKind;
+  const label = labelAttr || textLabel || idAttr;
+  const id = idAttr || label;
+
+  return {
+    kind: kind || "member",
+    id: id || "",
+    label: label || "",
+  };
+}
+
 const MentionExtension = Mention.extend({
   parseHTML() {
     return [
-      { tag: "span[data-type='mention']" },
       {
-        tag: "span.mention-pill[data-type='member'], span.mention-pill[data-type='project'], span.mention-pill[data-type='task']",
-        getAttrs: (node) => {
-          if (!(node instanceof HTMLElement)) return false;
-          return {
-            kind: node.getAttribute("data-type") || "member",
-            id: node.getAttribute("data-id") || node.textContent?.replace(/^@/, "") || "",
-            label: node.getAttribute("data-label") || node.textContent?.replace(/^@/, "") || "",
-          };
-        },
+        tag: "span[data-type='mention']",
+        getAttrs: (node) => mentionAttrsFromNode(node, "member"),
+      },
+      {
+        tag: "span.mention-pill[data-type='member'], span.mention-pill[data-type='project'], span.mention-pill[data-type='task'], span.mention-pill[data-type='resource'], span.mention-pill[data-type='note']",
+        getAttrs: (node) => mentionAttrsFromNode(node, "member"),
       },
     ];
   },
@@ -41,10 +64,12 @@ function normalizeLegacyMentionMarkup(content) {
   return content
     .replace(/data-type="member"/g, 'data-type="mention" data-kind="member"')
     .replace(/data-type="project"/g, 'data-type="mention" data-kind="project"')
-    .replace(/data-type="task"/g, 'data-type="mention" data-kind="task"');
+    .replace(/data-type="task"/g, 'data-type="mention" data-kind="task"')
+    .replace(/data-type="resource"/g, 'data-type="mention" data-kind="resource"')
+    .replace(/data-type="note"/g, 'data-type="mention" data-kind="note"');
 }
 
-function buildMentionItems({ members, projects, tasks, query }) {
+function buildMentionItems({ members, projects, tasks, resources, notes, query, currentNoteId }) {
   const q = (query || "").trim().toLowerCase();
 
   const memberItems = (members || []).map((m) => ({
@@ -67,12 +92,26 @@ function buildMentionItems({ members, projects, tasks, query }) {
       kind: "task",
     }));
 
-  const all = [...memberItems, ...projectItems, ...taskItems];
+  const resourceItems = (resources || []).map((r) => ({
+    id: r.id,
+    label: r.data?.name || r.data?.url || "Untitled resource",
+    kind: "resource",
+  }));
+
+  const noteItems = (notes || [])
+    .filter((n) => n.id !== currentNoteId)
+    .map((n) => ({
+      id: n.id,
+      label: n.data?.title || "Untitled note",
+      kind: "note",
+    }));
+
+  const all = [...memberItems, ...projectItems, ...taskItems, ...resourceItems, ...noteItems];
   const filtered = !q
     ? all
     : all.filter((item) => {
-        const text = `${item.label} ${item.kind}`.toLowerCase();
-        return text.includes(q);
+      const text = `${item.label} ${item.kind}`.toLowerCase();
+      return text.includes(q);
       });
 
   return filtered.slice(0, 8);
@@ -81,13 +120,33 @@ function buildMentionItems({ members, projects, tasks, query }) {
 function mentionKindIcon(kind) {
   if (kind === "member") return "👤";
   if (kind === "project") return "📁";
+  if (kind === "resource") return "🔗";
+  if (kind === "note") return "📝";
   return "✓";
 }
 
-export default function RichEditor({ value, onChange, members = [], projects = [], tasks = [] }) {
+export default function RichEditor({
+  value,
+  onChange,
+  members = [],
+  projects = [],
+  tasks = [],
+  resources = [],
+  notes = [],
+  currentNoteId = null,
+  showDateObjectButton = false,
+}) {
   const mentionSuggestion = useMemo(() => ({
     char: "@",
-    items: ({ query }) => buildMentionItems({ members, projects, tasks, query }),
+    items: ({ query }) => buildMentionItems({
+      members,
+      projects,
+      tasks,
+      resources,
+      notes,
+      query,
+      currentNoteId,
+    }),
     render: () => {
       let popup = null;
       let selectedIndex = 0;
@@ -202,7 +261,7 @@ export default function RichEditor({ value, onChange, members = [], projects = [
         },
       };
     },
-  }), [members, projects, tasks]);
+  }), [members, projects, tasks, resources, notes, currentNoteId]);
 
   const editor = useEditor({
     extensions: [
@@ -217,17 +276,23 @@ export default function RichEditor({ value, onChange, members = [], projects = [
         HTMLAttributes: { class: "mention-pill" },
         suggestion: mentionSuggestion,
         renderText({ options, node }) {
-          return `${options.suggestion.char}${node.attrs.label ?? node.attrs.id}`;
+          const label = normalizeMentionAttr(node.attrs.label) || normalizeMentionAttr(node.attrs.id);
+          return `${options.suggestion.char}${label}`;
         },
         renderHTML({ options, node, HTMLAttributes }) {
+          const id = normalizeMentionAttr(node.attrs.id);
+          const label = normalizeMentionAttr(node.attrs.label) || id;
+          const kind = normalizeMentionAttr(node.attrs.kind) || "member";
           return [
             "span",
             mergeAttributes(HTMLAttributes, {
               class: "mention-pill",
               "data-type": "mention",
-              "data-kind": node.attrs.kind || "member",
+              "data-kind": kind,
+              "data-id": id,
+              "data-label": label,
             }),
-            `${options.suggestion.char}${node.attrs.label ?? node.attrs.id}`,
+            `${options.suggestion.char}${label}`,
           ];
         },
       }),
@@ -241,9 +306,24 @@ export default function RichEditor({ value, onChange, members = [], projects = [
 
   if (!editor) return null;
 
+  function insertDateObject() {
+    const now = new Date();
+    const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const label = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    editor
+      .chain()
+      .focus()
+      .insertContent(`<span class="date-object" data-type="date-object" data-date="${isoDate}">${label}</span>&nbsp;`)
+      .run();
+  }
+
   return (
     <div className="rich-editor">
-      <EditorToolbar editor={editor} />
+      <EditorToolbar
+        editor={editor}
+        showDateObjectButton={showDateObjectButton}
+        onInsertDateObject={insertDateObject}
+      />
       <EditorContent editor={editor} className="editor-content" />
     </div>
   );

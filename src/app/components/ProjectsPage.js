@@ -8,6 +8,8 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import IconButton from "./IconButton";
+import { DELETE_ICON, EDIT_ICON } from "./icons";
 
 // ─ Constants ───────────────────────────────────────────────────────────────────────────────────
 
@@ -45,7 +47,8 @@ const STAFFING_ROLES = [
 ];
 
 const USD_TO_TWD = 32;
-const DONATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
+const DONATION_OPTIONS = Array.from({ length: 11 }, (_, i) => i * 10);
+const MIN_INTERNAL_ADMIN_HOURLY_TWD = 200;
 
 const EMPTY_FORM = {
   name: "",
@@ -54,6 +57,7 @@ const EMPTY_FORM = {
   budget: "",
   budgetCurrency: "TWD",
   donationPercent: "20",
+  projectedHourlyWage: "",
   maxHours: "",
   startDate: "",
   // stagePlans: [{id, name, weeks, perspectiveHours, delayWeeks, order}]
@@ -84,6 +88,10 @@ function donationAmount(amountTWD, donationPercent) {
   if (amountTWD == null) return null;
   const pct = Number(donationPercent) || 0;
   return Math.round((amountTWD * pct) / 100);
+}
+
+function isInternalOrAdminKind(kind) {
+  return kind === "Internal" || kind === "Admin";
 }
 
 function fmtH(h) {
@@ -222,7 +230,7 @@ function StagePlanEdit({ stagePlans, onChange }) {
               />
             </label>
           </div>
-          <button type="button" className="icon-btn icon-btn--delete" onClick={() => removeStage(i)}>×</button>
+          <IconButton variant="delete" onClick={() => removeStage(i)}>{DELETE_ICON}</IconButton>
         </div>
       ))}
       <button type="button" className="btn btn--ghost btn--small stage-add-btn" onClick={addStage}>
@@ -347,17 +355,32 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     budget:         d.budget != null ? String(d.budget) : "",
     budgetCurrency: d.budgetCurrency || "TWD",
     donationPercent: d.donationPercent != null ? String(d.donationPercent) : "20",
+    projectedHourlyWage: d.projectedHourlyWage != null ? String(d.projectedHourlyWage) : "",
     maxHours:       d.maxHours != null ? String(d.maxHours) : "",
     startDate:      d.startDate      || "",
     stagePlans:     normalizeStagePlans(d.stagePlans),
     staffing:       normalizeStaffing(d.staffing),
   });
 
-  function setField(k, v) { setForm((p) => ({ ...p, [k]: v })); }
+  function setField(k, v) {
+    setForm((p) => {
+      const next = { ...p, [k]: v };
+      if (k === "kind" && isInternalOrAdminKind(v) && !String(next.projectedHourlyWage || "").trim()) {
+        next.projectedHourlyWage = String(MIN_INTERNAL_ADMIN_HOURLY_TWD);
+      }
+      return next;
+    });
+  }
 
   function handleSave(e) {
     e.preventDefault();
     if (!form.name.trim()) return;
+    const internalOrAdmin = isInternalOrAdminKind(form.kind);
+    const projectedHourlyWage = form.projectedHourlyWage ? Number(form.projectedHourlyWage) : null;
+    if (internalOrAdmin && (!Number.isFinite(projectedHourlyWage) || projectedHourlyWage < MIN_INTERNAL_ADMIN_HOURLY_TWD)) {
+      window.alert(`For Internal/Admin projects, projected hourly wage must be at least NT$${MIN_INTERNAL_ADMIN_HOURLY_TWD}/h.`);
+      return;
+    }
 
     const stagePlans = form.stagePlans
       .filter((sp) => sp.name.trim())
@@ -388,6 +411,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       budget:         form.budget         ? Number(form.budget) : null,
       budgetCurrency: form.budgetCurrency,
       donationPercent: Number(form.donationPercent) || 0,
+      projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
       maxHours:       form.maxHours       ? Number(form.maxHours) : null,
       startDate:      form.startDate      || null,
       stagePlans,
@@ -400,12 +424,20 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   const hours     = assignedHours(allTasks, project.id);
   const maxH      = d.maxHours ? Number(d.maxHours) : null;
   const budgTWD   = budgetToTWD(d.budget, d.budgetCurrency);
+  const internalOrAdmin = isInternalOrAdminKind(d.kind);
+  const projectedHourlyWage = d.projectedHourlyWage != null ? Number(d.projectedHourlyWage) : null;
+  const effectiveProjectedHourly = Number.isFinite(projectedHourlyWage) && projectedHourlyWage >= MIN_INTERNAL_ADMIN_HOURLY_TWD
+    ? projectedHourlyWage
+    : null;
   const donationPct = Number(d.donationPercent) || 0;
   const donationTWD = donationAmount(budgTWD, donationPct);
   const effectiveBudgetTWD = budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
-  const hourly    = (effectiveBudgetTWD != null && maxH && maxH > 0)
+  const budgetBasedHourly = (effectiveBudgetTWD != null && maxH && maxH > 0)
     ? Math.round(effectiveBudgetTWD / maxH)
     : null;
+  const hourly = internalOrAdmin ? effectiveProjectedHourly : budgetBasedHourly;
+  const burnSoFarTWD = hourly != null ? Math.round(hours * hourly) : null;
+  const projectedBurnAtMaxTWD = (hourly != null && maxH != null) ? Math.round(maxH * hourly) : null;
   const remainingHours = maxH != null ? Math.max(0, maxH - hours) : null;
   const twks      = totalWeeks(d.stagePlans);
   const statusSt  = d.status ? (STATUS_STYLE[d.status] || {}) : {};
@@ -443,6 +475,18 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   }, [d.staffing, allTasks, project.id]);
 
   if (editing) {
+    const formInternalOrAdmin = isInternalOrAdminKind(form.kind);
+    const formProjectedHourly = form.projectedHourlyWage ? Number(form.projectedHourlyWage) : null;
+    const formProjectedHourlyValid = Number.isFinite(formProjectedHourly) && formProjectedHourly >= MIN_INTERNAL_ADMIN_HOURLY_TWD
+      ? formProjectedHourly
+      : null;
+    const formBudgetTWD = budgetToTWD(form.budget, form.budgetCurrency);
+    const formDonationTWD = donationAmount(formBudgetTWD, form.donationPercent);
+    const formEffectiveBudgetTWD = formBudgetTWD != null ? Math.max(0, formBudgetTWD - (formDonationTWD || 0)) : null;
+    const formBudgetHourly = (formEffectiveBudgetTWD != null && Number(form.maxHours) > 0)
+      ? Math.round(formEffectiveBudgetTWD / Number(form.maxHours))
+      : null;
+    const formHourly = formInternalOrAdmin ? formProjectedHourlyValid : formBudgetHourly;
     const formStagePlannedHours = form.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0);
     const formStageAssignableLeft = form.maxHours ? Number(form.maxHours) - formStagePlannedHours : null;
     const formStaffingHours = form.staffing.reduce((s, entry) => s + (Number(entry.maxHours) || 0), 0);
@@ -522,6 +566,20 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                 ))}
               </select>
             </label>
+            {formInternalOrAdmin && (
+              <label className="edit-field-group">
+                <span className="edit-field-label">Projected hourly wage (TWD)</span>
+                <input
+                  className="project-field"
+                  type="number"
+                  placeholder={`min ${MIN_INTERNAL_ADMIN_HOURLY_TWD}`}
+                  min={MIN_INTERNAL_ADMIN_HOURLY_TWD}
+                  step="1"
+                  value={form.projectedHourlyWage}
+                  onChange={(e) => setField("projectedHourlyWage", e.target.value)}
+                />
+              </label>
+            )}
             <label className="edit-field-group">
               <span className="edit-field-label">Max billable hours</span>
               <input
@@ -568,7 +626,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   staffing={form.staffing}
                   members={members}
                   onChange={(v) => setField("staffing", v)}
-                  hourly={hourly}
+                  hourly={formHourly}
                 />
               </div>
             </details>
@@ -605,7 +663,23 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         </div>
 
         <div className="project-row-budget-cell">
-          {budgTWD != null ? (
+          {internalOrAdmin ? (
+            hourly != null ? (
+              <>
+                <span className="project-row-budget-twd">
+                  {projectedBurnAtMaxTWD != null ? fmtTWD(projectedBurnAtMaxTWD) : fmtTWD(burnSoFarTWD)}
+                </span>
+                <span className="project-row-budget-orig">
+                  Burned {burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"} · {fmtTWD(hourly)}/h
+                </span>
+                {projectedBurnAtMaxTWD != null && (
+                  <span className="project-row-budget-orig">Projected at max hours</span>
+                )}
+              </>
+            ) : (
+              <span className="project-row-empty">Set projected hourly ≥ NT${MIN_INTERNAL_ADMIN_HOURLY_TWD}</span>
+            )
+          ) : budgTWD != null ? (
             <>
               <span className="project-row-budget-twd">{fmtTWD(budgTWD)}</span>
               <span className="project-row-budget-orig">
@@ -632,8 +706,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
         <div className="project-row-actions" onClick={(e) => e.stopPropagation()}>
           <span className="project-row-chevron">{open ? "▴" : "▾"}</span>
-          <button type="button" className="icon-btn" onClick={() => setEditing(true)} title="Edit">✏️</button>
-          <button type="button" className="icon-btn icon-btn--delete" onClick={() => onDelete(project)} title="Delete">×</button>
+          <IconButton onClick={() => setEditing(true)} title="Edit">{EDIT_ICON}</IconButton>
+          <IconButton variant="delete" onClick={() => onDelete(project)} title="Delete">{DELETE_ICON}</IconButton>
         </div>
       </div>
 
@@ -678,11 +752,19 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               <span className="detail-kpi-value">{fmtH(hours)}</span>
               {maxH != null && <span className="detail-kpi-sub">of {fmtH(maxH)}</span>}
             </div>
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Company donation</span>
-              <span className="detail-kpi-value">{donationPct}%</span>
-              <span className="detail-kpi-sub">{donationTWD != null ? fmtTWD(donationTWD) : "—"}</span>
-            </div>
+            {internalOrAdmin ? (
+              <div className="detail-kpi-card">
+                <span className="detail-kpi-label">Projected burn rate</span>
+                <span className="detail-kpi-value">{hourly != null ? `${fmtTWD(hourly)}/h` : "—"}</span>
+                <span className="detail-kpi-sub">Internal/Admin minimum NT${MIN_INTERNAL_ADMIN_HOURLY_TWD}/h</span>
+              </div>
+            ) : (
+              <div className="detail-kpi-card">
+                <span className="detail-kpi-label">Company donation</span>
+                <span className="detail-kpi-value">{donationPct}%</span>
+                <span className="detail-kpi-sub">{donationTWD != null ? fmtTWD(donationTWD) : "—"}</span>
+              </div>
+            )}
             <div className="detail-kpi-card">
               <span className="detail-kpi-label">Task hours left</span>
               <span className="detail-kpi-value">{remainingHours != null ? fmtH(remainingHours) : "—"}</span>
@@ -698,11 +780,21 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               <span className="detail-kpi-value">{fmtH(teamMaxHours)}</span>
               <span className="detail-kpi-sub">{unassignedTeamHours != null ? `${fmtH(unassignedTeamHours)} unassigned` : ""}</span>
             </div>
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Budget after donation</span>
-              <span className="detail-kpi-value">{effectiveBudgetTWD != null ? fmtTWD(effectiveBudgetTWD) : "—"}</span>
-              <span className="detail-kpi-sub">used for hourly estimate</span>
-            </div>
+            {internalOrAdmin ? (
+              <div className="detail-kpi-card">
+                <span className="detail-kpi-label">Burned so far</span>
+                <span className="detail-kpi-value">{burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"}</span>
+                <span className="detail-kpi-sub">
+                  {projectedBurnAtMaxTWD != null ? `Projected max ${fmtTWD(projectedBurnAtMaxTWD)}` : "Set max hours for full projection"}
+                </span>
+              </div>
+            ) : (
+              <div className="detail-kpi-card">
+                <span className="detail-kpi-label">Budget after donation</span>
+                <span className="detail-kpi-value">{effectiveBudgetTWD != null ? fmtTWD(effectiveBudgetTWD) : "—"}</span>
+                <span className="detail-kpi-sub">used for hourly estimate</span>
+              </div>
+            )}
           </div>
 
           {maxH != null && (
@@ -834,12 +926,26 @@ export default function ProjectsPage() {
     window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2500);
   }
 
-  function setField(field, value) { setForm((prev) => ({ ...prev, [field]: value })); }
+  function setField(field, value) {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "kind" && isInternalOrAdminKind(value) && !String(next.projectedHourlyWage || "").trim()) {
+        next.projectedHourlyWage = String(MIN_INTERNAL_ADMIN_HOURLY_TWD);
+      }
+      return next;
+    });
+  }
 
   async function handleAdd(e) {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
+    const internalOrAdmin = isInternalOrAdminKind(form.kind);
+    const projectedHourlyWage = form.projectedHourlyWage ? Number(form.projectedHourlyWage) : null;
+    if (internalOrAdmin && (!Number.isFinite(projectedHourlyWage) || projectedHourlyWage < MIN_INTERNAL_ADMIN_HOURLY_TWD)) {
+      addToast(`For Internal/Admin projects, projected hourly wage must be at least NT$${MIN_INTERNAL_ADMIN_HOURLY_TWD}/h.`, true);
+      return;
+    }
     setSaving(true);
     try {
       await createDocument("projects", {
@@ -849,6 +955,7 @@ export default function ProjectsPage() {
         budget:         form.budget         ? Number(form.budget) : null,
         budgetCurrency: form.budgetCurrency,
         donationPercent: Number(form.donationPercent) || 0,
+        projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
         maxHours:       form.maxHours       ? Number(form.maxHours) : null,
         startDate:      form.startDate      || null,
         stagePlans:     [],
@@ -964,6 +1071,18 @@ export default function ProjectsPage() {
             <option key={pct} value={pct}>{pct}% donation</option>
           ))}
         </select>
+        {isInternalOrAdminKind(form.kind) && (
+          <input
+            className="project-field"
+            type="number"
+            placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
+            min={MIN_INTERNAL_ADMIN_HOURLY_TWD}
+            step="1"
+            value={form.projectedHourlyWage}
+            onChange={(e) => setField("projectedHourlyWage", e.target.value)}
+            title="Projected hourly wage for Internal/Admin projects (TWD)"
+          />
+        )}
         <button type="submit" className="btn btn--primary" disabled={saving || !form.name.trim()}>
           Add project
         </button>
