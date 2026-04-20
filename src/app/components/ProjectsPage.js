@@ -119,6 +119,31 @@ function fmtDate(dateStr) {
   return new Date(y, mo - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function phaseNowLabel(startDate, stagePlans) {
+  if (!Array.isArray(stagePlans) || stagePlans.length === 0) {
+    return startDate ? `Not started · starts ${fmtDate(startDate)}` : "No stage plan";
+  }
+
+  const sorted = [...stagePlans].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  if (!startDate) return `Setup · ${sorted[0]?.name || "No stage"}`;
+
+  const start = new Date(startDate + "T00:00:00");
+  const today = new Date();
+  start.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  if (today < start) return `Not started · starts ${fmtDate(startDate)}`;
+
+  const elapsedWeeks = Math.floor((today.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  let acc = 0;
+  for (const sp of sorted) {
+    const span = Math.max(1, Number(sp.weeks) || 0);
+    acc += span;
+    if (elapsedWeeks < acc) return sp.name || "Unnamed stage";
+  }
+  return "Completed";
+}
+
 function newUUID() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -199,7 +224,7 @@ function StagePlanEdit({ stagePlans, onChange }) {
 // ─ StaffingEdit ─────────────────────────────────────────────────────────────────────────────
 
 // Multi-member assignment with roles + per-member maxHours
-function StaffingEdit({ staffing, members, onChange, hourly, projectMaxHours }) {
+function StaffingEdit({ staffing, members, onChange, hourly }) {
   function toggleMember(memberId) {
     const exists = staffing.find((s) => s.memberId === memberId);
     if (exists) {
@@ -269,19 +294,6 @@ function StaffingEdit({ staffing, members, onChange, hourly, projectMaxHours }) 
           </div>
         );
       })}
-      <div className="staffing-grid-foot">
-        <span>
-          Assigned capacity: {fmtH(
-            staffing.reduce((s, entry) => s + (Number(entry.maxHours) || 0), 0)
-          )}
-          {projectMaxHours ? ` / ${fmtH(projectMaxHours)}` : ""}
-        </span>
-        {projectMaxHours != null && (
-          <span>
-            Unassigned: {fmtH(Math.max(0, projectMaxHours - staffing.reduce((s, entry) => s + (Number(entry.maxHours) || 0), 0)))}
-          </span>
-        )}
-      </div>
     </div>
   );
 }
@@ -382,7 +394,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   const stagePlannedHours = Array.isArray(d.stagePlans)
     ? d.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0)
     : 0;
-  const stageAssignableLeft = Math.max(0, stagePlannedHours - hours);
+  const stageAssignableLeft = maxH != null ? Math.max(0, maxH - hours) : null;
 
   // Resolve staffing entries to member objects
   const staffingResolved = useMemo(() => {
@@ -397,6 +409,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     if (!Array.isArray(d.stagePlans)) return [];
     return [...d.stagePlans].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
   }, [d.stagePlans]);
+
+  const phaseNow = useMemo(() => phaseNowLabel(d.startDate, sortedStagePlans), [d.startDate, sortedStagePlans]);
 
   const teamMaxHours = useMemo(() => {
     if (!Array.isArray(d.staffing)) return 0;
@@ -424,7 +438,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
   if (editing) {
     const formStagePlannedHours = form.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0);
-    const formStageAssignableLeft = Math.max(0, formStagePlannedHours - hours);
+    const formStageAssignableLeft = form.maxHours ? Math.max(0, Number(form.maxHours) - hours) : null;
     const formStaffingHours = form.staffing.reduce((s, entry) => s + (Number(entry.maxHours) || 0), 0);
     const formStaffingUnassigned = form.maxHours ? Math.max(0, Number(form.maxHours) - formStaffingHours) : null;
 
@@ -505,38 +519,41 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           </div>
 
           {/* Stage plans */}
-          <div className="project-edit-section">
-            <div className="project-edit-headline">
+          <details className="project-edit-section edit-disclosure" open>
+            <summary className="edit-disclosure-summary">
               <span className="project-edit-label">Stage plan</span>
               <span className="project-edit-metric">
-                Planned: {fmtH(formStagePlannedHours)} · Left to assign: {fmtH(formStageAssignableLeft)}
+                Estimate: {fmtH(formStagePlannedHours)} · Left to assign: {formStageAssignableLeft != null ? fmtH(formStageAssignableLeft) : "Set max hours"}
               </span>
+            </summary>
+            <div className="edit-disclosure-body">
+              <StagePlanEdit
+                stagePlans={form.stagePlans}
+                onChange={(v) => setField("stagePlans", v)}
+              />
             </div>
-            <StagePlanEdit
-              stagePlans={form.stagePlans}
-              onChange={(v) => setField("stagePlans", v)}
-            />
-          </div>
+          </details>
 
           {/* Staffing */}
           {members.length > 0 && (
-            <div className="project-edit-section">
-              <div className="project-edit-headline">
+            <details className="project-edit-section edit-disclosure" open>
+              <summary className="edit-disclosure-summary">
                 <span className="project-edit-label">Team staffing</span>
                 <span className="project-edit-metric">
-                  Assigned: {fmtH(formStaffingHours)}
+                  Capacity: {fmtH(formStaffingHours)}
                   {form.maxHours ? ` / ${fmtH(Number(form.maxHours) || 0)}` : ""}
                   {formStaffingUnassigned != null ? ` · Unassigned: ${fmtH(formStaffingUnassigned)}` : ""}
                 </span>
+              </summary>
+              <div className="edit-disclosure-body">
+                <StaffingEdit
+                  staffing={form.staffing}
+                  members={members}
+                  onChange={(v) => setField("staffing", v)}
+                  hourly={hourly}
+                />
               </div>
-              <StaffingEdit
-                staffing={form.staffing}
-                members={members}
-                onChange={(v) => setField("staffing", v)}
-                hourly={hourly}
-                projectMaxHours={form.maxHours ? Number(form.maxHours) : null}
-              />
-            </div>
+            </details>
           )}
 
           <div className="project-edit-actions">
@@ -607,10 +624,13 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           <strong>Team:</strong> {teamPreview || "Unassigned"}
           {staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}
         </span>
+        <span className="condensed-item"><strong>Phase:</strong> {phaseNow}</span>
         {remainingHours != null && (
           <span className="condensed-item condensed-item--highlight"><strong>Unassigned work:</strong> {fmtH(remainingHours)}</span>
         )}
-        <span className="condensed-item condensed-item--highlight"><strong>Stage hrs left:</strong> {fmtH(stageAssignableLeft)}</span>
+        {stageAssignableLeft != null && (
+          <span className="condensed-item condensed-item--highlight"><strong>Hours left to assign:</strong> {fmtH(stageAssignableLeft)}</span>
+        )}
       </div>
 
       {/* Expanded detail panel */}
@@ -650,9 +670,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               </div>
             )}
             <div className="detail-stat">
-              <span className="detail-stat-label">Stage hrs left</span>
-              <span className="detail-stat-val">{fmtH(stageAssignableLeft)}</span>
-              <span className="detail-stat-sub">{fmtH(stagePlannedHours)} planned vs {fmtH(hours)} assigned</span>
+              <span className="detail-stat-label">Hours left to assign</span>
+              <span className="detail-stat-val">{stageAssignableLeft != null ? fmtH(stageAssignableLeft) : "Set max hours"}</span>
+              <span className="detail-stat-sub">{maxH != null ? `${fmtH(maxH)} max vs ${fmtH(hours)} assigned` : `${fmtH(stagePlannedHours)} stage estimate`}</span>
             </div>
           </div>
 
