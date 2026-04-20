@@ -4,8 +4,8 @@ const TABS = [
   { key: "members", label: "Member To-do" },
   { key: "projects", label: "Projects" },
   { key: "finance", label: "Finance" },
-  { key: "tasks", label: "Tasks" },
-  { key: "kanban", label: "Kanban" },
+  { key: "tasks", label: "X" },
+  { key: "kanban", label: "X" },
   { key: "meetingNotes", label: "Meeting Notes" },
   { key: "resources", label: "Resources" },
 ];

@@ -655,7 +655,6 @@ export default function MembersPage() {
         <div className="members-week-info">
           <span className="members-quarter">{quarterLabel(selectedWeek)}</span>
           <h2 className="members-week-title">{relativeWeekTitle(selectedWeek)}</h2>
-          <span className="members-week-dates">{weekLabel(getMondayOf(new Date(selectedWeek + "T00:00:00")))}</span>
         </div>
         <select
           className="week-select"

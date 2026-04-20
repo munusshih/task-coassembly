@@ -182,13 +182,16 @@ function StagePlanEdit({ stagePlans, onChange }) {
     <div className="stage-list">
       {stagePlans.map((sp, i) => (
         <div key={sp.id || i} className="stage-row">
-          <input
-            className="project-field stage-field--name"
-            type="text"
-            placeholder="Stage name"
-            value={sp.name}
-            onChange={(e) => setSpField(i, "name", e.target.value)}
-          />
+          <label className="stage-title-label">
+            <span>Stage title</span>
+            <input
+              className="project-field stage-field--name"
+              type="text"
+              placeholder="Stage name"
+              value={sp.name}
+              onChange={(e) => setSpField(i, "name", e.target.value)}
+            />
+          </label>
           <div className="stage-row-nums">
             <div className="stage-num-label">
               <span>weeks</span>
@@ -616,20 +619,39 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       </div>
 
       <div className="project-row-condensed" onClick={() => setOpen((s) => !s)}>
-        <span className="condensed-item">
-          <strong>Stages:</strong> {stagePreview || "Not set"}
-          {sortedStagePlans.length > 3 ? ` +${sortedStagePlans.length - 3} more` : ""}
-        </span>
-        <span className="condensed-item">
-          <strong>Team:</strong> {teamPreview || "Unassigned"}
-          {staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}
-        </span>
-        <span className="condensed-item"><strong>Phase:</strong> {phaseNow}</span>
+        <div className="condensed-cell">
+          <span className="condensed-label">Status</span>
+          {d.status
+            ? <span className="condensed-status" style={{ background: statusSt.bg, color: statusSt.color }}>{d.status}</span>
+            : <span className="condensed-value">—</span>}
+        </div>
+        <div className="condensed-cell condensed-cell--wide">
+          <span className="condensed-label">Phase now</span>
+          <span className="condensed-value">{phaseNow}</span>
+        </div>
+        <div className="condensed-cell condensed-cell--wide">
+          <span className="condensed-label">Stage plan</span>
+          <span className="condensed-value">
+            {stagePreview || "Not set"}
+            {sortedStagePlans.length > 3 ? ` +${sortedStagePlans.length - 3} more` : ""}
+          </span>
+        </div>
+        <div className="condensed-cell">
+          <span className="condensed-label">Team</span>
+          <span className="condensed-value">
+            {teamPreview || "Unassigned"}
+            {staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}
+          </span>
+        </div>
+        <div className="condensed-cell condensed-cell--metric">
+          <span className="condensed-label">Hours left</span>
+          <span className="condensed-value condensed-value--highlight">{stageAssignableLeft != null ? fmtH(stageAssignableLeft) : "—"}</span>
+        </div>
         {remainingHours != null && (
-          <span className="condensed-item condensed-item--highlight"><strong>Unassigned work:</strong> {fmtH(remainingHours)}</span>
-        )}
-        {stageAssignableLeft != null && (
-          <span className="condensed-item condensed-item--highlight"><strong>Hours left to assign:</strong> {fmtH(stageAssignableLeft)}</span>
+          <div className="condensed-cell condensed-cell--metric">
+            <span className="condensed-label">Unassigned work</span>
+            <span className="condensed-value condensed-value--highlight">{fmtH(remainingHours)}</span>
+          </div>
         )}
       </div>
 
