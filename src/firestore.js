@@ -1,0 +1,61 @@
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  setDoc,
+} from "firebase/firestore";
+import { db } from "./firebase";
+
+function getDb() {
+  if (!db) {
+    throw new Error(
+      "Firebase is not configured. Add NEXT_PUBLIC_FIREBASE_* environment variables.",
+    );
+  }
+
+  return db;
+}
+
+function sortDocuments(items) {
+  return [...items].sort((left, right) => {
+    const leftCreatedAt = Number(left.data.createdAt) || 0;
+    const rightCreatedAt = Number(right.data.createdAt) || 0;
+
+    if (leftCreatedAt !== rightCreatedAt) {
+      return rightCreatedAt - leftCreatedAt;
+    }
+
+    const leftName = String(left.data.name || left.id).toLowerCase();
+    const rightName = String(right.data.name || right.id).toLowerCase();
+    return leftName.localeCompare(rightName);
+  });
+}
+
+export function subscribeCollection(collectionName, onData) {
+  const collectionRef = collection(getDb(), collectionName);
+
+  return onSnapshot(collectionRef, (snapshot) => {
+    const documents = snapshot.docs.map((snapshotDocument) => ({
+      id: snapshotDocument.id,
+      data: snapshotDocument.data(),
+    }));
+
+    onData(sortDocuments(documents));
+  });
+}
+
+export async function createDocument(collectionName, payload) {
+  const collectionRef = collection(getDb(), collectionName);
+  const documentRef = await addDoc(collectionRef, payload);
+  return documentRef.id;
+}
+
+export async function replaceDocument(collectionName, id, payload) {
+  await setDoc(doc(getDb(), collectionName, id), payload);
+}
+
+export async function deleteDocument(collectionName, id) {
+  await deleteDoc(doc(getDb(), collectionName, id));
+}
