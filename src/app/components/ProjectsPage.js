@@ -522,7 +522,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           </div>
 
           {/* Stage plans */}
-          <details className="project-edit-section edit-disclosure" open>
+          <details className="project-edit-section edit-disclosure">
             <summary className="edit-disclosure-summary">
               <span className="project-edit-label">Stage plan</span>
               <span className="project-edit-metric">
@@ -539,7 +539,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
           {/* Staffing */}
           {members.length > 0 && (
-            <details className="project-edit-section edit-disclosure" open>
+            <details className="project-edit-section edit-disclosure">
               <summary className="edit-disclosure-summary">
                 <span className="project-edit-label">Team staffing</span>
                 <span className="project-edit-metric">
@@ -619,40 +619,33 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       </div>
 
       <div className="project-row-condensed" onClick={() => setOpen((s) => !s)}>
-        <div className="condensed-cell">
-          <span className="condensed-label">Status</span>
-          {d.status
-            ? <span className="condensed-status" style={{ background: statusSt.bg, color: statusSt.color }}>{d.status}</span>
-            : <span className="condensed-value">—</span>}
+        <div className="condensed-topline">
+          <div className="condensed-phase-block">
+            <span className="condensed-label">Current phase</span>
+            <span className="condensed-phase-val">{phaseNow}</span>
+          </div>
+          <div className="condensed-phase-meta">
+            {d.status && <span className="condensed-status" style={{ background: statusSt.bg, color: statusSt.color }}>{d.status}</span>}
+            <span className="condensed-value condensed-value--highlight">
+              {stageAssignableLeft != null ? `${fmtH(stageAssignableLeft)} left` : "Set max hours"}
+            </span>
+          </div>
         </div>
-        <div className="condensed-cell condensed-cell--wide">
-          <span className="condensed-label">Phase now</span>
-          <span className="condensed-value">{phaseNow}</span>
-        </div>
-        <div className="condensed-cell condensed-cell--wide">
-          <span className="condensed-label">Stage plan</span>
-          <span className="condensed-value">
-            {stagePreview || "Not set"}
-            {sortedStagePlans.length > 3 ? ` +${sortedStagePlans.length - 3} more` : ""}
-          </span>
-        </div>
-        <div className="condensed-cell">
-          <span className="condensed-label">Team</span>
-          <span className="condensed-value">
-            {teamPreview || "Unassigned"}
-            {staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}
-          </span>
-        </div>
-        <div className="condensed-cell condensed-cell--metric">
-          <span className="condensed-label">Hours left</span>
-          <span className="condensed-value condensed-value--highlight">{stageAssignableLeft != null ? fmtH(stageAssignableLeft) : "—"}</span>
-        </div>
-        {remainingHours != null && (
-          <div className="condensed-cell condensed-cell--metric">
-            <span className="condensed-label">Unassigned work</span>
-            <span className="condensed-value condensed-value--highlight">{fmtH(remainingHours)}</span>
+
+        {maxH != null && (
+          <div className="condensed-progress-track" role="img" aria-label={`Assigned ${fmtH(hours)} out of ${fmtH(maxH)}`}>
+            <div
+              className="condensed-progress-fill"
+              style={{ width: `${Math.max(0, Math.min(100, Math.round((hours / Math.max(1, maxH)) * 100)))}%` }}
+            />
           </div>
         )}
+
+        <div className="condensed-chip-row">
+          <span className="condensed-chip"><strong>Stages</strong> {stagePreview || "Not set"}{sortedStagePlans.length > 3 ? ` +${sortedStagePlans.length - 3}` : ""}</span>
+          <span className="condensed-chip"><strong>Team</strong> {teamPreview || "Unassigned"}{staffingResolved.length > 3 ? ` +${staffingResolved.length - 3}` : ""}</span>
+          {remainingHours != null && <span className="condensed-chip condensed-chip--warn"><strong>Unassigned</strong> {fmtH(remainingHours)}</span>}
+        </div>
       </div>
 
       {/* Expanded detail panel */}
