@@ -16,6 +16,7 @@ import BoardSection from "./ui/BoardSection";
 import EmptyState from "./ui/EmptyState";
 import Pill from "./ui/Pill";
 import SelectField from "./ui/SelectField";
+import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
 
 // ─── Constants ───────────────────────────────────────────────────────────────────────────────
@@ -738,7 +739,6 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
     <BoardSection
       title={project?.data?.name || "Unassigned"}
       badge={`${totalActive} active`}
-      className="backlog-section"
     >
       <div className="wish-list-area">
         {Object.keys(byMember).length === 0 && !addOpen && (
@@ -1509,14 +1509,16 @@ export default function MembersPage() {
     },
   ];
 
+  const memberBoardSubtitle = `${members.length} member${members.length !== 1 ? "s" : ""} · Weekly planning board`;
+
   return (
-    <div className="members-page">
-      <div className="members-week-bar">
-        <div className="members-week-info">
-          <span className="members-quarter">{quarterLabel(selectedWeek)}</span>
-          <h2 className="members-week-title">{relativeWeekTitle(selectedWeek)}</h2>
-        </div>
-        <div className="members-week-bar-right">
+    <TabPage
+      className="members-page"
+      title={relativeWeekTitle(selectedWeek)}
+      badge={quarterLabel(selectedWeek)}
+      subtitle={memberBoardSubtitle}
+      right={(
+        <>
           <ViewToggle
             className="projects-view-toggle"
             value={memberViewMode}
@@ -1538,8 +1540,9 @@ export default function MembersPage() {
               );
             })}
           </SelectField>
-        </div>
-      </div>
+        </>
+      )}
+    >
 
       {members.length === 0 && <EmptyState>No members found in Firestore.</EmptyState>}
 
@@ -1600,6 +1603,6 @@ export default function MembersPage() {
           <div key={t.id} className={t.isError ? "toast toast--error" : "toast"}>{t.message}</div>
         ))}
       </div>
-    </div>
+    </TabPage>
   );
 }

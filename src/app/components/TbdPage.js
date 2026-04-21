@@ -1,15 +1,14 @@
 "use client";
 
 import EmptyState from "./ui/EmptyState";
-import PageHeader from "./ui/PageHeader";
+import TabPage from "./ui/TabPage";
 
 export default function TbdPage({ tabKey }) {
   return (
-    <div className="tbd-page">
-      <PageHeader title={tabKey} />
-      <div className="panel empty-state-card">
+    <TabPage className="tbd-page" title={tabKey}>
+      <div className="card-section">
         <EmptyState inset>This section is under construction. Check back soon.</EmptyState>
       </div>
-    </div>
+    </TabPage>
   );
 }

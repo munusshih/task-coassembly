@@ -14,10 +14,10 @@ import { DELETE_ICON } from "./icons";
 import AddTrigger from "./ui/AddTrigger";
 import BoardSection from "./ui/BoardSection";
 import ModalShell from "./ui/ModalShell";
-import PageHeader from "./ui/PageHeader";
 import InputField from "./ui/InputField";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
+import TabPage from "./ui/TabPage";
 
 const TODO_TYPE = "memberTodo";
 const REACTION_EMOJIS = ["👍", "🔥", "💡", "❤️"];
@@ -219,7 +219,6 @@ function ProjectSection({ project, items, members, onAdd, onDelete, onPush, onRe
     <BoardSection
       title={project?.data?.name || "Unassigned"}
       badge={String(items.length)}
-      className="backlog-section"
     >
       <div className="wish-list-area">
         {visibleItems.length > 0 && (
@@ -373,19 +372,18 @@ export default function BacklogPage() {
   const totalItems = wishItems.length;
 
   return (
-    <div className="backlog-page">
-      <PageHeader
-        title="Wishes"
-        badge={`${totalItems} wish${totalItems !== 1 ? "es" : ""}`}
-        right={(
-          <SearchField
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-        )}
-      />
-
+    <TabPage
+      className="backlog-page"
+      title="Wishes"
+      badge={`${totalItems} wish${totalItems !== 1 ? "es" : ""}`}
+      right={(
+        <SearchField
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery("")}
+        />
+      )}
+    >
       <div className="backlog-grid">
         {sortedProjects.map((project) => (
           <ProjectSection
@@ -412,6 +410,6 @@ export default function BacklogPage() {
           onComment={handleComment}
         />
       </div>
-    </div>
+    </TabPage>
   );
 }

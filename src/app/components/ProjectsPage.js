@@ -12,9 +12,10 @@ import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON, EDIT_ICON, KANBAN_VIEW_ICON, LIST_VIEW_ICON } from "./icons";
 import EmptyState from "./ui/EmptyState";
+import InputField from "./ui/InputField";
 import SelectField from "./ui/SelectField";
 import ModalShell from "./ui/ModalShell";
-import PageHeader from "./ui/PageHeader";
+import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
 
 // ─ Constants ───────────────────────────────────────────────────────────────────────────────────
@@ -206,7 +207,7 @@ function StagePlanEdit({ stagePlans, onChange }) {
         <div key={sp.id || i} className="stage-row">
           <label className="stage-title-label">
             <span>Stage title</span>
-            <input
+            <InputField
               className="project-field stage-field--name"
               type="text"
               placeholder="Stage name"
@@ -225,7 +226,7 @@ function StagePlanEdit({ stagePlans, onChange }) {
             </div>
             <label className="stage-num-label">
               <span>est. hours</span>
-              <input
+              <InputField
                 className="project-field stage-field--num"
                 type="number"
                 placeholder="0"
@@ -300,7 +301,7 @@ function StaffingEdit({ staffing, members, onChange, hourly }) {
               ))}
             </div>
             <label className="staffing-col staffing-col--hours">
-              <input
+              <InputField
                 className="project-field staffing-field--hours"
                 type="number"
                 placeholder="0"
@@ -525,7 +526,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           <div className="edit-field-grid">
             <label className="edit-field-group edit-field-group--wide">
               <span className="edit-field-label">Project name *</span>
-              <input
+              <InputField
                 className="project-field"
                 type="text"
                 placeholder="e.g. Asian Labor Future Index Site"
@@ -551,7 +552,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             </label>
             <label className="edit-field-group">
               <span className="edit-field-label">Start date</span>
-              <input
+              <InputField
                 className="project-field"
                 type="date"
                 value={form.startDate}
@@ -561,7 +562,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             <div className="edit-field-group">
               <span className="edit-field-label">Budget</span>
               <div className="project-budget-group">
-                <input
+                <InputField
                   className="project-field project-field--budget"
                   type="number"
                   placeholder="Amount"
@@ -595,7 +596,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             {formInternalOrAdmin && (
               <label className="edit-field-group">
                 <span className="edit-field-label">Projected hourly wage (TWD)</span>
-                <input
+                <InputField
                   className="project-field"
                   type="number"
                   placeholder={`min ${MIN_INTERNAL_ADMIN_HOURLY_TWD}`}
@@ -608,7 +609,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             )}
             <label className="edit-field-group">
               <span className="edit-field-label">Max billable hours</span>
-              <input
+              <InputField
                 className="project-field"
                 type="number"
                 placeholder="e.g. 150"
@@ -1152,25 +1153,24 @@ export default function ProjectsPage() {
     : "Budget, staffing, and delivery capacity overview";
 
   return (
-    <div className="projects-page">
-      <PageHeader
-        className="members-header"
-        title="Projects"
-        badge={`${projects.length} project${projects.length !== 1 ? "s" : ""}`}
-        subtitle={projectSubtitle}
-        right={(
-          <ViewToggle
-            className="projects-view-toggle"
-            value={viewMode}
-            onChange={setViewMode}
-            options={projectViewOptions}
-            ariaLabel="Project view"
-          />
-        )}
-      />
+    <TabPage
+      className="projects-page"
+      title="Projects"
+      badge={`${projects.length} project${projects.length !== 1 ? "s" : ""}`}
+      subtitle={projectSubtitle}
+      right={(
+        <ViewToggle
+          className="projects-view-toggle"
+          value={viewMode}
+          onChange={setViewMode}
+          options={projectViewOptions}
+          ariaLabel="Project view"
+        />
+      )}
+    >
 
       <form className="project-add-form" onSubmit={handleAdd}>
-        <input
+        <InputField
           className="project-field project-field--name"
           type="text"
           placeholder="Project name *"
@@ -1187,7 +1187,7 @@ export default function ProjectsPage() {
           {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </SelectField>
         <div className="project-budget-group">
-          <input
+          <InputField
             className="project-field project-field--budget"
             type="number"
             placeholder="Budget"
@@ -1212,7 +1212,7 @@ export default function ProjectsPage() {
           ))}
         </SelectField>
         {isInternalOrAdminKind(form.kind) && (
-          <input
+          <InputField
             className="project-field"
             type="number"
             placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
@@ -1263,6 +1263,6 @@ export default function ProjectsPage() {
           <div key={t.id} className={t.isError ? "toast toast--error" : "toast"}>{t.message}</div>
         ))}
       </div>
-    </div>
+    </TabPage>
   );
 }

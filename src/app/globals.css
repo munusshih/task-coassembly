@@ -368,16 +368,25 @@ button { cursor: pointer; }
 
 /* ─── Shared page headers ────────────────────────────────────────────────── */
 
-.page-header,
-.page-topbar {
+.tab-page {
+  display: grid;
+  gap: var(--tab-page-gap, 20px);
+}
+
+.tab-page-content {
+  display: grid;
+  gap: var(--tab-content-gap, 16px);
+}
+
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
-.page-header-left,
-.page-topbar-left {
+
+.page-header-left {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -388,8 +397,7 @@ button { cursor: pointer; }
   gap: 10px;
   min-width: 0;
 }
-.page-header-right,
-.page-topbar-right {
+.page-header-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -477,16 +485,8 @@ button { cursor: pointer; }
 }
 
 .search-input {
-  font: inherit;
-  font-size: 13px;
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-sm);
-  padding: 5px 10px;
-  background: var(--surface);
-  color: var(--text);
   width: 180px;
 }
-.search-input:focus { outline: none; border-color: #999; }
 .search-input::placeholder { color: var(--text-muted); }
 
 .search-clear {
@@ -571,8 +571,10 @@ button { cursor: pointer; }
 
 /* ─── Members page ───────────────────────────────────────────────────────── */
 
-.members-page   { display: grid; gap: 24px; }
-.members-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.members-page {
+  --tab-page-gap: 24px;
+  --tab-content-gap: 24px;
+}
 
 .projects-view-toggle,
 .view-toggle-group {
@@ -1242,7 +1244,10 @@ button { cursor: pointer; }
 
 /* ─── Projects page ──────────────────────────────────────────────────────── */
 
-.projects-page { display: grid; gap: 24px; }
+.projects-page {
+  --tab-page-gap: 24px;
+  --tab-content-gap: 24px;
+}
 
 .project-add-form {
   display: flex;
@@ -1256,17 +1261,9 @@ button { cursor: pointer; }
 }
 
 .project-field {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fafafa;
-  color: #1a1a1a;
-  padding: 7px 10px;
-  font: inherit;
-  font-size: 14px;
   min-width: 0;
 }
 
-.project-field:focus { outline: none; border-color: #999; background: #fff; }
 .project-field--name     { flex: 3 1 180px; }
 .project-field--kind     { flex: 1 1 130px; }
 .project-field--status   { flex: 1 1 160px; }
@@ -1956,6 +1953,8 @@ button { cursor: pointer; }
 
 /* ─── Data view ──────────────────────────────────────────────────────────── */
 
+.data-view-page { --tab-content-gap: 12px; }
+
 .panel {
   background: #fff;
   border-radius: 6px;
@@ -1964,7 +1963,7 @@ button { cursor: pointer; }
 }
 
 .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.workspace { display: grid; gap: 12px; margin-top: 12px; }
+.workspace { display: grid; gap: 12px; }
 
 .document-list { display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
 
@@ -2264,14 +2263,9 @@ button { cursor: pointer; }
 /* ─── Meeting Notes ────────────────────────────────────────────────────── */
 
 .notes-page {
-  display: grid;
-  gap: 20px;
+  --tab-page-gap: 20px;
+  --tab-content-gap: 20px;
 }
-
-/* Notes topbar — now uses shared .page-topbar classes */
-.notes-topbar       { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.notes-topbar-left  { display: flex; align-items: baseline; gap: 10px; }
-.notes-topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Create area */
 .note-create-area {
@@ -2639,17 +2633,7 @@ button { cursor: pointer; }
 
 /* ─── Resources ────────────────────────────────────────────────────── */
 
-.resources-page {
-  display: grid;
-  gap: 16px;
-}
-
-/* resources-topbar / resources-topbar-left / resources-topbar-right 
-   now use shared .page-topbar classes — kept as aliases for backwards compat */
-.resources-topbar       { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.resources-topbar-left  { display: flex; align-items: baseline; gap: 10px; }
-.resources-count        { font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--fill); border-radius: var(--radius-pill); padding: 1px 8px; }
-.resources-topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.resources-page { --tab-content-gap: 16px; }
 
 /* .resource-search and .resource-search-clear replaced by shared .search-input / .search-clear */
 
@@ -2912,17 +2896,10 @@ button { cursor: pointer; }
   grid-template-columns: minmax(0,1fr) minmax(0,1fr) 24px;
 }
 
-/* Shared input — use design tokens to match search-input */
 .resource-input {
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-  color: var(--text);
-  padding: 7px 10px;
-  font: inherit;
-  font-size: 13px;
+  width: 100%;
+  min-width: 0;
 }
-.resource-input:focus { outline: none; border-color: #999; }
 .resource-input::placeholder { color: var(--text-muted); }
 .resource-input--sm { padding: 5px 8px; font-size: 12px; }
 
@@ -3172,7 +3149,10 @@ button { cursor: pointer; }
 
 /* ─── Member directory page ─────────────────────────────────────────────── */
 
-.member-directory-page { display: grid; gap: 18px; }
+.member-directory-page {
+  --tab-page-gap: 18px;
+  --tab-content-gap: 18px;
+}
 
 .member-directory-kpis {
   display: grid;
@@ -3684,8 +3664,8 @@ button { cursor: pointer; }
 /* ─── Backlog Page ────────────────────────────────────────────────────── */
 
 .backlog-page {
-  display: grid;
-  gap: 20px;
+  --tab-page-gap: 20px;
+  --tab-content-gap: 20px;
 }
 
 .backlog-grid {
@@ -3695,37 +3675,11 @@ button { cursor: pointer; }
   align-items: start;
 }
 
-.board-section,
-.backlog-section {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e5e3e1;
-  overflow: hidden;
-}
-
-.board-section-head,
-.backlog-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid #f0edeb;
-}
-
-.board-section-title,
-.backlog-section-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #333;
-}
 .board-section-meta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-
-/* .backlog-section-count replaced by shared .count-badge */
 
 .backlog-lined-paper {
   padding: 6px 0 10px;
@@ -3812,15 +3766,7 @@ button { cursor: pointer; }
 .backlog-add-input {
   flex: 1;
   min-width: 120px;
-  font: inherit;
-  font-size: 13px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 5px 10px;
-  background: #fff;
-  color: #1a1a1a;
 }
-.backlog-add-input:focus { outline: none; border-color: #999; }
 
 /* backlog add trigger now uses shared .add-trigger--inset */
 

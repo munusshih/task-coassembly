@@ -19,9 +19,9 @@ import {
 } from "./icons";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
-import PageHeader from "./ui/PageHeader";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
+import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
 
 const NOTE_SCOPE_DATE = "date";
@@ -847,27 +847,27 @@ export default function MeetingNotesPage() {
   ];
 
   return (
-    <div className="notes-page">
-      <PageHeader
-        title="Notes / doc"
-        badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
-        right={(
-          <>
-            <SearchField
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onClear={() => setSearchQuery("")}
-            />
-            <ViewToggle
-              className="projects-view-toggle"
-              value={groupMode}
-              onChange={setGroupMode}
-              options={groupingOptions}
-              ariaLabel="Note grouping"
-            />
-          </>
-        )}
-      />
+    <TabPage
+      className="notes-page"
+      title="Notes / doc"
+      badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
+      right={(
+        <>
+          <SearchField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onClear={() => setSearchQuery("")}
+          />
+          <ViewToggle
+            className="projects-view-toggle"
+            value={groupMode}
+            onChange={setGroupMode}
+            options={groupingOptions}
+            ariaLabel="Note grouping"
+          />
+        </>
+      )}
+    >
 
       <div className="note-create-area">
         <div className="note-create-row">
@@ -968,6 +968,6 @@ export default function MeetingNotesPage() {
           <EmptyState>No notes match the current filters.</EmptyState>
         )}
       </div>
-    </div>
+    </TabPage>
   );
 }

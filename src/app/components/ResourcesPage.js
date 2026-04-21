@@ -15,9 +15,9 @@ import AddTrigger from "./ui/AddTrigger";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
 import ModalShell from "./ui/ModalShell";
-import PageHeader from "./ui/PageHeader";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
+import TabPage from "./ui/TabPage";
 
 const DEFAULT_CATEGORIES = ["general", "admin", "projects", "finance", "others"];
 
@@ -242,18 +242,18 @@ export default function ResourcesPage() {
   }
 
   return (
-    <div className="resources-page">
-      <PageHeader
-        title="Resources"
-        badge={`${links.length} link${links.length !== 1 ? "s" : ""}`}
-        right={(
-          <SearchField
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-        )}
-      />
+    <TabPage
+      className="resources-page"
+      title="Resources"
+      badge={`${links.length} link${links.length !== 1 ? "s" : ""}`}
+      right={(
+        <SearchField
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery("")}
+        />
+      )}
+    >
 
       {/* Add resource trigger */}
       <AddTrigger label="Add a resource…" onClick={() => setAddOpen(true)} />
@@ -326,6 +326,6 @@ export default function ResourcesPage() {
           />
         </ModalShell>
       )}
-    </div>
+    </TabPage>
   );
 }

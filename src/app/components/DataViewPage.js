@@ -10,7 +10,8 @@ import {
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import EmptyState from "./ui/EmptyState";
-import PageHeader from "./ui/PageHeader";
+import TabPage from "./ui/TabPage";
+import TextareaField from "./ui/TextareaField";
 
 function formatJson(value) {
   return JSON.stringify(value, null, 2);
@@ -97,13 +98,12 @@ export default function DataViewPage({ tabKey }) {
   }
 
   return (
-    <div>
-      <PageHeader
-        title={tabKey}
-        badge={`${documents.length} document${documents.length !== 1 ? "s" : ""}`}
-        subtitle={<>Collection: <code>{collectionName}</code></>}
-      />
-
+    <TabPage
+      className="data-view-page"
+      title={tabKey}
+      badge={`${documents.length} document${documents.length !== 1 ? "s" : ""}`}
+      subtitle={<>Collection: <code>{collectionName}</code></>}
+    >
       <section className="workspace">
         <div className="panel">
           <h3>Documents</h3>
@@ -144,7 +144,7 @@ export default function DataViewPage({ tabKey }) {
               <Button variant="danger" onClick={handleDelete} disabled={!selectedDocument}>Delete</Button>
             </div>
           </div>
-          <textarea
+          <TextareaField
             className="json-input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -160,7 +160,7 @@ export default function DataViewPage({ tabKey }) {
             </div>
             <Button onClick={handleCreate}>Create</Button>
           </div>
-          <textarea
+          <TextareaField
             className="json-input"
             value={newDraft}
             onChange={(e) => setNewDraft(e.target.value)}
@@ -171,6 +171,6 @@ export default function DataViewPage({ tabKey }) {
 
       {status && <p className="message message--ok">{status}</p>}
       {error && <p className="message message--error">{error}</p>}
-    </div>
+    </TabPage>
   );
 }

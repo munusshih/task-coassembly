@@ -14,8 +14,8 @@ import { DELETE_ICON, EDIT_ICON } from "./icons";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
 import ModalShell from "./ui/ModalShell";
-import PageHeader from "./ui/PageHeader";
 import SelectField from "./ui/SelectField";
+import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 
 const TODO_TYPE = "memberTodo";
@@ -663,12 +663,11 @@ export default function MemberDirectoryPage() {
   const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
 
   return (
-    <div className="member-directory-page">
-      <PageHeader
-        className="members-header"
-        title="Members"
-        subtitle="Manage member records, meeting ownership roles, and workload/project assignment snapshots."
-      />
+    <TabPage
+      className="member-directory-page"
+      title="Members"
+      subtitle="Manage member records, meeting ownership roles, and workload/project assignment snapshots."
+    >
 
       <div className="member-directory-kpis">
         <div className="member-directory-kpi">
@@ -1127,6 +1126,6 @@ export default function MemberDirectoryPage() {
           </div>
         </ModalShell>
       )}
-    </div>
+    </TabPage>
   );
 }
