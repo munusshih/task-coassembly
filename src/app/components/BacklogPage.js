@@ -91,24 +91,36 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
           >
             💬{comments.length > 0 && <span className="wish-comment-count">{comments.length}</span>}
           </button>
+          {pushing && (
+            <div className="edit-modal-overlay" onClick={() => { setPushing(false); setSelectedMember(""); }}>
+              <div className="edit-modal edit-modal--sm" onClick={(e) => e.stopPropagation()}>
+                <div className="edit-modal-header">
+                  <span className="edit-modal-title">Push to board</span>
+                  <button type="button" className="edit-modal-close" onClick={() => { setPushing(false); setSelectedMember(""); }}>✕</button>
+                </div>
+                <div className="edit-modal-body">
+                  <p className="push-modal-wish">{item.data.text}</p>
+                  <select
+                    className="backlog-member-select"
+                    value={selectedMember}
+                    onChange={(e) => setSelectedMember(e.target.value)}
+                    autoFocus
+                  >
+                    <option value="">Pick a member…</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="edit-modal-footer">
+                  <button type="button" className="btn btn--primary btn--small" onClick={handlePushConfirm} disabled={!selectedMember}>Push to board</button>
+                  <button type="button" className="btn btn--ghost btn--small" onClick={() => { setPushing(false); setSelectedMember(""); }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
           {pushed ? (
             <span className="backlog-pushed-confirm">✓</span>
-          ) : pushing ? (
-            <div className="wish-push-popover">
-              <select
-                className="backlog-member-select"
-                value={selectedMember}
-                onChange={(e) => setSelectedMember(e.target.value)}
-                autoFocus
-              >
-                <option value="">Pick a member…</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
-                ))}
-              </select>
-              <button type="button" className="btn btn--primary btn--small" onClick={handlePushConfirm} disabled={!selectedMember}>Push</button>
-              <button type="button" className="btn btn--ghost btn--small" onClick={() => { setPushing(false); setSelectedMember(""); }}>✕</button>
-            </div>
           ) : (
             <button type="button" className="backlog-push-btn" onClick={() => setPushing(true)} title="Push to member's board">→</button>
           )}

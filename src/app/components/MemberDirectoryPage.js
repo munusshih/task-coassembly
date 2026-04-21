@@ -517,7 +517,6 @@ export default function MemberDirectoryPage() {
   function startEdit(member) {
     setEditingId(member.id);
     setEditDraft(buildFormFromMember(member.data));
-    setExpandedMembers((prev) => ({ ...prev, [member.id]: true }));
   }
 
   function cancelEdit() {
@@ -653,6 +652,8 @@ export default function MemberDirectoryPage() {
       setNotice({ error: true, text: error.message || "Could not delete member" });
     }
   }
+
+  const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
 
   return (
     <div className="member-directory-page">
@@ -847,8 +848,7 @@ export default function MemberDirectoryPage() {
             thisWeekProjectKindSegments: [],
           };
 
-          const editing = editingId === member.id;
-          const expanded = editing || Boolean(expandedMembers[member.id]);
+          const expanded = Boolean(expandedMembers[member.id]);
           const latestWeek = metric.weekly[0] || {
             weekKey: currentWeekKey,
             assigned: metric.assignedThisWeekCount,
@@ -870,108 +870,23 @@ export default function MemberDirectoryPage() {
                 </div>
 
                 <div className="member-directory-card-actions">
-                  {!editing && (
-                    <IconButton
-                      onClick={() => toggleMemberExpanded(member.id)}
-                      title={expanded ? "Collapse details" : "Expand details"}
-                      aria-expanded={expanded}
-                    >
-                      {expanded ? "▴" : "▾"}
-                    </IconButton>
-                  )}
-                  {!editing && (
-                    <IconButton onClick={() => startEdit(member)} title="Edit">
-                      {EDIT_ICON}
-                    </IconButton>
-                  )}
-                  {!editing && (
-                    <IconButton variant="delete" onClick={() => handleDeleteMember(member)} title="Delete">
-                      {DELETE_ICON}
-                    </IconButton>
-                  )}
+                  <IconButton
+                    onClick={() => toggleMemberExpanded(member.id)}
+                    title={expanded ? "Collapse details" : "Expand details"}
+                    aria-expanded={expanded}
+                  >
+                    {expanded ? "▴" : "▾"}
+                  </IconButton>
+                  <IconButton onClick={() => startEdit(member)} title="Edit">
+                    {EDIT_ICON}
+                  </IconButton>
+                  <IconButton variant="delete" onClick={() => handleDeleteMember(member)} title="Delete">
+                    {DELETE_ICON}
+                  </IconButton>
                 </div>
               </div>
 
-              {editing ? (
-                <div className="member-form-grid">
-                  <label className="member-form-field">
-                    <span>Name</span>
-                    <input
-                      className="member-form-input"
-                      value={editDraft.name}
-                      onChange={(e) => updateEditField("name", e.target.value)}
-                    />
-                  </label>
-                  <label className="member-form-field">
-                    <span>Type</span>
-                    <select
-                      className="member-form-input"
-                      value={editDraft.role}
-                      onChange={(e) => updateEditField("role", e.target.value)}
-                    >
-                      {MEMBER_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="member-form-field">
-                    <span>Email</span>
-                    <input
-                      className="member-form-input"
-                      value={editDraft.email}
-                      onChange={(e) => updateEditField("email", e.target.value)}
-                    />
-                  </label>
-                  <label className="member-form-field">
-                    <span>Timezone</span>
-                    <input
-                      className="member-form-input"
-                      value={editDraft.timezone}
-                      onChange={(e) => updateEditField("timezone", e.target.value)}
-                    />
-                  </label>
-                  <label className="member-form-field">
-                    <span>Joined on</span>
-                    <input
-                      type="date"
-                      className="member-form-input"
-                      value={editDraft.joinedOn}
-                      onChange={(e) => updateEditField("joinedOn", e.target.value)}
-                    />
-                  </label>
-                  <label className="member-form-field member-form-field--toggle">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(editDraft.active)}
-                      onChange={(e) => updateEditField("active", e.target.checked)}
-                    />
-                    <span>Active member</span>
-                  </label>
-                  <label className="member-form-field member-form-field--full">
-                    <span>Notes</span>
-                    <textarea
-                      className="member-form-input member-form-textarea"
-                      value={editDraft.notes}
-                      onChange={(e) => updateEditField("notes", e.target.value)}
-                    />
-                  </label>
-
-                  <div className="member-form-actions member-form-actions--full">
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--small"
-                      onClick={() => saveEdit(member)}
-                      disabled={!editDraft.name.trim()}
-                    >
-                      Save
-                    </button>
-                    <button type="button" className="btn btn--ghost btn--small" onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
+              <>
                   <button
                     type="button"
                     className="member-directory-card-condensed"
@@ -1118,12 +1033,101 @@ export default function MemberDirectoryPage() {
                       )}
                     </div>
                   )}
-                </>
-              )}
+              </>
             </article>
           );
         })}
       </div>
+
+      {editingMember && (
+        <div className="edit-modal-overlay" onClick={cancelEdit}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <span className="edit-modal-title">{editingMember.data?.name || "Edit member"}</span>
+              <button type="button" className="edit-modal-close" onClick={cancelEdit}>✕</button>
+            </div>
+            <div className="edit-modal-body">
+              <div className="member-form-grid">
+                <label className="member-form-field">
+                  <span>Name</span>
+                  <input
+                    className="member-form-input"
+                    value={editDraft.name}
+                    onChange={(e) => updateEditField("name", e.target.value)}
+                    autoFocus
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Type</span>
+                  <select
+                    className="member-form-input"
+                    value={editDraft.role}
+                    onChange={(e) => updateEditField("role", e.target.value)}
+                  >
+                    {MEMBER_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="member-form-field">
+                  <span>Email</span>
+                  <input
+                    className="member-form-input"
+                    value={editDraft.email}
+                    onChange={(e) => updateEditField("email", e.target.value)}
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Timezone</span>
+                  <input
+                    className="member-form-input"
+                    value={editDraft.timezone}
+                    onChange={(e) => updateEditField("timezone", e.target.value)}
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Joined on</span>
+                  <input
+                    type="date"
+                    className="member-form-input"
+                    value={editDraft.joinedOn}
+                    onChange={(e) => updateEditField("joinedOn", e.target.value)}
+                  />
+                </label>
+                <label className="member-form-field member-form-field--toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editDraft.active)}
+                    onChange={(e) => updateEditField("active", e.target.checked)}
+                  />
+                  <span>Active member</span>
+                </label>
+                <label className="member-form-field member-form-field--full">
+                  <span>Notes</span>
+                  <textarea
+                    className="member-form-input member-form-textarea"
+                    value={editDraft.notes}
+                    onChange={(e) => updateEditField("notes", e.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="edit-modal-footer">
+              <button
+                type="button"
+                className="btn btn--primary btn--small"
+                onClick={() => saveEdit(editingMember)}
+                disabled={!editDraft.name.trim()}
+              >
+                Save
+              </button>
+              <button type="button" className="btn btn--ghost btn--small" onClick={cancelEdit}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

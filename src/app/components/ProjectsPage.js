@@ -508,8 +508,15 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     const formStaffingUnassigned = form.maxHours ? Math.max(0, Number(form.maxHours) - formStaffingHours) : null;
 
     return (
-      <li className="project-row project-row--editing">
-        <form className="project-edit-form" onSubmit={handleSave}>
+      <li className="project-row">
+        <div className="edit-modal-overlay" onClick={() => setEditing(false)}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <span className="edit-modal-title">{form.name || "Edit project"}</span>
+              <button type="button" className="edit-modal-close" onClick={() => setEditing(false)}>✕</button>
+            </div>
+            <form className="project-edit-form" onSubmit={handleSave}>
+          <div className="edit-modal-body">
           {/* Section 1: Core info */}
           <div className="edit-field-grid">
             <label className="edit-field-group edit-field-group--wide">
@@ -647,11 +654,14 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             </details>
           )}
 
-          <div className="project-edit-actions">
+          </div>{/* edit-modal-body */}
+          <div className="edit-modal-footer">
             <button type="submit" className="btn btn--primary btn--small" disabled={!form.name.trim()}>Save</button>
             <button type="button" className="btn btn--ghost btn--small" onClick={() => setEditing(false)}>Cancel</button>
           </div>
         </form>
+          </div>{/* edit-modal */}
+        </div>{/* edit-modal-overlay */}
       </li>
     );
   }

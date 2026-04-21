@@ -255,91 +255,84 @@ export default function ResourcesPage() {
         </div>
       </div>
 
-      {/* Add resource area */}
-      {addOpen ? (
-        <div className="resource-add-panel">
-          <span className="resources-section-label">New resource</span>
-          <ResourceForm
-            form={addForm}
-            setForm={setAddForm}
-            categoryOptions={categoryOptions}
-            onSave={handleCreate}
-            onCancel={() => { setAddForm(EMPTY_FORM); setAddOpen(false); }}
-            saveLabel="Add resource"
-          />
-        </div>
-      ) : (
-        <button type="button" className="resource-add-trigger" onClick={() => setAddOpen(true)}>
-          <span className="resource-add-plus">+</span>
-          <span className="resource-add-placeholder">Add a resource…</span>
-        </button>
-      )}
+      {/* Add resource trigger */}
+      <button type="button" className="resource-add-trigger" onClick={() => setAddOpen(true)}>
+        <span className="resource-add-plus">+</span>
+        <span className="resource-add-placeholder">Add a resource…</span>
+      </button>
 
       {/* Sticky note grid */}
       {filteredLinks.length > 0 ? (
         <div className="resources-grid">
           {filteredLinks.map((link) => (
-            <div key={link.id} className={`resource-sticky${editingId === link.id ? " resource-sticky--editing" : ""}`}>
-              {editingId === link.id ? (
-                <div className="resource-sticky-edit">
-                  <ResourceForm
-                    form={editForm}
-                    setForm={setEditForm}
-                    categoryOptions={categoryOptions}
-                    onSave={handleSaveEdit}
-                    onCancel={() => setEditingId(null)}
-                    saveLabel="Save"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="resource-sticky-actions">
-                    <IconButton onClick={() => startEdit(link)} title="Edit">{EDIT_ICON}</IconButton>
-                    {pendingDeleteId === link.id ? (
-                      <>
-                        <Button variant="ghost" size="small" onClick={() => handleDelete(link.id)}>Confirm</Button>
-                        <Button variant="ghost" size="small" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
-                      </>
-                    ) : (
-                      <IconButton variant="delete" onClick={() => setPendingDeleteId(link.id)} title="Delete">{DELETE_ICON}</IconButton>
-                    )}
+            <div key={link.id} className="resource-sticky">
+              <div className="resource-sticky-actions">
+                <IconButton onClick={() => startEdit(link)} title="Edit">{EDIT_ICON}</IconButton>
+                {pendingDeleteId === link.id ? (
+                  <>
+                    <Button variant="ghost" size="small" onClick={() => handleDelete(link.id)}>Confirm</Button>
+                    <Button variant="ghost" size="small" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+                  </>
+                ) : (
+                  <IconButton variant="delete" onClick={() => setPendingDeleteId(link.id)} title="Delete">{DELETE_ICON}</IconButton>
+                )}
+              </div>
+              <div className="resource-sticky-body">
+                <a
+                  className="resource-sticky-name"
+                  href={toLinkHref(link.data.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {link.data.name}
+                </a>
+                {link.data.description && (
+                  <span className="resource-sticky-desc">{link.data.description}</span>
+                )}
+                {Array.isArray(link.data.subLinks) && link.data.subLinks.filter((s) => s.url).length > 0 && (
+                  <div className="resource-sticky-sublinks">
+                    {link.data.subLinks.filter((s) => s.url).map((sl, i) => (
+                      <a
+                        key={i}
+                        className="resource-sticky-sublink"
+                        href={toLinkHref(sl.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {sl.label || sl.url}
+                      </a>
+                    ))}
                   </div>
-                  <div className="resource-sticky-body">
-                    <a
-                      className="resource-sticky-name"
-                      href={toLinkHref(link.data.url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {link.data.name}
-                    </a>
-                    {link.data.description && (
-                      <span className="resource-sticky-desc">{link.data.description}</span>
-                    )}
-                    {Array.isArray(link.data.subLinks) && link.data.subLinks.filter((s) => s.url).length > 0 && (
-                      <div className="resource-sticky-sublinks">
-                        {link.data.subLinks.filter((s) => s.url).map((sl, i) => (
-                          <a
-                            key={i}
-                            className="resource-sticky-sublink"
-                            href={toLinkHref(sl.url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {sl.label || sl.url}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="resource-sticky-cat">{normalizeCategory(link.data.category)}</span>
-                </>
-              )}
+                )}
+              </div>
+              <span className="resource-sticky-cat">{normalizeCategory(link.data.category)}</span>
             </div>
           ))}
         </div>
       ) : (
         <p className="empty-state">{searchQuery ? "No results." : "No resources yet. Add one above!"}</p>
+      )}
+
+      {/* Add / Edit modal */}
+      {(addOpen || editingId !== null) && (
+        <div className="edit-modal-overlay" onClick={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <span className="edit-modal-title">{editingId ? "Edit resource" : "Add resource"}</span>
+              <button type="button" className="edit-modal-close" onClick={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}>✕</button>
+            </div>
+            <div className="edit-modal-body">
+              <ResourceForm
+                form={editingId ? editForm : addForm}
+                setForm={editingId ? setEditForm : setAddForm}
+                categoryOptions={categoryOptions}
+                onSave={editingId ? handleSaveEdit : handleCreate}
+                onCancel={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}
+                saveLabel={editingId ? "Save" : "Add resource"}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
