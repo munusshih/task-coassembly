@@ -19,6 +19,7 @@ const MEETING_ROTATION = ["facilitator", "notetaker", "time keeper"];
 const MEMBER_TYPE_OPTIONS = [
   { value: "worker-owner", label: "Worker-owner" },
   { value: "associate", label: "Associate" },
+  { value: "contractor", label: "Contractor" },
   { value: "flying-member", label: "Flying member" },
   { value: "external-collaborator", label: "External collaborator" },
 ];
@@ -51,6 +52,7 @@ function normalizeMemberRole(rawRole) {
   const value = String(rawRole || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
   if (value === "worker-owner" || value === "workerowner") return "worker-owner";
   if (value === "associate") return "associate";
+  if (value === "contractor") return "contractor";
   if (value === "flying-member" || value === "flying") return "flying-member";
   if (value === "external-collaborator" || value === "external") return "external-collaborator";
   return "associate";

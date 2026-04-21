@@ -432,8 +432,16 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   const donationPct = Number(d.donationPercent) || 0;
   const donationTWD = donationAmount(budgTWD, donationPct);
   const effectiveBudgetTWD = budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
-  const budgetBasedHourly = (effectiveBudgetTWD != null && maxH && maxH > 0)
-    ? Math.round(effectiveBudgetTWD / maxH)
+  const leadStaff = Array.isArray(d.staffing) ? d.staffing.find((s) => (s.roles || []).includes("lead")) : null;
+  // Lead bonus: 10% of post-donation budget, always applied to non-Internal/Admin projects
+  const leadBonusTWD = (!internalOrAdmin && effectiveBudgetTWD != null)
+    ? Math.round(effectiveBudgetTWD * 0.10)
+    : null;
+  const teamDistributableTWD = (effectiveBudgetTWD != null && leadBonusTWD != null)
+    ? effectiveBudgetTWD - leadBonusTWD
+    : effectiveBudgetTWD;
+  const budgetBasedHourly = (teamDistributableTWD != null && maxH && maxH > 0)
+    ? Math.round(teamDistributableTWD / maxH)
     : null;
   const hourly = internalOrAdmin ? effectiveProjectedHourly : budgetBasedHourly;
   const burnSoFarTWD = hourly != null ? Math.round(hours * hourly) : null;
@@ -483,8 +491,15 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     const formBudgetTWD = budgetToTWD(form.budget, form.budgetCurrency);
     const formDonationTWD = donationAmount(formBudgetTWD, form.donationPercent);
     const formEffectiveBudgetTWD = formBudgetTWD != null ? Math.max(0, formBudgetTWD - (formDonationTWD || 0)) : null;
-    const formBudgetHourly = (formEffectiveBudgetTWD != null && Number(form.maxHours) > 0)
-      ? Math.round(formEffectiveBudgetTWD / Number(form.maxHours))
+    // Lead bonus always applies to non-Internal/Admin projects
+    const formLeadBonusTWD = (!formInternalOrAdmin && formEffectiveBudgetTWD != null)
+      ? Math.round(formEffectiveBudgetTWD * 0.10)
+      : null;
+    const formTeamDistributableTWD = (formEffectiveBudgetTWD != null && formLeadBonusTWD != null)
+      ? formEffectiveBudgetTWD - formLeadBonusTWD
+      : formEffectiveBudgetTWD;
+    const formBudgetHourly = (formTeamDistributableTWD != null && Number(form.maxHours) > 0)
+      ? Math.round(formTeamDistributableTWD / Number(form.maxHours))
       : null;
     const formHourly = formInternalOrAdmin ? formProjectedHourlyValid : formBudgetHourly;
     const formStagePlannedHours = form.stagePlans.reduce((s, sp) => s + (Number(sp.perspectiveHours) || 0), 0);
@@ -648,11 +663,6 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         <div className="project-row-main">
           <span className="project-row-name">{d.name || "Unnamed"}</span>
           <div className="project-row-badges">
-            {d.status && (
-              <span className="project-row-status" style={{ background: statusSt.bg, color: statusSt.color }}>
-                {d.status}
-              </span>
-            )}
             {d.kind && (
               <span
                 className="project-row-kind"
@@ -711,6 +721,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         </div>
       </div>
 
+      {sortedStagePlans.length > 0 && (
       <div className="project-row-condensed" onClick={() => setOpen((s) => !s)}>
         <div className="condensed-topline">
           <div className="condensed-phase-block">
@@ -735,13 +746,14 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         )}
 
         <div className="condensed-chip-row">
-          <span className="condensed-chip"><strong>Stages</strong> {sortedStagePlans.length || 0}</span>
+          <span className="condensed-chip"><strong>Stages</strong> {sortedStagePlans.length}</span>
           <span className="condensed-chip"><strong>Team</strong> {staffingResolved.length || 0}</span>
           {stageAssignableLeft != null && (
             <span className="condensed-chip condensed-chip--warn"><strong>Stage plan left</strong> {fmtH(Math.max(0, stageAssignableLeft))}</span>
           )}
         </div>
       </div>
+      )}
 
       {/* Expanded detail panel */}
       {open && (
@@ -792,7 +804,14 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               <div className="detail-kpi-card">
                 <span className="detail-kpi-label">Budget after donation</span>
                 <span className="detail-kpi-value">{effectiveBudgetTWD != null ? fmtTWD(effectiveBudgetTWD) : "—"}</span>
-                <span className="detail-kpi-sub">used for hourly estimate</span>
+                <span className="detail-kpi-sub">{fmtTWD(teamDistributableTWD)} for team · {fmtTWD(leadBonusTWD)} lead bonus</span>
+              </div>
+            )}
+            {!internalOrAdmin && (
+              <div className="detail-kpi-card">
+                <span className="detail-kpi-label">Lead bonus</span>
+                <span className="detail-kpi-value">{leadBonusTWD != null ? fmtTWD(leadBonusTWD) : "—"}</span>
+                <span className="detail-kpi-sub">10% after donation{leadStaff ? ` · ${staffingResolved.find((s) => (s.roles || []).includes("lead"))?.member?.data?.name || "Lead"}` : " · no lead assigned"}</span>
               </div>
             )}
           </div>
@@ -881,6 +900,18 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       <div className="team-card-pay-row">
                         <span className="team-card-pay-label">Pay est.</span>
                         <span className="team-card-pay-value">{fmtTWD((Number(s.maxHours) || 0) * hourly)}</span>
+                      </div>
+                    )}
+                    {hourly != null && leadBonusTWD != null && (s.roles || []).includes("lead") && (
+                      <div className="team-card-pay-row">
+                        <span className="team-card-pay-label">Lead bonus</span>
+                        <span className="team-card-pay-value">{fmtTWD(leadBonusTWD)}</span>
+                      </div>
+                    )}
+                    {hourly != null && leadBonusTWD != null && (s.roles || []).includes("lead") && (
+                      <div className="team-card-pay-row">
+                        <span className="team-card-pay-label">Total pay</span>
+                        <span className="team-card-pay-value">{fmtTWD((Number(s.maxHours) || 0) * hourly + leadBonusTWD)}</span>
                       </div>
                     )}
                     {hourly != null && (

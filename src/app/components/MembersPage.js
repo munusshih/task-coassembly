@@ -1320,6 +1320,34 @@ export default function MembersPage() {
     return `Project remaining: ${formatHourAmount(remaining)} of ${formatHourAmount(capacityHours)}`;
   }
 
+  const MEMBER_TYPE_ORDER = ["worker-owner", "associate", "contractor", "flying-member", "external-collaborator"];
+  const MEMBER_TYPE_LABELS = {
+    "worker-owner": "Worker-owners",
+    "associate": "Associates",
+    "contractor": "Contractors",
+    "flying-member": "Flying members",
+    "external-collaborator": "External collaborators",
+  };
+
+  function normalizeMemberType(raw) {
+    const v = String(raw || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
+    if (v === "worker-owner" || v === "workerowner") return "worker-owner";
+    if (v === "contractor") return "contractor";
+    if (v === "flying-member" || v === "flying") return "flying-member";
+    if (v === "external-collaborator" || v === "external") return "external-collaborator";
+    return "associate";
+  }
+
+  const membersByType = useMemo(() => {
+    const groups = {};
+    for (const m of members) {
+      const type = normalizeMemberType(m.data?.role);
+      if (!groups[type]) groups[type] = [];
+      groups[type].push(m);
+    }
+    return groups;
+  }, [members]);
+
   return (
     <div className="members-page">
       <div className="members-week-bar">
@@ -1345,25 +1373,30 @@ export default function MembersPage() {
 
       {members.length === 0 && <p className="empty-state">No members found in Firestore.</p>}
 
-      <div className="members-grid">
-        {members.map((member) => (
-          <MemberCard
-            key={member.id}
-            member={member}
-            todos={tasksByMember[member.id] || []}
-            projects={projects}
-            onCreate={handleCreate}
-            onToggle={handleToggle}
-            onToggleSubtask={handleToggleSubtask}
-            onSaveEdit={handleSaveEdit}
-            onDelete={handleDelete}
-            onArchiveAll={handleArchiveAll}
-            onOvertimeSave={handleOvertimeSave}
-            onProjectRemaining={projectRemainingHint}
-            selectedWeek={selectedWeek}
-          />
-        ))}
-      </div>
+      {MEMBER_TYPE_ORDER.filter((type) => membersByType[type]?.length > 0).map((type) => (
+        <div key={type} className="members-type-group">
+          <h3 className="members-type-heading">{MEMBER_TYPE_LABELS[type]}</h3>
+          <div className="members-grid">
+            {membersByType[type].map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                todos={tasksByMember[member.id] || []}
+                projects={projects}
+                onCreate={handleCreate}
+                onToggle={handleToggle}
+                onToggleSubtask={handleToggleSubtask}
+                onSaveEdit={handleSaveEdit}
+                onDelete={handleDelete}
+                onArchiveAll={handleArchiveAll}
+                onOvertimeSave={handleOvertimeSave}
+                onProjectRemaining={projectRemainingHint}
+                selectedWeek={selectedWeek}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
       <div className="toast-container" aria-live="polite">
         {toasts.map((t) => (

@@ -319,6 +319,17 @@ button { cursor: pointer; }
 .members-page   { display: grid; gap: 24px; }
 .members-header { display: grid; gap: 2px; }
 
+.members-type-group { display: grid; gap: 12px; }
+.members-type-heading {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #888);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
 .members-grid {
   display: grid;
   gap: 20px;
@@ -2882,21 +2893,16 @@ button { cursor: pointer; }
 
 .rotation-timeline {
   display: grid;
-  gap: 10px;
+  gap: 16px;
 }
 
 .rotation-month {
-  border: 1px solid #e4e4e4;
-  border-radius: 10px;
-  padding: 9px 10px;
-  background: #fbfbfb;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-.rotation-month--current {
-  border-color: #d6c5a2;
-  background: #fffaf0;
+.rotation-month--current .rotation-month-title {
+  color: #a07000;
 }
 
 .rotation-month-head {
@@ -2907,18 +2913,20 @@ button { cursor: pointer; }
 }
 
 .rotation-month-title-wrap {
-  display: grid;
-  gap: 1px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .rotation-month-title {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .rotation-month-key {
   font-size: 11px;
-  color: #8f8f8f;
+  color: #aaa;
 }
 
 .rotation-list {
@@ -2926,19 +2934,21 @@ button { cursor: pointer; }
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .rotation-item {
-  border: 1px solid #e6e5e2;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fff;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
   flex-wrap: wrap;
+}
+
+.rotation-item:last-child {
+  border-bottom: none;
 }
 
 .rotation-main {
@@ -2950,19 +2960,19 @@ button { cursor: pointer; }
 
 .rotation-role {
   font-size: 11px;
-  color: #2f5f90;
-  background: #e8f0fe;
+  color: #666;
+  background: #f0f0f0;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 1px 7px;
   text-transform: capitalize;
 }
 
 .rotation-attendance {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   font-size: 12px;
-  color: #444;
+  color: #888;
 }
 
 .member-directory-list {
