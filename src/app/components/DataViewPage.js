@@ -9,7 +9,10 @@ import {
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
+import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
+import SectionBlock from "./ui/SectionBlock";
+import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 
@@ -104,9 +107,8 @@ export default function DataViewPage({ tabKey }) {
       badge={`${documents.length} document${documents.length !== 1 ? "s" : ""}`}
       subtitle={<>Collection: <code>{collectionName}</code></>}
     >
-      <section className="workspace">
-        <div className="panel">
-          <h3>Documents</h3>
+      <CollectionLayout as="section" variant="split" className="workspace">
+        <SectionBlock className="panel" title="Documents" titleTag="h3">
           <div className="document-list">
             {documents.length ? (
               documents.map((doc) => (
@@ -131,46 +133,48 @@ export default function DataViewPage({ tabKey }) {
               <EmptyState>No documents.</EmptyState>
             )}
           </div>
-        </div>
+        </SectionBlock>
 
-        <div className="panel editor-panel">
-          <div className="panel-header">
-            <div>
-              <h3>Selected</h3>
-              <p>{selectedDocument ? selectedDocument.id : "—"}</p>
-            </div>
+        <SectionBlock
+          className="panel editor-panel"
+          title="Selected"
+          titleTag="h3"
+          actions={(
             <div className="button-row">
               <Button onClick={handleSave} disabled={!selectedDocument}>Save</Button>
               <Button variant="danger" onClick={handleDelete} disabled={!selectedDocument}>Delete</Button>
             </div>
-          </div>
+          )}
+        >
+          <p className="panel-subtitle">{selectedDocument ? selectedDocument.id : "—"}</p>
           <TextareaField
             className="json-input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             spellCheck={false}
           />
-        </div>
+        </SectionBlock>
 
-        <div className="panel editor-panel">
-          <div className="panel-header">
-            <div>
-              <h3>New document</h3>
-              <p>Create in {collectionName}</p>
-            </div>
-            <Button onClick={handleCreate}>Create</Button>
-          </div>
+        <SectionBlock
+          className="panel editor-panel"
+          title="New document"
+          titleTag="h3"
+          actions={<Button onClick={handleCreate}>Create</Button>}
+        >
+          <p className="panel-subtitle">Create in {collectionName}</p>
           <TextareaField
             className="json-input"
             value={newDraft}
             onChange={(e) => setNewDraft(e.target.value)}
             spellCheck={false}
           />
-        </div>
-      </section>
+        </SectionBlock>
+      </CollectionLayout>
 
-      {status && <p className="message message--ok">{status}</p>}
-      {error && <p className="message message--error">{error}</p>}
+      <StatusStack>
+        {status ? <p className="message message--ok">{status}</p> : null}
+        {error ? <p className="message message--error">{error}</p> : null}
+      </StatusStack>
     </TabPage>
   );
 }

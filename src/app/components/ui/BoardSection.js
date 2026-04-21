@@ -1,9 +1,9 @@
 "use client";
 
-import CountBadge from "./CountBadge";
+import SectionBlock from "./SectionBlock";
 
 export default function BoardSection({ title, badge, children, className = "", headerExtra }) {
-  const classes = ["card-section", "board-section", className].filter(Boolean).join(" ");
+  const classes = ["board-section", className].filter(Boolean).join(" ");
 
   return (
     <div className={classes}>
@@ -15,6 +15,6 @@ export default function BoardSection({ title, badge, children, className = "", h
         </div>
       </div>
       {children}
-    </div>
+    </SectionBlock>
   );
 }

@@ -6,6 +6,8 @@ export {
   LIST_VIEW_ICON,
   MEMBER_VIEW_ICON,
   PROJECT_VIEW_ICON,
+  BOOK_GRID_ICON,
+  BOOK_SHELF_ICON,
   IconBacklog,
   IconChartLine,
   IconChecklist,

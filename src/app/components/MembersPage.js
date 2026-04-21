@@ -11,13 +11,25 @@ import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON, MEMBER_VIEW_ICON, PROJECT_VIEW_ICON } from "./icons";
-import AddTrigger from "./ui/AddTrigger";
 import BoardSection from "./ui/BoardSection";
+import CollectionLayout from "./ui/CollectionLayout";
+import CreateBar from "./ui/CreateBar";
 import EmptyState from "./ui/EmptyState";
+import EntityCard from "./ui/EntityCard";
+import InputField from "./ui/InputField";
+import PaperSurface from "./ui/PaperSurface";
+import PageControls from "./ui/PageControls";
 import Pill from "./ui/Pill";
 import SelectField from "./ui/SelectField";
+import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
+import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import {
+  memberPlanningTexture,
+  memberSnapshotTexture,
+  SURFACE_TEXTURES,
+} from "./ui/paperTextures";
 
 // ─── Constants ───────────────────────────────────────────────────────────────────────────────
 
@@ -207,7 +219,10 @@ function formatHourAmount(hours) {
 function formatDeadline(dateStr) {
   if (!dateStr) return null;
   const [y, mo, d] = dateStr.split("-").map(Number);
-  return new Date(y, mo - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(y, mo - 1, d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function totalWeeklyMinutes(todos) {
@@ -240,9 +255,12 @@ function weekKey(ts) {
 function weekLabel(mondayDate) {
   const friday = new Date(mondayDate);
   friday.setDate(friday.getDate() + 4);
-  const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const yearSuffix = mondayDate.getFullYear() !== new Date().getFullYear()
-    ? ` ${mondayDate.getFullYear()}` : "";
+  const fmt = (d) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const yearSuffix =
+    mondayDate.getFullYear() !== new Date().getFullYear()
+      ? ` ${mondayDate.getFullYear()}`
+      : "";
   return `${fmt(mondayDate)}–${fmt(friday)}${yearSuffix}`;
 }
 
@@ -260,7 +278,9 @@ function quarterLabel(weekKeyStr) {
 function relativeWeekTitle(weekKeyStr) {
   const selected = new Date(weekKeyStr + "T00:00:00");
   const current = getMondayOf(Date.now());
-  const diff = Math.round((selected.getTime() - current.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  const diff = Math.round(
+    (selected.getTime() - current.getTime()) / (7 * 24 * 60 * 60 * 1000),
+  );
   if (diff === 0) return "This week";
   if (diff === 1) return "Next week";
   if (diff === 2) return "Two weeks ahead";
@@ -281,12 +301,16 @@ function sortTodos(items) {
 
 function isMemberAssignedToProject(project, memberId) {
   if (!project || !memberId) return false;
-  const staffing = Array.isArray(project.data?.staffing) ? project.data.staffing : [];
+  const staffing = Array.isArray(project.data?.staffing)
+    ? project.data.staffing
+    : [];
   return staffing.some((entry) => entry?.memberId === memberId);
 }
 
 function getAssignableProjects(projects, memberId) {
-  return (projects || []).filter((project) => isMemberAssignedToProject(project, memberId));
+  return (projects || []).filter((project) =>
+    isMemberAssignedToProject(project, memberId),
+  );
 }
 
 function isProjectIdAssignable(projects, memberId, projectId) {
@@ -323,13 +347,18 @@ function TaskItem({
   const [showOT, setShowOT] = useState(false);
   const [otUnits, setOtUnits] = useState("");
 
-  const { completed, timeUnits, projectId, deadline, title, overtimeUnits } = todo.data;
+  const { completed, timeUnits, projectId, deadline, title, overtimeUnits } =
+    todo.data;
   const memberId = todo.data.memberId;
   const draft = editDraft || emptyEditDraft();
   const draftProjectId = isEditing ? draft.projectId : projectId;
-  const editProjects = Array.isArray(assignableProjects) ? assignableProjects : getAssignableProjects(projects, memberId);
+  const editProjects = Array.isArray(assignableProjects)
+    ? assignableProjects
+    : getAssignableProjects(projects, memberId);
   const selectedProject = (projects || []).find((p) => p.id === draftProjectId);
-  const showUnassignedSelectedProject = Boolean(draftProjectId) && !isProjectIdAssignable(projects, memberId, draftProjectId);
+  const showUnassignedSelectedProject =
+    Boolean(draftProjectId) &&
+    !isProjectIdAssignable(projects, memberId, draftProjectId);
   const projectName = projects.find((p) => p.id === projectId)?.data?.name;
   const remainingHint = draftProjectId
     ? getProjectRemaining?.(memberId, draftProjectId, todo.id)
@@ -379,7 +408,9 @@ function TaskItem({
             >
               <option value="">units</option>
               {UNIT_OPTIONS.map((units) => (
-                <option key={units} value={units}>{formatUnitOption(units)}</option>
+                <option key={units} value={units}>
+                  {formatUnitOption(units)}
+                </option>
               ))}
             </SelectField>
             <SelectField
@@ -389,15 +420,20 @@ function TaskItem({
             >
               <option value="">project</option>
               {editProjects.map((p) => (
-                <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
+                <option key={p.id} value={p.id}>
+                  {p.data.name || p.id}
+                </option>
               ))}
               {showUnassignedSelectedProject && (
                 <option value={draftProjectId} disabled>
-                  {(selectedProject?.data?.name || draftProjectId) + " (not assigned)"}
+                  {(selectedProject?.data?.name || draftProjectId) +
+                    " (not assigned)"}
                 </option>
               )}
             </SelectField>
-            {remainingHint ? <span className="meta-helper-chip">{remainingHint}</span> : null}
+            {remainingHint ? (
+              <span className="meta-helper-chip">{remainingHint}</span>
+            ) : null}
             <input
               type="date"
               className="meta-date"
@@ -406,10 +442,25 @@ function TaskItem({
             />
           </div>
 
-          <details className="todo-edit-disclosure" open={draft.subtasks.length > 0}>
+          <details
+            className="todo-edit-disclosure"
+            open={draft.subtasks.length > 0}
+          >
             <summary className="todo-edit-disclosure-summary">
-              <span className="todo-edit-section-title">Subtasks ({draft.subtasks.length})</span>
-              <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); onEditSubtaskAdd(); }}>+ Add</Button>
+              <span className="todo-edit-section-title">
+                Subtasks ({draft.subtasks.length})
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onEditSubtaskAdd();
+                }}
+              >
+                + Add
+              </Button>
             </summary>
             <div className="todo-edit-section">
               {draft.subtasks.length === 0 ? (
@@ -422,13 +473,21 @@ function TaskItem({
                         type="checkbox"
                         className="todo-edit-row-check"
                         checked={Boolean(subtask.completed)}
-                        onChange={(e) => onEditSubtaskChange(idx, "completed", e.target.checked)}
+                        onChange={(e) =>
+                          onEditSubtaskChange(
+                            idx,
+                            "completed",
+                            e.target.checked,
+                          )
+                        }
                       />
                       <input
                         className="todo-edit-row-input"
                         value={subtask.text}
                         placeholder="Subtask"
-                        onChange={(e) => onEditSubtaskChange(idx, "text", e.target.value)}
+                        onChange={(e) =>
+                          onEditSubtaskChange(idx, "text", e.target.value)
+                        }
                       />
                       <IconButton
                         variant="delete"
@@ -444,10 +503,25 @@ function TaskItem({
             </div>
           </details>
 
-          <details className="todo-edit-disclosure" open={draft.links.length > 0}>
+          <details
+            className="todo-edit-disclosure"
+            open={draft.links.length > 0}
+          >
             <summary className="todo-edit-disclosure-summary">
-              <span className="todo-edit-section-title">Links ({draft.links.length})</span>
-              <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); onEditLinkAdd(); }}>+ Add</Button>
+              <span className="todo-edit-section-title">
+                Links ({draft.links.length})
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onEditLinkAdd();
+                }}
+              >
+                + Add
+              </Button>
             </summary>
             <div className="todo-edit-section">
               {draft.links.length === 0 ? (
@@ -455,19 +529,26 @@ function TaskItem({
               ) : (
                 <div className="todo-edit-list">
                   {draft.links.map((link, idx) => (
-                    <div key={`link-${idx}`} className="todo-edit-row todo-edit-row--link">
+                    <div
+                      key={`link-${idx}`}
+                      className="todo-edit-row todo-edit-row--link"
+                    >
                       <div className="todo-edit-row-fields">
                         <input
                           className="todo-edit-row-input"
                           value={link.name}
                           placeholder="Link name"
-                          onChange={(e) => onEditLinkChange(idx, "name", e.target.value)}
+                          onChange={(e) =>
+                            onEditLinkChange(idx, "name", e.target.value)
+                          }
                         />
                         <input
                           className="todo-edit-row-input todo-edit-row-input--url"
                           value={link.url}
                           placeholder="https://..."
-                          onChange={(e) => onEditLinkChange(idx, "url", e.target.value)}
+                          onChange={(e) =>
+                            onEditLinkChange(idx, "url", e.target.value)
+                          }
                         />
                       </div>
                       <IconButton
@@ -485,10 +566,22 @@ function TaskItem({
           </details>
 
           <div className="todo-edit-actions">
-            <Button type="button" size="small" onClick={() => onEditSave(todo)} disabled={!draft.title.trim()}>
+            <Button
+              type="button"
+              size="small"
+              onClick={() => onEditSave(todo)}
+              disabled={!draft.title.trim()}
+            >
               Save
             </Button>
-            <Button type="button" variant="ghost" size="small" onClick={onEditCancel}>Cancel</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="small"
+              onClick={onEditCancel}
+            >
+              Cancel
+            </Button>
           </div>
         </div>
       </li>
@@ -505,42 +598,79 @@ function TaskItem({
             onChange={(e) => handleCheck(e.target.checked)}
           />
         </div>
-        <div className="todo-content" onClick={() => !completed && onEditStart(todo)}>
-          <span className={completed ? "todo-text todo-text--done" : "todo-text"}>
+        <div
+          className="todo-content"
+          onClick={() => !completed && onEditStart(todo)}
+        >
+          <span
+            className={completed ? "todo-text todo-text--done" : "todo-text"}
+          >
             {title || "Untitled"}
           </span>
           {(timeUnits || overtimeUnits || projectId || deadline) && (
             <div className="todo-chips">
               {timeUnits && (
-                <Pill>
+                <Pill className="chip--time">
                   {formatTimeUnits(timeUnits)}
-                  {overtimeUnits ? <span className="chip-ot">+{formatTimeUnits(overtimeUnits)} OT</span> : null}
+                  {overtimeUnits ? (
+                    <span className="chip-ot">
+                      +{formatTimeUnits(overtimeUnits)} OT
+                    </span>
+                  ) : null}
                 </Pill>
               )}
-              {!timeUnits && overtimeUnits && <Pill className="chip--ot">{formatTimeUnits(overtimeUnits)} OT</Pill>}
-              {projectName && <Pill>{projectName}</Pill>}
-              {deadline && <Pill>{formatDeadline(deadline)}</Pill>}
+              {!timeUnits && overtimeUnits && (
+                <Pill className="chip--ot">
+                  {formatTimeUnits(overtimeUnits)} OT
+                </Pill>
+              )}
+              {projectName && (
+                <Pill className="chip--project">{projectName}</Pill>
+              )}
+              {deadline && (
+                <Pill className="chip--deadline">
+                  {formatDeadline(deadline)}
+                </Pill>
+              )}
             </div>
           )}
           {(subtasks.length > 0 || links.length > 0) && (
-            <details className="todo-inline-details" onClick={(e) => e.stopPropagation()}>
+            <details
+              className="todo-inline-details"
+              onClick={(e) => e.stopPropagation()}
+            >
               <summary className="todo-inline-details-summary">
                 Details
-                {subtasks.length > 0 ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}` : ""}
-                {links.length > 0 ? ` · ${links.length} link${links.length > 1 ? "s" : ""}` : ""}
+                {subtasks.length > 0
+                  ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}`
+                  : ""}
+                {links.length > 0
+                  ? ` · ${links.length} link${links.length > 1 ? "s" : ""}`
+                  : ""}
               </summary>
               {subtasks.length > 0 && (
                 <ul className="todo-subtasks">
                   {subtasks.map((subtask, idx) => (
-                    <li key={`view-subtask-${idx}`} className="todo-subtask-item">
+                    <li
+                      key={`view-subtask-${idx}`}
+                      className="todo-subtask-item"
+                    >
                       <label className="todo-subtask-label">
                         <input
                           type="checkbox"
                           className="todo-subtask-check"
                           checked={Boolean(subtask.completed)}
-                          onChange={(e) => onToggleSubtask(todo, idx, e.target.checked)}
+                          onChange={(e) =>
+                            onToggleSubtask(todo, idx, e.target.checked)
+                          }
                         />
-                        <span className={subtask.completed ? "todo-subtask-text todo-subtask-text--done" : "todo-subtask-text"}>
+                        <span
+                          className={
+                            subtask.completed
+                              ? "todo-subtask-text todo-subtask-text--done"
+                              : "todo-subtask-text"
+                          }
+                        >
                           {subtask.text}
                         </span>
                       </label>
@@ -568,7 +698,12 @@ function TaskItem({
           )}
         </div>
         <div className="todo-actions">
-          <IconButton type="button" variant="delete" onClick={() => onDelete(todo)} title="Delete">
+          <IconButton
+            type="button"
+            variant="delete"
+            onClick={() => onDelete(todo)}
+            title="Delete"
+          >
             {DELETE_ICON}
           </IconButton>
         </div>
@@ -584,11 +719,22 @@ function TaskItem({
           >
             <option value="">none</option>
             {UNIT_OPTIONS.map((units) => (
-              <option key={units} value={units}>{formatUnitOption(units)}</option>
+              <option key={units} value={units}>
+                {formatUnitOption(units)}
+              </option>
             ))}
           </SelectField>
-          <Button type="button" size="small" onClick={submitOT}>Save</Button>
-          <Button type="button" variant="ghost" size="small" onClick={() => setShowOT(false)}>Skip</Button>
+          <Button type="button" size="small" onClick={submitOT}>
+            Save
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="small"
+            onClick={() => setShowOT(false)}
+          >
+            Skip
+          </Button>
         </li>
       )}
     </>
@@ -606,7 +752,8 @@ function ArchiveSection({ archivedTodos, projects }) {
     for (const todo of archivedTodos) {
       const ts = Number(todo.data.archivedAt || todo.data.updatedAt || 0);
       const key = ts ? weekKey(ts) : "unknown";
-      if (!byWeek[key]) byWeek[key] = { monday: ts ? getMondayOf(ts) : null, todos: [] };
+      if (!byWeek[key])
+        byWeek[key] = { monday: ts ? getMondayOf(ts) : null, todos: [] };
       byWeek[key].todos.push(todo);
     }
     // Sort weeks descending
@@ -621,8 +768,12 @@ function ArchiveSection({ archivedTodos, projects }) {
           byProject[pid].push(todo);
         }
         const totalMin = todos.reduce(
-          (s, t) => s + ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) * 15,
-          0
+          (s, t) =>
+            s +
+            ((Number(t.data.timeUnits) || 0) +
+              (Number(t.data.overtimeUnits) || 0)) *
+              15,
+          0,
         );
         return { key, monday, byProject, totalMin, count: todos.length };
       });
@@ -632,7 +783,11 @@ function ArchiveSection({ archivedTodos, projects }) {
 
   return (
     <div className="archive-section">
-      <button type="button" className="archive-toggle" onClick={() => setOpen((s) => !s)}>
+      <button
+        type="button"
+        className="archive-toggle"
+        onClick={() => setOpen((s) => !s)}
+      >
         Archive ({archivedTodos.length}){open ? " ▲" : " ▼"}
       </button>
       {open && (
@@ -644,23 +799,31 @@ function ArchiveSection({ archivedTodos, projects }) {
                   {monday ? weekLabel(monday) : "Unknown week"}
                 </span>
                 <span className="archive-week-total">
-                  {count} task{count !== 1 ? "s" : ""} · {formatWeeklyTime(totalMin) || "0m"}
+                  {count} task{count !== 1 ? "s" : ""} ·{" "}
+                  {formatWeeklyTime(totalMin) || "0m"}
                 </span>
               </div>
               {Object.entries(byProject).map(([pid, todos]) => {
-                const projName = pid === "__none__"
-                  ? null
-                  : projects.find((p) => p.id === pid)?.data?.name || pid;
+                const projName =
+                  pid === "__none__"
+                    ? null
+                    : projects.find((p) => p.id === pid)?.data?.name || pid;
                 const projMin = todos.reduce(
-                  (s, t) => s + ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) * 15,
-                  0
+                  (s, t) =>
+                    s +
+                    ((Number(t.data.timeUnits) || 0) +
+                      (Number(t.data.overtimeUnits) || 0)) *
+                      15,
+                  0,
                 );
                 return (
                   <div key={pid} className="archive-project-group">
                     {projName && (
                       <div className="archive-project-header">
                         <span className="archive-project-name">{projName}</span>
-                        <span className="archive-project-time">{formatWeeklyTime(projMin) || "0m"}</span>
+                        <span className="archive-project-time">
+                          {formatWeeklyTime(projMin) || "0m"}
+                        </span>
                       </div>
                     )}
                     <ul className="archive-list">
@@ -669,10 +832,16 @@ function ArchiveSection({ archivedTodos, projects }) {
                         const ot = Number(todo.data.overtimeUnits) || 0;
                         return (
                           <li key={todo.id} className="archive-item">
-                            <span className="archive-item-text">{todo.data.title || "Untitled"}</span>
+                            <span className="archive-item-text">
+                              {todo.data.title || "Untitled"}
+                            </span>
                             <span className="archive-item-meta">
                               {planned ? formatTimeUnits(planned) : null}
-                              {ot ? <span className="archive-ot">+{formatTimeUnits(ot)}</span> : null}
+                              {ot ? (
+                                <span className="archive-ot">
+                                  +{formatTimeUnits(ot)}
+                                </span>
+                              ) : null}
                             </span>
                           </li>
                         );
@@ -691,14 +860,23 @@ function ArchiveSection({ archivedTodos, projects }) {
 
 // ─── ProjectGroupCard ─────────────────────────────────────────────────────────────────────────
 
-function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelete }) {
+function ProjectGroupCard({
+  project,
+  tasks,
+  members,
+  onCreate,
+  onToggle,
+  onDelete,
+}) {
   const [addOpen, setAddOpen] = useState(false);
   const [addTitle, setAddTitle] = useState("");
   const [addMemberId, setAddMemberId] = useState("");
 
   const memberNameById = useMemo(() => {
     const map = {};
-    members.forEach((m) => { map[m.id] = m.data?.name || m.id; });
+    members.forEach((m) => {
+      map[m.id] = m.data?.name || m.id;
+    });
     return map;
   }, [members]);
 
@@ -742,71 +920,112 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
     >
       <div className="wish-list-area">
         {Object.keys(byMember).length === 0 && !addOpen && (
-          <p className="todo-empty" style={{ padding: "8px 14px" }}>No active tasks.</p>
+          <p className="todo-empty todo-empty--inset">No active tasks.</p>
         )}
         {Object.entries(byMember).map(([mid, memberTasks]) => (
           <div key={mid} className="project-member-group">
-            <div className="project-member-label">{memberNameById[mid] || mid}</div>
-            <ul className="wish-list">
-              {memberTasks.map((task) => (
-                <li key={task.id} className="wish-item wish-item--task">
-                  <div className="wish-item-main">
-                    <input
-                      type="checkbox"
-                      className="wish-task-check"
-                      checked={Boolean(task.data.completed)}
-                      onChange={(e) => onToggle(task, e.target.checked)}
-                    />
-                    <span className={task.data.completed ? "wish-item-text todo-text--done" : "wish-item-text"}>
-                      {task.data.title || "Untitled"}
-                    </span>
-                    {task.data.timeUnits && (
-                      <Pill size="xs">{formatTimeUnits(task.data.timeUnits)}</Pill>
-                    )}
-                    <IconButton
-                      type="button"
-                      variant="delete"
-                      onClick={() => onDelete(task)}
-                      title="Delete"
-                    >
-                      {DELETE_ICON}
-                    </IconButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="project-member-label">
+              {memberNameById[mid] || mid}
+            </div>
+            <PaperSurface
+              className="project-member-paper"
+              texture={SURFACE_TEXTURES.memberProjectBoard}
+            >
+              <ul className="wish-list">
+                {memberTasks.map((task) => (
+                  <li key={task.id} className="wish-item wish-item--task">
+                    <div className="wish-item-main">
+                      <input
+                        type="checkbox"
+                        className="wish-task-check"
+                        checked={Boolean(task.data.completed)}
+                        onChange={(e) => onToggle(task, e.target.checked)}
+                      />
+                      <span
+                        className={
+                          task.data.completed
+                            ? "wish-item-text todo-text--done"
+                            : "wish-item-text"
+                        }
+                      >
+                        {task.data.title || "Untitled"}
+                      </span>
+                      {task.data.timeUnits && (
+                        <Pill size="xs">
+                          {formatTimeUnits(task.data.timeUnits)}
+                        </Pill>
+                      )}
+                      <IconButton
+                        type="button"
+                        variant="delete"
+                        onClick={() => onDelete(task)}
+                        title="Delete"
+                      >
+                        {DELETE_ICON}
+                      </IconButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </PaperSurface>
           </div>
         ))}
-        {addOpen ? (
-          <div className="backlog-add-row" style={{ flexWrap: "wrap", padding: "8px 14px 6px" }}>
-            <input
-              className="backlog-add-input"
-              type="text"
-              placeholder="Task title…"
-              value={addTitle}
-              autoFocus
-              onChange={(e) => setAddTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
-                if (e.key === "Escape") { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }
-              }}
-            />
-            <SelectField
-              className="backlog-member-select"
-              value={addMemberId}
-              onChange={(e) => setAddMemberId(e.target.value)}
-            >
-              <option value="">Member…</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
-              ))}
-            </SelectField>
-            <Button type="button" size="small" onClick={handleAdd} disabled={!addTitle.trim() || !addMemberId}>Add</Button>
-            <Button type="button" variant="ghost" size="small" onClick={() => { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }}>Cancel</Button>
-          </div>
-        ) : (
-          <AddTrigger label="Add task" inset onClick={() => setAddOpen(true)} />
-        )}
+        <CreateBar
+          open={addOpen}
+          onOpen={() => setAddOpen(true)}
+          label="Add task"
+          inset
+          rowClassName="backlog-add-row backlog-add-row--inset"
+        >
+          <InputField
+            className="backlog-add-input"
+            type="text"
+            placeholder="Task title…"
+            value={addTitle}
+            autoFocus
+            onChange={(e) => setAddTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") {
+                setAddOpen(false);
+                setAddTitle("");
+                setAddMemberId("");
+              }
+            }}
+          />
+          <SelectField
+            className="backlog-member-select"
+            value={addMemberId}
+            onChange={(e) => setAddMemberId(e.target.value)}
+          >
+            <option value="">Member…</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.data?.name || m.id}
+              </option>
+            ))}
+          </SelectField>
+          <Button
+            type="button"
+            size="small"
+            onClick={handleAdd}
+            disabled={!addTitle.trim() || !addMemberId}
+          >
+            Add
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="small"
+            onClick={() => {
+              setAddOpen(false);
+              setAddTitle("");
+              setAddMemberId("");
+            }}
+          >
+            Cancel
+          </Button>
+        </CreateBar>
       </div>
     </BoardSection>
   );
@@ -814,7 +1033,20 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
 
 // ─── MemberCard ───────────────────────────────────────────────────────────────────────────────
 
-function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubtask, onSaveEdit, onDelete, onArchiveAll, onOvertimeSave, onProjectRemaining, selectedWeek }) {
+function MemberCard({
+  member,
+  todos,
+  projects,
+  onCreate,
+  onToggle,
+  onToggleSubtask,
+  onSaveEdit,
+  onDelete,
+  onArchiveAll,
+  onOvertimeSave,
+  onProjectRemaining,
+  selectedWeek,
+}) {
   const [ui, setUi] = useState(() => loadMemberDraft(member.id));
   const addInputRef = useRef(null);
 
@@ -823,7 +1055,10 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
   const activeTodos = sortTodos(todos.filter((t) => !t.data.archived));
   const archivedTodos = todos
     .filter((t) => t.data.archived)
-    .sort((a, b) => (Number(b.data.archivedAt) || 0) - (Number(a.data.archivedAt) || 0));
+    .sort(
+      (a, b) =>
+        (Number(b.data.archivedAt) || 0) - (Number(a.data.archivedAt) || 0),
+    );
 
   const {
     addActive,
@@ -840,13 +1075,17 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
   // For past-week snapshot: only tasks archived in that week
   const snapshotTodos = !isCurrentWeek
     ? archivedTodos.filter((t) => {
-      const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
-      return ts && weekKey(ts) === selectedWeek;
-    })
+        const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
+        return ts && weekKey(ts) === selectedWeek;
+      })
     : [];
 
   const snapshotMin = snapshotTodos.reduce(
-    (s, t) => s + ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) * 15, 0
+    (s, t) =>
+      s +
+      ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) *
+        15,
+    0,
   );
   const activeCount = activeTodos.length;
   const archivedCount = archivedTodos.length;
@@ -860,6 +1099,8 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
   );
 
   const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(todos));
+  const memberTexture = memberPlanningTexture(member?.data?.role);
+  const snapshotTexture = memberSnapshotTexture(member?.data?.role);
 
   useEffect(() => {
     writeLocalJSON(memberDraftKey(member.id), ui);
@@ -869,7 +1110,11 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
     if (!editingId) return;
     const stillExists = activeTodos.some((todo) => todo.id === editingId);
     if (!stillExists) {
-      setUi((prev) => ({ ...prev, editingId: null, editDraft: emptyEditDraft() }));
+      setUi((prev) => ({
+        ...prev,
+        editingId: null,
+        editDraft: emptyEditDraft(),
+      }));
     }
   }, [editingId, activeTodos]);
 
@@ -978,7 +1223,9 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
   }
 
   function addEditSubtask() {
-    patchEditDraft({ subtasks: [...editDraft.subtasks, { text: "", completed: false }] });
+    patchEditDraft({
+      subtasks: [...editDraft.subtasks, { text: "", completed: false }],
+    });
   }
 
   function removeEditSubtask(index) {
@@ -1007,22 +1254,26 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
   }
 
   return (
-    <article className="member-card">
+    <EntityCard as="article" className="member-card">
       <div className="member-card-header">
         <div className="member-card-head-main">
           <h3 className="card-name">{member.data.name || "Unnamed"}</h3>
           <div className="member-card-meta">
             <span className="member-card-meta-chip">{activeCount} active</span>
-            <span className="member-card-meta-chip">{archivedCount} archived</span>
+            <span className="member-card-meta-chip">
+              {archivedCount} archived
+            </span>
           </div>
         </div>
         <span className="member-week-time">
-          {isCurrentWeek ? (weeklyLabel || "no tasks") : (formatWeeklyTime(snapshotMin) || "—")}
+          {isCurrentWeek
+            ? weeklyLabel || "no tasks"
+            : formatWeeklyTime(snapshotMin) || "—"}
         </span>
       </div>
 
       {isCurrentWeek ? (
-        <div className="lined-paper">
+        <PaperSurface texture={memberTexture}>
           <ul className="todo-list">
             {activeTodos.length === 0 && (
               <li className="todo-empty">No tasks yet.</li>
@@ -1077,19 +1328,33 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  <SelectField className="meta-select" value={addTime} onChange={(e) => patchUi({ addTime: e.target.value })}>
+                  <SelectField
+                    className="meta-select"
+                    value={addTime}
+                    onChange={(e) => patchUi({ addTime: e.target.value })}
+                  >
                     <option value="">units</option>
                     {UNIT_OPTIONS.map((units) => (
-                      <option key={units} value={units}>{formatUnitOption(units)}</option>
+                      <option key={units} value={units}>
+                        {formatUnitOption(units)}
+                      </option>
                     ))}
                   </SelectField>
-                  <SelectField className="meta-select" value={addProject} onChange={(e) => patchUi({ addProject: e.target.value })}>
+                  <SelectField
+                    className="meta-select"
+                    value={addProject}
+                    onChange={(e) => patchUi({ addProject: e.target.value })}
+                  >
                     <option value="">project</option>
                     {assignableProjects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.data.name || p.id}
+                      </option>
                     ))}
                   </SelectField>
-                  {addRemainingHint ? <span className="meta-helper-chip">{addRemainingHint}</span> : null}
+                  {addRemainingHint ? (
+                    <span className="meta-helper-chip">{addRemainingHint}</span>
+                  ) : null}
                   <input
                     type="date"
                     className="meta-date"
@@ -1100,10 +1365,25 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               </div>
 
               <div className="notepad-add-sections">
-                <details className="todo-edit-disclosure" open={addSubtasks.length > 0}>
+                <details
+                  className="todo-edit-disclosure"
+                  open={addSubtasks.length > 0}
+                >
                   <summary className="todo-edit-disclosure-summary">
-                    <span className="todo-edit-section-title">Subtasks ({addSubtasks.length})</span>
-                    <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); addAddSubtask(); }}>+ Add</Button>
+                    <span className="todo-edit-section-title">
+                      Subtasks ({addSubtasks.length})
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        addAddSubtask();
+                      }}
+                    >
+                      + Add
+                    </Button>
                   </summary>
                   <div className="todo-edit-section">
                     {addSubtasks.length === 0 ? (
@@ -1111,18 +1391,29 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                     ) : (
                       <div className="todo-edit-list">
                         {addSubtasks.map((subtask, idx) => (
-                          <div key={`add-subtask-${idx}`} className="todo-edit-row">
+                          <div
+                            key={`add-subtask-${idx}`}
+                            className="todo-edit-row"
+                          >
                             <input
                               type="checkbox"
                               className="todo-edit-row-check"
                               checked={Boolean(subtask.completed)}
-                              onChange={(e) => setAddSubtask(idx, "completed", e.target.checked)}
+                              onChange={(e) =>
+                                setAddSubtask(
+                                  idx,
+                                  "completed",
+                                  e.target.checked,
+                                )
+                              }
                             />
                             <input
                               className="todo-edit-row-input"
                               value={subtask.text}
                               placeholder="Subtask"
-                              onChange={(e) => setAddSubtask(idx, "text", e.target.value)}
+                              onChange={(e) =>
+                                setAddSubtask(idx, "text", e.target.value)
+                              }
                             />
                             <IconButton
                               type="button"
@@ -1139,10 +1430,25 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                   </div>
                 </details>
 
-                <details className="todo-edit-disclosure" open={addLinks.length > 0}>
+                <details
+                  className="todo-edit-disclosure"
+                  open={addLinks.length > 0}
+                >
                   <summary className="todo-edit-disclosure-summary">
-                    <span className="todo-edit-section-title">Links ({addLinks.length})</span>
-                    <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); addAddLink(); }}>+ Add</Button>
+                    <span className="todo-edit-section-title">
+                      Links ({addLinks.length})
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        addAddLink();
+                      }}
+                    >
+                      + Add
+                    </Button>
                   </summary>
                   <div className="todo-edit-section">
                     {addLinks.length === 0 ? (
@@ -1150,19 +1456,26 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                     ) : (
                       <div className="todo-edit-list">
                         {addLinks.map((link, idx) => (
-                          <div key={`add-link-${idx}`} className="todo-edit-row todo-edit-row--link">
+                          <div
+                            key={`add-link-${idx}`}
+                            className="todo-edit-row todo-edit-row--link"
+                          >
                             <div className="todo-edit-row-fields">
                               <input
                                 className="todo-edit-row-input"
                                 value={link.name}
                                 placeholder="Link name"
-                                onChange={(e) => setAddLink(idx, "name", e.target.value)}
+                                onChange={(e) =>
+                                  setAddLink(idx, "name", e.target.value)
+                                }
                               />
                               <input
                                 className="todo-edit-row-input todo-edit-row-input--url"
                                 value={link.url}
                                 placeholder="https://..."
-                                onChange={(e) => setAddLink(idx, "url", e.target.value)}
+                                onChange={(e) =>
+                                  setAddLink(idx, "url", e.target.value)
+                                }
                               />
                             </div>
                             <IconButton
@@ -1182,34 +1495,59 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               </div>
 
               <div className="notepad-add-actions">
-                <Button type="button" size="small" onClick={submitAdd} disabled={!addTitle.trim()}>
+                <Button
+                  type="button"
+                  size="small"
+                  onClick={submitAdd}
+                  disabled={!addTitle.trim()}
+                >
                   Save
                 </Button>
-                <Button type="button" variant="ghost" size="small" onClick={cancelAdd}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={cancelAdd}
+                >
                   Cancel
                 </Button>
               </div>
             </div>
           )}
-        </div>
+        </PaperSurface>
       ) : (
-        <div className="lined-paper">
+        <PaperSurface texture={snapshotTexture}>
           {snapshotTodos.length === 0 ? (
             <p className="todo-empty">No tasks completed this week.</p>
           ) : (
             <ul className="todo-list snapshot-list">
               {snapshotTodos.map((todo) => {
-                const projName = projects.find((p) => p.id === todo.data.projectId)?.data?.name;
+                const projName = projects.find(
+                  (p) => p.id === todo.data.projectId,
+                )?.data?.name;
                 const t = Number(todo.data.timeUnits) || 0;
                 const ot = Number(todo.data.overtimeUnits) || 0;
                 return (
                   <li key={todo.id} className="todo-item snapshot-item">
                     <div className="snapshot-check">✓</div>
                     <div className="todo-content">
-                      <span className="todo-text todo-text--done">{todo.data.title || "Untitled"}</span>
+                      <span className="todo-text todo-text--done">
+                        {todo.data.title || "Untitled"}
+                      </span>
                       <div className="todo-chips">
-                        {t > 0 && <Pill>{formatTimeUnits(t)}{ot > 0 && <span className="chip-ot">+{formatTimeUnits(ot)} OT</span>}</Pill>}
-                        {projName && <Pill>{projName}</Pill>}
+                        {t > 0 && (
+                          <Pill className="chip--time">
+                            {formatTimeUnits(t)}
+                            {ot > 0 && (
+                              <span className="chip-ot">
+                                +{formatTimeUnits(ot)} OT
+                              </span>
+                            )}
+                          </Pill>
+                        )}
+                        {projName && (
+                          <Pill className="chip--project">{projName}</Pill>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -1217,20 +1555,24 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               })}
             </ul>
           )}
-        </div>
+        </PaperSurface>
       )}
 
       {isCurrentWeek && (
         <div className="member-card-footer">
           {activeTodos.length > 0 && (
-            <button type="button" className="flush-btn" onClick={() => onArchiveAll(member.id)}>
+            <button
+              type="button"
+              className="flush-btn"
+              onClick={() => onArchiveAll(member.id)}
+            >
               Flush completed
             </button>
           )}
           <ArchiveSection archivedTodos={archivedTodos} projects={projects} />
         </div>
       )}
-    </article>
+    </EntityCard>
   );
 }
 
@@ -1242,12 +1584,14 @@ export default function MembersPage() {
   const [projects, setProjects] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
-  const [memberViewMode, setMemberViewMode] = useState("member"); // "member" | "project"
+  const [memberViewMode, setMemberViewMode] = useState("member");
+  const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
 
   useEffect(() => {
     const cached = readTaskBoardCache();
     if (cached.members.length) setMembers(cached.members);
-    if (cached.tasks.length) setAllTasks(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE));
+    if (cached.tasks.length)
+      setAllTasks(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE));
     if (cached.projects.length) setProjects(cached.projects);
 
     const storedWeek = readLocalJSON(TASK_BOARD_WEEK_KEY, null);
@@ -1259,9 +1603,15 @@ export default function MembersPage() {
   useEffect(() => {
     if (!firebaseReady) return;
     const u1 = subscribeCollection("members", setMembers);
-    const u2 = subscribeCollection("tasks", (items) => setAllTasks(items.filter((i) => i.data.type === TODO_TYPE)));
+    const u2 = subscribeCollection("tasks", (items) =>
+      setAllTasks(items.filter((i) => i.data.type === TODO_TYPE)),
+    );
     const u3 = subscribeCollection("projects", setProjects);
-    return () => { u1(); u2(); u3(); };
+    return () => {
+      u1();
+      u2();
+      u3();
+    };
   }, []);
 
   useEffect(() => {
@@ -1288,9 +1638,12 @@ export default function MembersPage() {
     return g;
   }, [allTasks]);
 
-  const sortedProjectsForView = useMemo(() =>
-    [...projects].sort((a, b) => (a.data?.name || "").localeCompare(b.data?.name || "")),
-    [projects]
+  const sortedProjectsForView = useMemo(
+    () =>
+      [...projects].sort((a, b) =>
+        (a.data?.name || "").localeCompare(b.data?.name || ""),
+      ),
+    [projects],
   );
 
   const tasksByProject = useMemo(() => {
@@ -1326,13 +1679,19 @@ export default function MembersPage() {
   function addToast(msg, isError = false) {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message: msg, isError }]);
-    window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2500);
+    window.setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      2500,
+    );
   }
 
   async function handleCreate(memberId, taskData) {
     const now = Date.now();
     const nextProjectId = taskData.projectId || null;
-    if (nextProjectId && !isProjectIdAssignable(projects, memberId, nextProjectId)) {
+    if (
+      nextProjectId &&
+      !isProjectIdAssignable(projects, memberId, nextProjectId)
+    ) {
       addToast("Project is not assigned to this member", true);
       return false;
     }
@@ -1363,8 +1722,14 @@ export default function MembersPage() {
 
   async function handleToggle(task, checked) {
     try {
-      await replaceDocument("tasks", task.id, { ...task.data, completed: checked, updatedAt: Date.now() });
-    } catch (e) { addToast(e.message || "Could not update", true); }
+      await replaceDocument("tasks", task.id, {
+        ...task.data,
+        completed: checked,
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      addToast(e.message || "Could not update", true);
+    }
   }
 
   async function handleToggleSubtask(task, subtaskIndex, checked) {
@@ -1402,7 +1767,8 @@ export default function MembersPage() {
     }
 
     const parsedUnits = Number(draft.timeUnits);
-    const nextTimeUnits = Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
+    const nextTimeUnits =
+      Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
 
     try {
       await replaceDocument("tasks", task.id, {
@@ -1424,8 +1790,19 @@ export default function MembersPage() {
   }
 
   async function handleDelete(task) {
-    try { await deleteDocument("tasks", task.id); addToast("Deleted"); }
-    catch (e) { addToast(e.message || "Could not delete", true); }
+    setDeleteTarget({
+      label: task.data?.title || "this task",
+      onConfirm: async () => {
+        try {
+          await deleteDocument("tasks", task.id);
+          addToast("Deleted");
+        } catch (e) {
+          addToast(e.message || "Could not delete", true);
+        } finally {
+          setDeleteTarget(null);
+        }
+      },
+    });
   }
 
   async function handleOvertimeSave(task, otUnits) {
@@ -1435,17 +1812,31 @@ export default function MembersPage() {
         overtimeUnits: otUnits || null,
         updatedAt: Date.now(),
       });
-    } catch (e) { addToast(e.message || "Could not save overtime", true); }
+    } catch (e) {
+      addToast(e.message || "Could not save overtime", true);
+    }
   }
 
   async function handleArchiveAll(memberId) {
-    const tasks = (tasksByMember[memberId] || []).filter((t) => !t.data.archived);
+    const tasks = (tasksByMember[memberId] || []).filter(
+      (t) => !t.data.archived,
+    );
     if (!tasks.length) return;
     const now = Date.now();
     try {
-      await Promise.all(tasks.map((t) => replaceDocument("tasks", t.id, { ...t.data, archived: true, archivedAt: now })));
+      await Promise.all(
+        tasks.map((t) =>
+          replaceDocument("tasks", t.id, {
+            ...t.data,
+            archived: true,
+            archivedAt: now,
+          }),
+        ),
+      );
       addToast("Flushed to archive");
-    } catch (e) { addToast(e.message || "Could not archive", true); }
+    } catch (e) {
+      addToast(e.message || "Could not archive", true);
+    }
   }
 
   function projectRemainingHint(memberId, projectId, excludeTaskId = null) {
@@ -1453,7 +1844,9 @@ export default function MembersPage() {
     const project = projects.find((p) => p.id === projectId);
     if (!project || !Array.isArray(project.data?.staffing)) return null;
 
-    const memberStaffing = project.data.staffing.find((s) => s.memberId === memberId);
+    const memberStaffing = project.data.staffing.find(
+      (s) => s.memberId === memberId,
+    );
     if (!memberStaffing) return "Not assigned in this project's staffing";
 
     const capacityHours = Number(memberStaffing.maxHours) || 0;
@@ -1468,21 +1861,31 @@ export default function MembersPage() {
     return `Project remaining: ${formatHourAmount(remaining)} of ${formatHourAmount(capacityHours)}`;
   }
 
-  const MEMBER_TYPE_ORDER = ["worker-owner", "associate", "contractor", "flying-member", "external-collaborator"];
+  const MEMBER_TYPE_ORDER = [
+    "worker-owner",
+    "associate",
+    "contractor",
+    "flying-member",
+    "external-collaborator",
+  ];
   const MEMBER_TYPE_LABELS = {
     "worker-owner": "Worker-owners",
-    "associate": "Associates",
-    "contractor": "Contractors",
+    associate: "Associates",
+    contractor: "Contractors",
     "flying-member": "Flying members",
     "external-collaborator": "External collaborators",
   };
 
   function normalizeMemberType(raw) {
-    const v = String(raw || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
+    const v = String(raw || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s]+/g, "-");
     if (v === "worker-owner" || v === "workerowner") return "worker-owner";
     if (v === "contractor") return "contractor";
     if (v === "flying-member" || v === "flying") return "flying-member";
-    if (v === "external-collaborator" || v === "external") return "external-collaborator";
+    if (v === "external-collaborator" || v === "external")
+      return "external-collaborator";
     return "associate";
   }
 
@@ -1517,8 +1920,8 @@ export default function MembersPage() {
       title={relativeWeekTitle(selectedWeek)}
       badge={quarterLabel(selectedWeek)}
       subtitle={memberBoardSubtitle}
-      right={(
-        <>
+      right={
+        <PageControls compact>
           <ViewToggle
             className="projects-view-toggle"
             value={memberViewMode}
@@ -1540,14 +1943,15 @@ export default function MembersPage() {
               );
             })}
           </SelectField>
-        </>
-      )}
+        </PageControls>
+      }
     >
-
-      {members.length === 0 && <EmptyState>No members found in Firestore.</EmptyState>}
+      {members.length === 0 && (
+        <EmptyState>No members found in Firestore.</EmptyState>
+      )}
 
       {memberViewMode === "project" ? (
-        <div className="backlog-grid">
+        <CollectionLayout variant="board" className="backlog-grid">
           {sortedProjectsForView.map((project) => (
             <ProjectGroupCard
               key={project.id}
@@ -1570,39 +1974,56 @@ export default function MembersPage() {
               onDelete={handleDelete}
             />
           )}
-        </div>
+        </CollectionLayout>
       ) : (
-        MEMBER_TYPE_ORDER.filter((type) => membersByType[type]?.length > 0).map((type) => (
-          <div key={type} className="members-type-group">
-            <h3 className="members-type-heading">{MEMBER_TYPE_LABELS[type]}</h3>
-            <div className="members-grid">
-              {membersByType[type].map((member) => (
-                <MemberCard
-                  key={member.id}
-                  member={member}
-                  todos={tasksByMember[member.id] || []}
-                  projects={projects}
-                  onCreate={handleCreate}
-                  onToggle={handleToggle}
-                  onToggleSubtask={handleToggleSubtask}
-                  onSaveEdit={handleSaveEdit}
-                  onDelete={handleDelete}
-                  onArchiveAll={handleArchiveAll}
-                  onOvertimeSave={handleOvertimeSave}
-                  onProjectRemaining={projectRemainingHint}
-                  selectedWeek={selectedWeek}
-                />
-              ))}
+        MEMBER_TYPE_ORDER.filter((type) => membersByType[type]?.length > 0).map(
+          (type) => (
+            <div key={type} className="members-type-group">
+              <h3 className="members-type-heading">
+                {MEMBER_TYPE_LABELS[type]}
+              </h3>
+              <CollectionLayout variant="grid" className="members-grid">
+                {membersByType[type].map((member) => (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    todos={tasksByMember[member.id] || []}
+                    projects={projects}
+                    onCreate={handleCreate}
+                    onToggle={handleToggle}
+                    onToggleSubtask={handleToggleSubtask}
+                    onSaveEdit={handleSaveEdit}
+                    onDelete={handleDelete}
+                    onArchiveAll={handleArchiveAll}
+                    onOvertimeSave={handleOvertimeSave}
+                    onProjectRemaining={projectRemainingHint}
+                    selectedWeek={selectedWeek}
+                  />
+                ))}
+              </CollectionLayout>
             </div>
-          </div>
-        ))
+          ),
+        )
       )}
 
-      <div className="toast-container" aria-live="polite">
+      <StatusStack className="toast-container" ariaLive="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={t.isError ? "toast toast--error" : "toast"}>{t.message}</div>
+          <div
+            key={t.id}
+            className={t.isError ? "toast toast--error" : "toast"}
+          >
+            {t.message}
+          </div>
         ))}
-      </div>
+      </StatusStack>
+
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          label={deleteTarget.label}
+          onConfirm={deleteTarget.onConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </TabPage>
   );
 }

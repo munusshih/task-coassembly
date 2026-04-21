@@ -1,6 +1,12 @@
 "use client";
 
-function IconBase({ children, size = 14, strokeWidth = 1.5, className = "", ...props }) {
+function IconBase({
+  children,
+  size = 14,
+  strokeWidth = 1.5,
+  className = "",
+  ...props
+}) {
   return (
     <svg
       width={size}
@@ -139,6 +145,29 @@ export function IconTrash(props) {
   );
 }
 
+export function IconBookGrid(props) {
+  return (
+    <IconBase {...props}>
+      <rect x="1" y="2" width="5" height="9.5" rx="0.5" />
+      <line x1="2.5" y1="2" x2="2.5" y2="11.5" strokeWidth="1.5" />
+      <rect x="8" y="2" width="5" height="9.5" rx="0.5" />
+      <line x1="9.5" y1="2" x2="9.5" y2="11.5" strokeWidth="1.5" />
+    </IconBase>
+  );
+}
+
+export function IconBookShelf(props) {
+  return (
+    <IconBase {...props}>
+      <rect x="0.5" y="2" width="2.5" height="9" rx="0.5" />
+      <rect x="4" y="4" width="2.5" height="7" rx="0.5" />
+      <rect x="7.5" y="2.5" width="2.5" height="8.5" rx="0.5" />
+      <rect x="11" y="3" width="2.5" height="8" rx="0.5" />
+      <line x1="0" y1="12.5" x2="14" y2="12.5" />
+    </IconBase>
+  );
+}
+
 export const EDIT_ICON = <IconEdit />;
 export const DELETE_ICON = <IconTrash />;
 export const LIST_VIEW_ICON = <IconList />;
@@ -146,3 +175,5 @@ export const KANBAN_VIEW_ICON = <IconKanban />;
 export const MEMBER_VIEW_ICON = <IconUser />;
 export const PROJECT_VIEW_ICON = <IconFolder />;
 export const DATE_VIEW_ICON = <IconDocument />;
+export const BOOK_GRID_ICON = <IconBookGrid />;
+export const BOOK_SHELF_ICON = <IconBookShelf />;

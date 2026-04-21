@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { firebaseReady } from "../firebase";
-import { createDocument, deleteDocument, replaceDocument, subscribeCollection } from "../firestore";
+import {
+  createDocument,
+  deleteDocument,
+  replaceDocument,
+  subscribeCollection,
+} from "../firestore";
 import Navigation from "./components/Navigation";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
@@ -14,30 +19,47 @@ import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
 
 const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
+const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
 const TBD_TABS = ["finance"];
 
-const TAB_ORDER = ["members", "memberDirectory", "projects", "backlog", "finance", "meetingNotes", "resources"];
+const TAB_ORDER = [
+  "members",
+  "memberDirectory",
+  "projects",
+  "backlog",
+  "finance",
+  "meetingNotes",
+  "resources",
+];
 
 const PRESENCE_COLORS = [
-  "#D81B60", "#1E88E5", "#43A047", "#F4511E", "#5E35B1", "#00897B", "#6D4C41", "#8E24AA",
+  "#D81B60",
+  "#1E88E5",
+  "#43A047",
+  "#F4511E",
+  "#5E35B1",
+  "#00897B",
+  "#6D4C41",
+  "#8E24AA",
 ];
 
 function hashIdToColor(id) {
   const text = String(id || "viewer");
   let hash = 0;
   for (let i = 0; i < text.length; i++) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash = (hash << 5) - hash + text.charCodeAt(i);
     hash |= 0;
   }
   return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length];
 }
 
 function buildLocalIdentity(username) {
-  const viewerId = (typeof crypto !== "undefined" && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : "viewer-" + Math.random().toString(36).slice(2, 10);
+  const viewerId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : "viewer-" + Math.random().toString(36).slice(2, 10);
   const displayName = username || "Viewer";
   const colorSeed = username || viewerId;
   return {
@@ -57,6 +79,66 @@ function lerp(from, to, factor) {
   return from + (to - from) * factor;
 }
 
+function loadStylePrefs() {
+  if (typeof window === "undefined") {
+    return {
+      bg: "paper",
+      font: "sentient",
+      radius: "soft",
+      bgColor: "#f2ebe2",
+      grain: 0.7,
+      wash: 0.18,
+    };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STYLE_TOOL_KEY);
+    if (!raw) {
+      return {
+        bg: "paper",
+        font: "sentient",
+        radius: "soft",
+        bgColor: "#f2ebe2",
+        grain: 0.7,
+        wash: 0.18,
+      };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      bg: ["paper", "linen", "blueprint", "confetti", "kraft"].includes(parsed?.bg)
+        ? parsed.bg
+        : "paper",
+      font: ["sentient", "sans", "accent"].includes(parsed?.font)
+        ? parsed.font
+        : "sentient",
+      radius: ["soft", "square", "round"].includes(parsed?.radius)
+        ? parsed.radius
+        : "soft",
+      bgColor:
+        typeof parsed?.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(parsed.bgColor)
+          ? parsed.bgColor
+          : "#f2ebe2",
+      grain:
+        Number.isFinite(Number(parsed?.grain))
+          ? Math.min(1, Math.max(0, Number(parsed.grain)))
+          : 0.7,
+      wash:
+        Number.isFinite(Number(parsed?.wash))
+          ? Math.min(1, Math.max(0, Number(parsed.wash)))
+          : 0.18,
+    };
+  } catch {
+    return {
+      bg: "paper",
+      font: "sentient",
+      radius: "soft",
+      bgColor: "#f2ebe2",
+      grain: 0.7,
+      wash: 0.18,
+    };
+  }
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("members");
   const [slideDir, setSlideDir] = useState("right");
@@ -67,6 +149,8 @@ export default function Home() {
   const [presenceRows, setPresenceRows] = useState([]);
   const [smoothedPeerCursors, setSmoothedPeerCursors] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
+  const [stylePrefs, setStylePrefs] = useState(() => loadStylePrefs());
+  const [toolboxOpen, setToolboxOpen] = useState(false);
   const cursorRef = useRef({ x: 120, y: 120 });
   const peerTargetsRef = useRef(new Map());
   const lastCursorActivityAtRef = useRef(Date.now());
@@ -140,13 +224,23 @@ export default function Home() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STYLE_TOOL_KEY, JSON.stringify(stylePrefs));
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [stylePrefs]);
+
+  useEffect(() => {
     if (typeof document === "undefined") return;
     function handleVisibilityChange() {
       setIsPageVisible(document.visibilityState === "visible");
     }
     handleVisibilityChange();
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   useEffect(() => {
@@ -201,7 +295,11 @@ export default function Home() {
     }
 
     function isIdle() {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return true;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      )
+        return true;
       return Date.now() - lastCursorActivityAtRef.current > IDLE_AFTER_MS;
     }
 
@@ -219,10 +317,10 @@ export default function Home() {
       const tabChanged = activeTab !== lastSent.tab;
       const idle = isIdle();
       const now = Date.now();
-      const heartbeatDue = now - lastWriteAt >= (idle ? IDLE_HEARTBEAT_MS : ACTIVE_HEARTBEAT_MS);
+      const heartbeatDue =
+        now - lastWriteAt >= (idle ? IDLE_HEARTBEAT_MS : ACTIVE_HEARTBEAT_MS);
 
       if (!force && !moved && !tabChanged && !heartbeatDue) return;
-      if (!force && idle && !moved && !tabChanged) return;
       if (!force && now - lastWriteAt < MIN_WRITE_INTERVAL_MS) {
         pending = true;
         return;
@@ -284,7 +382,9 @@ export default function Home() {
       const target = e.target;
       const isTypingTarget =
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
       if (isTypingTarget) return;
       onInteraction();
     }
@@ -446,7 +546,9 @@ export default function Home() {
       const t = e.target;
       const isTypingTarget =
         t instanceof HTMLElement &&
-        (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable);
       if (isTypingTarget) return;
       if (!(e.key.toLowerCase() === "c" && e.shiftKey)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -470,10 +572,13 @@ export default function Home() {
 
   if (!firebaseReady) {
     return (
-      <main className="page-shell">
+      <main className="page-shell page-shell--single">
         <section className="panel">
           <h1>Firebase config needed</h1>
-          <p>Add the required <code>NEXT_PUBLIC_FIREBASE_*</code> values to <code>.env.local</code>.</p>
+          <p>
+            Add the required <code>NEXT_PUBLIC_FIREBASE_*</code> values to{" "}
+            <code>.env.local</code>.
+          </p>
         </section>
       </main>
     );
@@ -486,7 +591,8 @@ export default function Home() {
     if (activeTab === "backlog") return <BacklogPage />;
     if (activeTab === "meetingNotes") return <MeetingNotesPage />;
     if (activeTab === "resources") return <ResourcesPage />;
-    if (DATA_TABS.includes(activeTab)) return <DataViewPage tabKey={activeTab} />;
+    if (DATA_TABS.includes(activeTab))
+      return <DataViewPage tabKey={activeTab} />;
     if (TBD_TABS.includes(activeTab)) return <TbdPage tabKey={activeTab} />;
     return null;
   }
@@ -499,8 +605,21 @@ export default function Home() {
   }
 
   return (
-    <>
-      <main className="page-shell">
+    <main
+      className={`page-shell style-bg-${stylePrefs.bg} style-font-${stylePrefs.font} style-radius-${stylePrefs.radius}`}
+      style={{
+        "--playground-bg": stylePrefs.bgColor,
+        "--playground-grain": String(stylePrefs.grain),
+        "--playground-wash": String(stylePrefs.wash),
+      }}
+    >
+      <Navigation
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        viewers={viewers}
+        commentCounts={commentCounts}
+      />
+      <div className="page-main">
         <section className="page-content" key={activeTab} data-dir={slideDir}>
           {renderPage()}
         </section>
@@ -512,8 +631,16 @@ export default function Home() {
               className="peer-cursor"
               style={{ left: Number(peer.x) || 0, top: Number(peer.y) || 0 }}
             >
-              <span className="peer-cursor-arrow" style={{ color: peer.color || "#1971c2" }} />
-              <span className="peer-cursor-label" style={{ backgroundColor: peer.color || "#1971c2" }}>{peer.name || "Viewer"}</span>
+              <span
+                className="peer-cursor-arrow"
+                style={{ color: peer.color || "#1971c2" }}
+              />
+              <span
+                className="peer-cursor-label"
+                style={{ backgroundColor: peer.color || "#1971c2" }}
+              >
+                {peer.name || "Viewer"}
+              </span>
             </div>
           ))}
         </div>
@@ -523,10 +650,17 @@ export default function Home() {
             <div
               key={comment.id}
               className="tab-comment"
-              style={{ left: Number(comment.x) || 0, top: Number(comment.y) || 0, borderColor: comment.color || "#bbb" }}
+              style={{
+                left: Number(comment.x) || 0,
+                top: Number(comment.y) || 0,
+                borderColor: comment.color || "#bbb",
+              }}
               title={comment.authorName || "Viewer"}
             >
-              <span className="tab-comment-author" style={{ color: comment.color || "#666" }}>
+              <span
+                className="tab-comment-author"
+                style={{ color: comment.color || "#666" }}
+              >
                 {comment.authorName || "Viewer"}
               </span>
               <span className="tab-comment-text">{comment.text}</span>
@@ -534,16 +668,151 @@ export default function Home() {
           ))}
         </div>
 
-        <form action="/api/auth/logout" method="post" className="logout-form">
-          <button type="submit" className="logout-btn" title="Sign out and return to login">Sign out</button>
-        </form>
-      </main>
-      <Navigation
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        viewers={viewers}
-        commentCounts={commentCounts}
-      />
-    </>
+        <div className={`style-toolbox${toolboxOpen ? " style-toolbox--open" : ""}`} role="region" aria-label="Style toolbox">
+          <button
+            type="button"
+            className="style-toolbox-trigger"
+            onClick={() => setToolboxOpen((prev) => !prev)}
+            aria-expanded={toolboxOpen}
+            aria-controls="playground-panel"
+            title="Open playground"
+          >
+            <span className="style-toolbox-trigger-icon">◎</span>
+            <span className="style-toolbox-trigger-text">Playground</span>
+          </button>
+
+          {toolboxOpen ? (
+            <div className="style-toolbox-panel" id="playground-panel">
+              <div className="style-toolbox-head">
+                <div>
+                  <div className="style-toolbox-title">Playground</div>
+                  <div className="style-toolbox-subtitle">Pattern first, controls on demand</div>
+                </div>
+                <button
+                  type="button"
+                  className="style-toolbox-close"
+                  onClick={() => setToolboxOpen(false)}
+                  aria-label="Close playground"
+                >
+                  x
+                </button>
+              </div>
+
+              <div className="style-toolbox-group">
+                <div className="style-toolbox-label">Patterns</div>
+                <div className="style-swatch-grid">
+                  {[
+                    { value: "paper", label: "Paper", glyph: "::" },
+                    { value: "linen", label: "Linen", glyph: "##" },
+                    { value: "blueprint", label: "Blueprint", glyph: "+ +" },
+                    { value: "confetti", label: "Confetti", glyph: ".." },
+                    { value: "kraft", label: "Kraft", glyph: "//" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`style-swatch${stylePrefs.bg === option.value ? " style-swatch--active" : ""}`}
+                      onClick={() =>
+                        setStylePrefs((prev) => ({ ...prev, bg: option.value }))
+                      }
+                      title={option.label}
+                      aria-pressed={stylePrefs.bg === option.value}
+                    >
+                      <span className={`style-swatch-preview style-swatch-preview--${option.value}`} />
+                      <span className="style-swatch-glyph">{option.glyph}</span>
+                      <span className="style-swatch-label">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="style-toolbox-group">
+                <div className="style-toolbox-label">Type and shape</div>
+                <div className="style-chip-row">
+                  {[
+                    { value: "sentient", label: "Aa", title: "Sentient" },
+                    { value: "sans", label: "SS", title: "Sans" },
+                    { value: "accent", label: "Ax", title: "Accent mix" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`style-chip-btn${stylePrefs.font === option.value ? " style-chip-btn--active" : ""}`}
+                      onClick={() =>
+                        setStylePrefs((prev) => ({ ...prev, font: option.value }))
+                      }
+                      title={option.title}
+                      aria-pressed={stylePrefs.font === option.value}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  {[
+                    { value: "soft", label: "[]", title: "Soft corners" },
+                    { value: "square", label: "][", title: "Square corners" },
+                    { value: "round", label: "()", title: "Round corners" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`style-chip-btn${stylePrefs.radius === option.value ? " style-chip-btn--active" : ""}`}
+                      onClick={() =>
+                        setStylePrefs((prev) => ({ ...prev, radius: option.value }))
+                      }
+                      title={option.title}
+                      aria-pressed={stylePrefs.radius === option.value}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <details className="style-toolbox-advanced">
+                <summary className="style-toolbox-advanced-summary">Fine tune</summary>
+                <div className="style-toolbox-advanced-body">
+                  <label className="style-toolbox-field style-toolbox-field--inline">
+                    <span>Base color</span>
+                    <input
+                      type="color"
+                      value={stylePrefs.bgColor}
+                      onChange={(event) =>
+                        setStylePrefs((prev) => ({ ...prev, bgColor: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="style-toolbox-field">
+                    <span>Grain</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={stylePrefs.grain}
+                      onChange={(event) =>
+                        setStylePrefs((prev) => ({ ...prev, grain: Number(event.target.value) }))
+                      }
+                    />
+                  </label>
+                  <label className="style-toolbox-field">
+                    <span>Pattern strength</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={stylePrefs.wash}
+                      onChange={(event) =>
+                        setStylePrefs((prev) => ({ ...prev, wash: Number(event.target.value) }))
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </main>
   );
 }

@@ -12,17 +12,25 @@ import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
 import {
+  BOOK_GRID_ICON,
+  BOOK_SHELF_ICON,
   DATE_VIEW_ICON,
   DELETE_ICON,
   EDIT_ICON,
   PROJECT_VIEW_ICON,
 } from "./icons";
+import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
+import PageControls from "./ui/PageControls";
+import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
+import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
+import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import ModalShell from "./ui/ModalShell";
 
 const NOTE_SCOPE_DATE = "date";
 const NOTE_SCOPE_PROJECT = "project";
@@ -33,6 +41,49 @@ const ROLE_FIELDS = [
   { key: "timekeeperId", label: "Timekeeper" },
   { key: "notetakerId", label: "Notetaker" },
 ];
+
+const BOOK_PALETTE = [
+  { spine: "#b98f6f", cover: "#f3e6d8" },
+  { spine: "#b08f82", cover: "#f2e3dc" },
+  { spine: "#9f9b7d", cover: "#ece9d7" },
+  { spine: "#a9968a", cover: "#efe4d9" },
+  { spine: "#b7a27a", cover: "#f3ead8" },
+];
+
+function hashText(value) {
+  const text = String(value || "");
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getNoteBookStyle(noteId) {
+  const palette = BOOK_PALETTE[hashText(noteId) % BOOK_PALETTE.length];
+  return {
+    "--book-spine": palette.spine,
+    "--book-cover": palette.cover,
+  };
+}
+
+function buildStarterNoteContent(title, scopeType, projectName) {
+  const heading = String(title || "Meeting notes").trim() || "Meeting notes";
+  const scopeLine =
+    scopeType === NOTE_SCOPE_PROJECT && projectName
+      ? `Project: ${projectName}`
+      : "General meeting";
+
+  return [
+    `<p><strong>${heading}</strong></p>`,
+    `<p><em>${scopeLine}</em></p>`,
+    "<p><strong>Agenda</strong></p>",
+    "<ul><li>Updates</li><li>Decisions</li><li>Blockers</li></ul>",
+    "<p><strong>Next steps</strong></p>",
+    "<ul><li>Owner and follow-up</li></ul>",
+  ].join("");
+}
 
 function normalizeScopeType(raw) {
   return raw === NOTE_SCOPE_PROJECT ? NOTE_SCOPE_PROJECT : NOTE_SCOPE_DATE;
@@ -56,8 +107,9 @@ function normalizeRoleAssignments(data) {
     next[field.key] = typeof value === "string" ? value : "";
   }
   next.meetingParticipantIds = normalizeIdList(data.meetingParticipantIds);
-  next.absentParticipantIds = normalizeIdList(data.absentParticipantIds)
-    .filter((id) => next.meetingParticipantIds.includes(id));
+  next.absentParticipantIds = normalizeIdList(data.absentParticipantIds).filter(
+    (id) => next.meetingParticipantIds.includes(id),
+  );
   return next;
 }
 
@@ -71,11 +123,16 @@ function emptyEditMeta() {
 }
 
 function normalizeMemberRole(rawRole) {
-  const value = String(rawRole || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
-  if (value === "worker-owner" || value === "workerowner") return "worker-owner";
+  const value = String(rawRole || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  if (value === "worker-owner" || value === "workerowner")
+    return "worker-owner";
   if (value === "associate") return "associate";
   if (value === "flying-member" || value === "flying") return "flying-member";
-  if (value === "external-collaborator" || value === "external") return "external-collaborator";
+  if (value === "external-collaborator" || value === "external")
+    return "external-collaborator";
   return "associate";
 }
 
@@ -92,10 +149,15 @@ function parseMonthSerial(monthKey) {
 }
 
 function normalizeMeetingDutyRole(rawRole) {
-  const normalized = String(rawRole || "").trim().toLowerCase().replace(/[_\s]+/g, " ");
+  const normalized = String(rawRole || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, " ");
   if (normalized === "facilitator") return "facilitator";
-  if (normalized === "notetaker" || normalized === "note taker") return "notetaker";
-  if (normalized === "time keeper" || normalized === "timekeeper") return "time keeper";
+  if (normalized === "notetaker" || normalized === "note taker")
+    return "notetaker";
+  if (normalized === "time keeper" || normalized === "timekeeper")
+    return "time keeper";
   return null;
 }
 
@@ -112,7 +174,9 @@ function getProjectTeamMemberIds(projectId, projects) {
   if (!projectId) return [];
   const project = (projects || []).find((item) => item.id === projectId);
   if (!project) return [];
-  const staffing = Array.isArray(project.data?.staffing) ? project.data.staffing : [];
+  const staffing = Array.isArray(project.data?.staffing)
+    ? project.data.staffing
+    : [];
   return staffing
     .map((entry) => (typeof entry?.memberId === "string" ? entry.memberId : ""))
     .map((id) => id.trim())
@@ -134,6 +198,8 @@ export default function MeetingNotesPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [groupMode, setGroupMode] = useState("date");
+  const [notesLayout, setNotesLayout] = useState("grid");
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [members, setMembers] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -143,7 +209,12 @@ export default function MeetingNotesPage() {
   useEffect(() => {
     if (!firebaseReady) return;
     return subscribeCollection("meetingNotes", (items) => {
-      setNotes(items.sort((a, b) => Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0)));
+      setNotes(
+        items.sort(
+          (a, b) =>
+            Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0),
+        ),
+      );
     });
   }, []);
 
@@ -193,11 +264,13 @@ export default function MeetingNotesPage() {
     const roleToMemberId = {};
     for (let index = 0; index < workerOwners.length; index++) {
       const member = workerOwners[index];
-      const fallbackRole = MEETING_ROTATION[(monthSerial + index) % MEETING_ROTATION.length];
+      const fallbackRole =
+        MEETING_ROTATION[(monthSerial + index) % MEETING_ROTATION.length];
       const explicitRoles = member?.data?.meetingRoles;
-      const explicitRole = explicitRoles && typeof explicitRoles === "object"
-        ? normalizeMeetingDutyRole(explicitRoles[monthKey])
-        : null;
+      const explicitRole =
+        explicitRoles && typeof explicitRoles === "object"
+          ? normalizeMeetingDutyRole(explicitRoles[monthKey])
+          : null;
       const role = explicitRole || fallbackRole;
       if (!roleToMemberId[role]) {
         roleToMemberId[role] = member.id;
@@ -213,7 +286,8 @@ export default function MeetingNotesPage() {
 
   useEffect(() => {
     setNewRoles((prev) => {
-      if (prev.facilitatorId || prev.timekeeperId || prev.notetakerId) return prev;
+      if (prev.facilitatorId || prev.timekeeperId || prev.notetakerId)
+        return prev;
       return {
         facilitatorId: defaultMeetingRoles.facilitatorId,
         timekeeperId: defaultMeetingRoles.timekeeperId,
@@ -231,11 +305,14 @@ export default function MeetingNotesPage() {
         const title = (note?.data?.title || "").toLowerCase();
         const content = (note?.data?.content || "").toLowerCase();
         const scopeType = normalizeScopeType(note?.data?.scopeType);
-        const scopeLabel = scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based";
-        const projectName = note?.data?.projectId ? (projectNameById[note.data.projectId] || "").toLowerCase() : "";
-        const roleNames = ROLE_FIELDS
-          .map((field) => (memberNameById[note?.data?.[field.key]] || "").toLowerCase())
-          .join(" ");
+        const scopeLabel =
+          scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based";
+        const projectName = note?.data?.projectId
+          ? (projectNameById[note.data.projectId] || "").toLowerCase()
+          : "";
+        const roleNames = ROLE_FIELDS.map((field) =>
+          (memberNameById[note?.data?.[field.key]] || "").toLowerCase(),
+        ).join(" ");
 
         const haystack = `${title} ${content} ${scopeLabel} ${projectName} ${roleNames}`;
         return haystack.includes(query);
@@ -243,7 +320,9 @@ export default function MeetingNotesPage() {
       .map((note) => {
         const title = (note?.data?.title || "").toLowerCase();
         const content = (note?.data?.content || "").toLowerCase();
-        const projectName = note?.data?.projectId ? (projectNameById[note.data.projectId] || "").toLowerCase() : "";
+        const projectName = note?.data?.projectId
+          ? (projectNameById[note.data.projectId] || "").toLowerCase()
+          : "";
         let matchType = "content";
         if (title.includes(query)) matchType = "title";
         else if (projectName.includes(query)) matchType = "project";
@@ -259,7 +338,9 @@ export default function MeetingNotesPage() {
     const weekAgoTime = todayTime - 604800000;
 
     return {
-      today: filteredNotes.filter((n) => Number(n.data.createdAt || 0) >= todayTime),
+      today: filteredNotes.filter(
+        (n) => Number(n.data.createdAt || 0) >= todayTime,
+      ),
       yesterday: filteredNotes.filter((n) => {
         const t = Number(n.data.createdAt || 0);
         return t >= yesterdayTime && t < todayTime;
@@ -268,7 +349,9 @@ export default function MeetingNotesPage() {
         const t = Number(n.data.createdAt || 0);
         return t >= weekAgoTime && t < yesterdayTime;
       }),
-      older: filteredNotes.filter((n) => Number(n.data.createdAt || 0) < weekAgoTime),
+      older: filteredNotes.filter(
+        (n) => Number(n.data.createdAt || 0) < weekAgoTime,
+      ),
     };
   }, [filteredNotes]);
 
@@ -360,11 +443,24 @@ export default function MeetingNotesPage() {
   }
 
   function updateNewRole(field, memberId) {
+    if (typeof field === "function") {
+      setNewRoles(field);
+      return;
+    }
     setNewRoles((prev) => ({ ...prev, [field]: memberId }));
   }
 
   function updateEditMeta(field, value) {
+    if (typeof field === "function") {
+      setEditMeta(field);
+      return;
+    }
     setEditMeta((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function openNote(noteId) {
+    setViewingId(noteId);
+    setEditingId(null);
   }
 
   function updateMetaParticipantSelection(setter, field, memberId, checked) {
@@ -380,7 +476,9 @@ export default function MeetingNotesPage() {
         return {
           ...prev,
           meetingParticipantIds: uniqueParticipants,
-          absentParticipantIds: currentAbsent.filter((id) => uniqueParticipants.includes(id)),
+          absentParticipantIds: currentAbsent.filter((id) =>
+            uniqueParticipants.includes(id),
+          ),
         };
       }
 
@@ -400,14 +498,21 @@ export default function MeetingNotesPage() {
   }
 
   function getMeetingMemberOptions(meta) {
-    const projectTeamIds = normalizeIdList(getProjectTeamMemberIds(meta.projectId, projects));
+    const projectTeamIds = normalizeIdList(
+      getProjectTeamMemberIds(meta.projectId, projects),
+    );
     const selectedIds = normalizeIdList(meta.meetingParticipantIds);
-    const roleIds = normalizeIdList([meta.facilitatorId, meta.timekeeperId, meta.notetakerId]);
+    const roleIds = normalizeIdList([
+      meta.facilitatorId,
+      meta.timekeeperId,
+      meta.notetakerId,
+    ]);
     const seedIds = [...projectTeamIds, ...selectedIds, ...roleIds];
 
-    const optionIds = seedIds.length > 0
-      ? seedIds.filter((id, index, all) => all.indexOf(id) === index)
-      : members.map((member) => member.id);
+    const optionIds =
+      seedIds.length > 0
+        ? seedIds.filter((id, index, all) => all.indexOf(id) === index)
+        : members.map((member) => member.id);
 
     return optionIds
       .map((id) => members.find((member) => member.id === id))
@@ -421,10 +526,14 @@ export default function MeetingNotesPage() {
 
   function startEditing(note) {
     const normalizedAssignments = normalizeRoleAssignments(note?.data);
-    const fallbackProjectTeamIds = getProjectTeamMemberIds(note?.data?.projectId || "", projects);
-    const participantIds = normalizedAssignments.meetingParticipantIds.length > 0
-      ? normalizedAssignments.meetingParticipantIds
-      : fallbackProjectTeamIds;
+    const fallbackProjectTeamIds = getProjectTeamMemberIds(
+      note?.data?.projectId || "",
+      projects,
+    );
+    const participantIds =
+      normalizedAssignments.meetingParticipantIds.length > 0
+        ? normalizedAssignments.meetingParticipantIds
+        : fallbackProjectTeamIds;
     setEditingId(note.id);
     setViewingId(note.id);
     setEditContent(note?.data?.content || "");
@@ -432,30 +541,45 @@ export default function MeetingNotesPage() {
       title: note?.data?.title || "",
       scopeType: normalizeScopeType(note?.data?.scopeType),
       projectId: note?.data?.projectId || "",
-      facilitatorId: normalizedAssignments.facilitatorId || defaultMeetingRoles.facilitatorId,
-      timekeeperId: normalizedAssignments.timekeeperId || defaultMeetingRoles.timekeeperId,
-      notetakerId: normalizedAssignments.notetakerId || defaultMeetingRoles.notetakerId,
+      facilitatorId:
+        normalizedAssignments.facilitatorId ||
+        defaultMeetingRoles.facilitatorId,
+      timekeeperId:
+        normalizedAssignments.timekeeperId || defaultMeetingRoles.timekeeperId,
+      notetakerId:
+        normalizedAssignments.notetakerId || defaultMeetingRoles.notetakerId,
       meetingParticipantIds: participantIds,
-      absentParticipantIds: normalizedAssignments.absentParticipantIds.filter((id) => participantIds.includes(id)),
+      absentParticipantIds: normalizedAssignments.absentParticipantIds.filter(
+        (id) => participantIds.includes(id),
+      ),
     });
   }
 
   async function handleCreateNote() {
     if (!newTitle.trim()) return;
     const scopeType = normalizeScopeType(newScopeType);
+    const projectName =
+      scopeType === NOTE_SCOPE_PROJECT ? projectLabel(newProjectId || "") : "";
     try {
       await createDocument("meetingNotes", {
         title: newTitle.trim(),
-        content: "",
+        content: buildStarterNoteContent(newTitle.trim(), scopeType, projectName),
         scopeType,
-        projectId: scopeType === NOTE_SCOPE_PROJECT ? (newProjectId || null) : null,
+        projectId:
+          scopeType === NOTE_SCOPE_PROJECT ? newProjectId || null : null,
         facilitatorId: newRoles.facilitatorId || null,
         timekeeperId: newRoles.timekeeperId || null,
         notetakerId: newRoles.notetakerId || null,
-        meetingParticipantIds: scopeType === NOTE_SCOPE_PROJECT ? normalizeIdList(newRoles.meetingParticipantIds) : [],
-        absentParticipantIds: scopeType === NOTE_SCOPE_PROJECT
-          ? normalizeIdList(newRoles.absentParticipantIds).filter((id) => normalizeIdList(newRoles.meetingParticipantIds).includes(id))
-          : [],
+        meetingParticipantIds:
+          scopeType === NOTE_SCOPE_PROJECT
+            ? normalizeIdList(newRoles.meetingParticipantIds)
+            : [],
+        absentParticipantIds:
+          scopeType === NOTE_SCOPE_PROJECT
+            ? normalizeIdList(newRoles.absentParticipantIds).filter((id) =>
+                normalizeIdList(newRoles.meetingParticipantIds).includes(id),
+              )
+            : [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -488,14 +612,21 @@ export default function MeetingNotesPage() {
         title,
         content: editContent,
         scopeType,
-        projectId: scopeType === NOTE_SCOPE_PROJECT ? (editMeta.projectId || null) : null,
+        projectId:
+          scopeType === NOTE_SCOPE_PROJECT ? editMeta.projectId || null : null,
         facilitatorId: editMeta.facilitatorId || null,
         timekeeperId: editMeta.timekeeperId || null,
         notetakerId: editMeta.notetakerId || null,
-        meetingParticipantIds: scopeType === NOTE_SCOPE_PROJECT ? normalizeIdList(editMeta.meetingParticipantIds) : [],
-        absentParticipantIds: scopeType === NOTE_SCOPE_PROJECT
-          ? normalizeIdList(editMeta.absentParticipantIds).filter((id) => normalizeIdList(editMeta.meetingParticipantIds).includes(id))
-          : [],
+        meetingParticipantIds:
+          scopeType === NOTE_SCOPE_PROJECT
+            ? normalizeIdList(editMeta.meetingParticipantIds)
+            : [],
+        absentParticipantIds:
+          scopeType === NOTE_SCOPE_PROJECT
+            ? normalizeIdList(editMeta.absentParticipantIds).filter((id) =>
+                normalizeIdList(editMeta.meetingParticipantIds).includes(id),
+              )
+            : [],
         updatedAt: Date.now(),
       });
       setEditingId(null);
@@ -504,15 +635,21 @@ export default function MeetingNotesPage() {
     }
   }
 
-  async function handleDeleteNote(noteId) {
-    if (!window.confirm("Delete this note?")) return;
-    try {
-      await deleteDocument("meetingNotes", noteId);
-      if (viewingId === noteId) setViewingId(null);
-      if (editingId === noteId) setEditingId(null);
-    } catch (error) {
-      console.error("Could not delete note:", error);
-    }
+  async function handleDeleteNote(noteId, noteTitle) {
+    setDeleteTarget({
+      label: noteTitle || "this note",
+      onConfirm: async () => {
+        try {
+          await deleteDocument("meetingNotes", noteId);
+          if (viewingId === noteId) setViewingId(null);
+          if (editingId === noteId) setEditingId(null);
+        } catch (error) {
+          console.error("Could not delete note:", error);
+        } finally {
+          setDeleteTarget(null);
+        }
+      },
+    });
   }
 
   function renderRoleSummary(noteData) {
@@ -531,11 +668,19 @@ export default function MeetingNotesPage() {
     }
 
     const participantIds = normalizeIdList(noteData?.meetingParticipantIds);
-    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter((id) => participantIds.includes(id));
+    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter(
+      (id) => participantIds.includes(id),
+    );
     if (participantIds.length > 0) {
-      const presentCount = Math.max(0, participantIds.length - absentIds.length);
+      const presentCount = Math.max(
+        0,
+        participantIds.length - absentIds.length,
+      );
       chips.push(
-        <span key="meeting-count" className="note-role-chip note-role-chip--meeting">
+        <span
+          key="meeting-count"
+          className="note-role-chip note-role-chip--meeting"
+        >
           In meeting: {presentCount}/{participantIds.length}
         </span>,
       );
@@ -543,17 +688,65 @@ export default function MeetingNotesPage() {
 
     if (absentIds.length > 0) {
       chips.push(
-        <span key="meeting-absent" className="note-role-chip note-role-chip--absent">
+        <span
+          key="meeting-absent"
+          className="note-role-chip note-role-chip--absent"
+        >
           Absent: {absentIds.map((id) => roleLabel(id)).join(", ")}
         </span>,
       );
     }
 
     if (chips.length === 0) {
-      return <span className="note-role-chip note-role-chip--empty">Roles not set</span>;
+      return (
+        <span className="note-role-chip note-role-chip--empty">
+          Roles not set
+        </span>
+      );
     }
 
     return chips;
+  }
+
+  function renderMeetingAttendanceDetail(noteData) {
+    const participantIds = normalizeIdList(noteData?.meetingParticipantIds);
+    if (participantIds.length === 0) return null;
+
+    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter((id) =>
+      participantIds.includes(id),
+    );
+    const presentIds = participantIds.filter((id) => !absentIds.includes(id));
+
+    return (
+      <div className="note-attendance-block">
+        <div className="note-attendance-group">
+          <span className="note-attendance-label">Present</span>
+          <div className="note-attendance-chips">
+            {presentIds.length ? (
+              presentIds.map((id) => (
+                <span key={`present-${id}`} className="note-role-chip note-role-chip--meeting">
+                  {roleLabel(id)}
+                </span>
+              ))
+            ) : (
+              <span className="note-role-chip note-role-chip--empty">None marked present</span>
+            )}
+          </div>
+        </div>
+        {absentIds.length > 0 && (
+          <div className="note-attendance-group">
+            <span className="note-attendance-label">Missing this meeting</span>
+            <div className="note-attendance-chips">
+              {absentIds.map((id) => (
+                <span key={`absent-${id}`} className="note-role-chip note-role-chip--absent">
+                  {roleLabel(id)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   function renderRoleSelectors(meta, onChange) {
@@ -583,24 +776,36 @@ export default function MeetingNotesPage() {
             </SelectField>
           </label>
         ))}
-        {normalizeScopeType(normalizedMeta.scopeType) === NOTE_SCOPE_PROJECT && (
+        {normalizeScopeType(normalizedMeta.scopeType) ===
+          NOTE_SCOPE_PROJECT && (
           <div className="note-meta-field note-meta-field--wide">
             <span>Meeting attendees</span>
             <div className="meeting-attendees-list">
               {meetingMemberOptions.length === 0 ? (
-                <p className="note-role-chip note-role-chip--empty">No members available for this project yet.</p>
+                <p className="note-role-chip note-role-chip--empty">
+                  No members available for this project yet.
+                </p>
               ) : (
                 meetingMemberOptions.map((member) => {
                   const memberId = member.id;
-                  const inMeeting = normalizedMeta.meetingParticipantIds.includes(memberId);
-                  const absent = normalizedMeta.absentParticipantIds.includes(memberId);
+                  const inMeeting =
+                    normalizedMeta.meetingParticipantIds.includes(memberId);
+                  const absent =
+                    normalizedMeta.absentParticipantIds.includes(memberId);
                   return (
                     <div key={memberId} className="meeting-attendee-row">
                       <label className="meeting-attendee-main">
                         <input
                           type="checkbox"
                           checked={inMeeting}
-                          onChange={(event) => updateMetaParticipantSelection(onChange, "meetingParticipantIds", memberId, event.target.checked)}
+                          onChange={(event) =>
+                            updateMetaParticipantSelection(
+                              onChange,
+                              "meetingParticipantIds",
+                              memberId,
+                              event.target.checked,
+                            )
+                          }
                         />
                         <span>{member?.data?.name || memberId}</span>
                       </label>
@@ -609,7 +814,14 @@ export default function MeetingNotesPage() {
                           <input
                             type="checkbox"
                             checked={absent}
-                            onChange={(event) => updateMetaParticipantSelection(onChange, "absentParticipantIds", memberId, event.target.checked)}
+                            onChange={(event) =>
+                              updateMetaParticipantSelection(
+                                onChange,
+                                "absentParticipantIds",
+                                memberId,
+                                event.target.checked,
+                              )
+                            }
                           />
                           <span>Misses this meeting</span>
                         </label>
@@ -629,65 +841,74 @@ export default function MeetingNotesPage() {
     if (!notesList.length) return null;
 
     return (
-      <div key={title} className="notes-section">
-        <h3 className="notes-section-title">{title}</h3>
-        <ul className="notes-list">
+      <SectionBlock
+        key={title}
+        className="notes-section"
+        title={title}
+        titleTag="h3"
+        bodyClassName="notes-section-body"
+      >
+        <ul className={`notes-list notes-list--${notesLayout}`}>
           {notesList.map((note) => {
             const scopeType = normalizeScopeType(note?.data?.scopeType);
             const projectId = note?.data?.projectId || "";
-            const isViewing = viewingId === note.id;
-            const isEditing = editingId === note.id;
+            const isOpen = viewingId === note.id;
 
             return (
-              <li key={note.id} className="note-item">
+              <li
+                key={note.id}
+                className="note-item"
+                style={getNoteBookStyle(note.id)}
+                onClick={() => openNote(note.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openNote(note.id);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open note ${note.data.title || "Untitled"}`}
+              >
                 <div className="note-row">
                   <div className="note-content-col">
-                    <span
-                      className="note-title"
-                      onClick={() => {
-                        setViewingId(isViewing ? null : note.id);
-                        setEditingId(null);
-                      }}
-                      onDoubleClick={() => startEditing(note)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      {formatDateInTitle(note.data.createdAt)} · {note.data.title || "Untitled"}
+                    <span className="note-title">
+                      {formatDateInTitle(note.data.createdAt)} ·{" "}
+                      {note.data.title || "Untitled"}
                       {searchQuery && note.matchType && (
-                        <span className="match-indicator">(matched in {note.matchType})</span>
+                        <span className="match-indicator">
+                          (matched in {note.matchType})
+                        </span>
                       )}
                     </span>
 
                     <div className="note-meta-line">
                       <span className="note-scope-chip">
-                        {scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based"}
+                        {scopeType === NOTE_SCOPE_PROJECT
+                          ? "project-based"
+                          : "date-based"}
                       </span>
                       {scopeType === NOTE_SCOPE_PROJECT && (
-                        <span className="note-project-chip">{projectLabel(projectId)}</span>
+                        <span className="note-project-chip">
+                          {projectLabel(projectId)}
+                        </span>
                       )}
                     </div>
 
-                    <div className="note-role-line">{renderRoleSummary(note?.data)}</div>
+                    <div className="note-role-line">
+                      {renderRoleSummary(note?.data)}
+                    </div>
 
-                    {note.data.updatedAt && note.data.updatedAt !== note.data.createdAt && (
-                      <span className="note-updated">
-                        Updated {formatUpdatedTime(note.data.updatedAt)}
-                      </span>
-                    )}
+                    {note.data.updatedAt &&
+                      note.data.updatedAt !== note.data.createdAt && (
+                        <span className="note-updated">
+                          Updated {formatUpdatedTime(note.data.updatedAt)}
+                        </span>
+                      )}
                   </div>
 
                   <div className="note-actions-row">
-                    <IconButton
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setViewingId(isViewing ? null : note.id);
-                        setEditingId(null);
-                      }}
-                      title={isViewing ? "Hide" : "View"}
-                    >
-                      {isViewing ? "−" : "+"}
-                    </IconButton>
-                    {!isEditing && (
+                    {editingId !== note.id && (
                       <IconButton
                         title="Edit"
                         onClick={(event) => {
@@ -704,7 +925,10 @@ export default function MeetingNotesPage() {
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        handleDeleteNote(note.id);
+                        handleDeleteNote(
+                          note.id,
+                          note.data.title || "Untitled",
+                        );
                       }}
                       title="Delete note"
                     >
@@ -712,126 +936,28 @@ export default function MeetingNotesPage() {
                     </IconButton>
                   </div>
                 </div>
-
-                {isViewing && !isEditing && (
-                  <div className="note-preview-row">
-                    {note.data.content ? (
-                      <div
-                        className="note-preview-content"
-                        dangerouslySetInnerHTML={{ __html: note.data.content }}
-                      />
-                    ) : (
-                      <p className="note-empty">No content yet. Click Edit to add content.</p>
-                    )}
-                  </div>
-                )}
-
-                {isEditing && (
-                  <div className="note-editor-row">
-                    <div className="note-editor-meta">
-                      <label className="note-meta-field note-meta-field--wide">
-                        <span>Title</span>
-                        <InputField
-                          type="text"
-                          className="note-meta-input"
-                          value={editMeta.title}
-                          onChange={(event) => updateEditMeta("title", event.target.value)}
-                        />
-                      </label>
-
-                      <label className="note-meta-field">
-                        <span>Type</span>
-                        <SelectField
-                          className="note-meta-input"
-                          value={editMeta.scopeType}
-                          onChange={(event) => {
-                            const nextScope = normalizeScopeType(event.target.value);
-                            setEditMeta((prev) => ({
-                              ...prev,
-                              scopeType: nextScope,
-                              projectId: nextScope === NOTE_SCOPE_PROJECT ? prev.projectId : "",
-                            }));
-                          }}
-                        >
-                          <option value={NOTE_SCOPE_DATE}>Date-based</option>
-                          <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-                        </SelectField>
-                      </label>
-
-                      {normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT && (
-                        <label className="note-meta-field">
-                          <span>Project</span>
-                          <SelectField
-                            className="note-meta-input"
-                            value={editMeta.projectId}
-                            onChange={(event) => {
-                              const projectId = event.target.value;
-                              const projectTeamIds = getProjectTeamMemberIds(projectId, projects);
-                              setEditMeta((prev) => ({
-                                ...prev,
-                                projectId,
-                                meetingParticipantIds: projectTeamIds,
-                                absentParticipantIds: [],
-                              }));
-                            }}
-                          >
-                            <option value="">No project selected</option>
-                            {projects.map((project) => (
-                              <option key={project.id} value={project.id}>
-                                {project?.data?.name || project.id}
-                              </option>
-                            ))}
-                          </SelectField>
-                        </label>
-                      )}
-
-                      {renderRoleSelectors(editMeta, updateEditMeta)}
-                    </div>
-
-                    <RichEditor
-                      value={editContent}
-                      onChange={setEditContent}
-                      members={members}
-                      projects={projects}
-                      tasks={tasks}
-                      resources={resources}
-                      notes={notes}
-                      currentNoteId={note.id}
-                      showDateObjectButton={normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT}
-                    />
-                    <div className="note-editor-actions">
-                      <Button onClick={() => handleSaveEdit(note.id)} disabled={!editMeta.title.trim()}>
-                        Save
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(null);
-                          setViewingId(note.id);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </li>
             );
           })}
         </ul>
-      </div>
+      </SectionBlock>
     );
   }
 
   const totalSectionsInCurrentMode =
     groupMode === "date"
       ? [
-        groupedNotesByDate.today,
-        groupedNotesByDate.yesterday,
-        groupedNotesByDate.thisWeek,
-        groupedNotesByDate.older,
-      ].reduce((count, list) => count + (list.length ? 1 : 0), 0)
+          groupedNotesByDate.today,
+          groupedNotesByDate.yesterday,
+          groupedNotesByDate.thisWeek,
+          groupedNotesByDate.older,
+        ].reduce((count, list) => count + (list.length ? 1 : 0), 0)
       : groupedNotesByProject.length;
+
+  const activeNote = useMemo(
+    () => notes.find((note) => note.id === viewingId) || null,
+    [notes, viewingId],
+  );
 
   const groupingOptions = [
     {
@@ -846,13 +972,18 @@ export default function MeetingNotesPage() {
     },
   ];
 
+  const layoutOptions = [
+    { value: "grid", title: "Book covers", icon: BOOK_GRID_ICON },
+    { value: "shelf", title: "Bookshelf", icon: BOOK_SHELF_ICON },
+  ];
+
   return (
     <TabPage
       className="notes-page"
       title="Notes / doc"
       badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
-      right={(
-        <>
+      right={
+        <PageControls compact>
           <SearchField
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -865,11 +996,22 @@ export default function MeetingNotesPage() {
             options={groupingOptions}
             ariaLabel="Note grouping"
           />
-        </>
-      )}
+          <ViewToggle
+            value={notesLayout}
+            onChange={setNotesLayout}
+            options={layoutOptions}
+            ariaLabel="Notes layout"
+          />
+        </PageControls>
+      }
     >
-
-      <div className="note-create-area">
+      <SectionBlock
+        className="note-create-section"
+        title="Create note"
+        titleTag="h3"
+        texture={SURFACE_TEXTURES.notesComposer}
+        bodyClassName="note-create-area"
+      >
         <div className="note-create-row">
           <InputField
             type="text"
@@ -890,8 +1032,14 @@ export default function MeetingNotesPage() {
               if (nextScope !== NOTE_SCOPE_PROJECT) setNewProjectId("");
               setNewRoles((prev) => ({
                 ...prev,
-                meetingParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.meetingParticipantIds : [],
-                absentParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.absentParticipantIds : [],
+                meetingParticipantIds:
+                  nextScope === NOTE_SCOPE_PROJECT
+                    ? prev.meetingParticipantIds
+                    : [],
+                absentParticipantIds:
+                  nextScope === NOTE_SCOPE_PROJECT
+                    ? prev.absentParticipantIds
+                    : [],
               }));
             }}
           >
@@ -905,7 +1053,10 @@ export default function MeetingNotesPage() {
               onChange={(event) => {
                 const projectId = event.target.value;
                 setNewProjectId(projectId);
-                const projectTeamIds = getProjectTeamMemberIds(projectId, projects);
+                const projectTeamIds = getProjectTeamMemberIds(
+                  projectId,
+                  projects,
+                );
                 setNewRoles((prev) => ({
                   ...prev,
                   meetingParticipantIds: projectTeamIds,
@@ -930,11 +1081,14 @@ export default function MeetingNotesPage() {
           <summary className="note-roles-summary">
             <span className="note-roles-summary-label">
               Roles
-              {(newRoles.facilitatorId || newRoles.timekeeperId || newRoles.notetakerId) && (
+              {(newRoles.facilitatorId ||
+                newRoles.timekeeperId ||
+                newRoles.notetakerId) && (
                 <span className="note-roles-summary-chips">
                   {ROLE_FIELDS.filter((f) => newRoles[f.key]).map((f) => (
                     <span key={f.key} className="note-role-pill">
-                      {f.label.slice(0, 3)}: {memberNameById[newRoles[f.key]] || "…"}
+                      {f.label.slice(0, 3)}:{" "}
+                      {memberNameById[newRoles[f.key]] || "…"}
                     </span>
                   ))}
                 </span>
@@ -945,9 +1099,9 @@ export default function MeetingNotesPage() {
             {renderRoleSelectors(newRoles, updateNewRole)}
           </div>
         </details>
-      </div>
+      </SectionBlock>
 
-      <div className="notes-sections">
+      <CollectionLayout variant="list" className="notes-sections">
         {groupMode === "date" ? (
           <>
             {renderNoteSection("Today", groupedNotesByDate.today)}
@@ -957,7 +1111,9 @@ export default function MeetingNotesPage() {
           </>
         ) : (
           <>
-            {groupedNotesByProject.map((section) => renderNoteSection(section.title, section.notesList))}
+            {groupedNotesByProject.map((section) =>
+              renderNoteSection(section.title, section.notesList),
+            )}
           </>
         )}
 
@@ -967,7 +1123,184 @@ export default function MeetingNotesPage() {
         {notes.length > 0 && totalSectionsInCurrentMode === 0 && (
           <EmptyState>No notes match the current filters.</EmptyState>
         )}
-      </div>
+      </CollectionLayout>
+
+        {activeNote && (
+          <ModalShell
+            title={editingId === activeNote.id ? "Edit note" : "Note details"}
+            size="lg"
+            className={editingId === activeNote.id ? "" : "note-detail-modal"}
+            onClose={() => {
+              setViewingId(null);
+              setEditingId(null);
+            }}
+          >
+            {editingId === activeNote.id ? (
+              <div className="note-editor-row">
+                <div className="note-editor-meta">
+                  <label className="note-meta-field note-meta-field--wide">
+                    <span>Title</span>
+                    <InputField
+                      type="text"
+                      className="note-meta-input"
+                      value={editMeta.title}
+                      onChange={(event) =>
+                        updateEditMeta("title", event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label className="note-meta-field">
+                    <span>Type</span>
+                    <SelectField
+                      className="note-meta-input"
+                      value={editMeta.scopeType}
+                      onChange={(event) => {
+                        const nextScope = normalizeScopeType(
+                          event.target.value,
+                        );
+                        setEditMeta((prev) => ({
+                          ...prev,
+                          scopeType: nextScope,
+                          projectId:
+                            nextScope === NOTE_SCOPE_PROJECT
+                              ? prev.projectId
+                              : "",
+                        }));
+                      }}
+                    >
+                      <option value={NOTE_SCOPE_DATE}>Date-based</option>
+                      <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
+                    </SelectField>
+                  </label>
+
+                  {normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT && (
+                    <label className="note-meta-field">
+                      <span>Project</span>
+                      <SelectField
+                        className="note-meta-input"
+                        value={editMeta.projectId}
+                        onChange={(event) => {
+                          const projectId = event.target.value;
+                          const projectTeamIds = getProjectTeamMemberIds(
+                            projectId,
+                            projects,
+                          );
+                          setEditMeta((prev) => ({
+                            ...prev,
+                            projectId,
+                            meetingParticipantIds: projectTeamIds,
+                            absentParticipantIds: [],
+                          }));
+                        }}
+                      >
+                        <option value="">No project selected</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project?.data?.name || project.id}
+                          </option>
+                        ))}
+                      </SelectField>
+                    </label>
+                  )}
+
+                  {renderRoleSelectors(editMeta, updateEditMeta)}
+                </div>
+
+                <RichEditor
+                  value={editContent}
+                  onChange={setEditContent}
+                  members={members}
+                  projects={projects}
+                  tasks={tasks}
+                  resources={resources}
+                  notes={notes}
+                  currentNoteId={activeNote.id}
+                  showDateObjectButton={
+                    normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT
+                  }
+                />
+                <div className="note-editor-actions">
+                  <Button
+                    onClick={() => handleSaveEdit(activeNote.id)}
+                    disabled={!editMeta.title.trim()}
+                  >
+                    Save
+                  </Button>
+                  <Button variant="ghost" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="note-preview-row">
+                <div className="note-preview-header">
+                  <div className="note-preview-title-block">
+                    <h3 className="note-preview-title">
+                      {formatDateInTitle(activeNote?.data?.createdAt)} · {activeNote?.data?.title || "Untitled"}
+                    </h3>
+                    <p className="note-preview-updated">
+                      {activeNote?.data?.updatedAt
+                        ? `Updated ${new Date(Number(activeNote.data.updatedAt)).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="note-editor-actions note-editor-actions--preview">
+                    <Button onClick={() => startEditing(activeNote)}>Edit</Button>
+                    <Button variant="ghost" onClick={() => setViewingId(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="note-preview-meta">
+                  <div className="note-meta-line">
+                    <span className="note-scope-chip">
+                      {normalizeScopeType(activeNote?.data?.scopeType) === NOTE_SCOPE_PROJECT
+                        ? "project-based"
+                        : "date-based"}
+                    </span>
+                    {normalizeScopeType(activeNote?.data?.scopeType) === NOTE_SCOPE_PROJECT && (
+                      <span className="note-project-chip">
+                        {projectLabel(activeNote?.data?.projectId || "")}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="note-role-line">
+                    {renderRoleSummary(activeNote?.data)}
+                  </div>
+
+                  {renderMeetingAttendanceDetail(activeNote?.data)}
+                </div>
+
+                {activeNote?.data?.content ? (
+                  <div
+                    className="note-preview-content"
+                    dangerouslySetInnerHTML={{ __html: activeNote.data.content }}
+                  />
+                ) : (
+                  <p className="note-empty">
+                    No content yet. Click Edit to add content.
+                  </p>
+                )}
+              </div>
+            )}
+          </ModalShell>
+        )}
+
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          label={deleteTarget.label}
+          onConfirm={deleteTarget.onConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </TabPage>
   );
 }

@@ -13,6 +13,7 @@ export default function ModalShell({
   const modalClasses = [
     "edit-modal",
     size === "sm" ? "edit-modal--sm" : "",
+    size === "lg" ? "edit-modal--lg" : "",
     className,
   ]
     .filter(Boolean)
