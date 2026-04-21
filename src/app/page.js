@@ -34,6 +34,35 @@ const TAB_ORDER = [
   "resources",
 ];
 
+const FONT_OPTIONS = [
+  {
+    value: "sentient",
+    label: "Sentient (Editorial)",
+  },
+  {
+    value: "sans",
+    label: "Avenir (Clean)",
+  },
+  {
+    value: "sponact",
+    label: "Sponact (All)",
+  },
+];
+
+const SHAPE_OPTIONS = [
+  { value: "soft", label: "Soft corners" },
+  { value: "square", label: "Sharp corners" },
+  { value: "round", label: "Round corners" },
+];
+
+const PATTERN_OPTIONS = [
+  { value: "paper", label: "Paper", glyph: "::", bgColor: "#f3efe6" },
+  { value: "linen", label: "Linen", glyph: "##", bgColor: "#e3efe4" },
+  { value: "blueprint", label: "Blueprint", glyph: "+ +", bgColor: "#d7e6ff" },
+  { value: "confetti", label: "Confetti", glyph: "..", bgColor: "#fcfdff" },
+  { value: "kraft", label: "Kraft", glyph: "//", bgColor: "#dfc18f" },
+];
+
 const PRESENCE_COLORS = [
   "#D81B60",
   "#1E88E5",
@@ -44,6 +73,15 @@ const PRESENCE_COLORS = [
   "#6D4C41",
   "#8E24AA",
 ];
+
+const DEFAULT_STYLE_PREFS = {
+  bg: "paper",
+  font: "sentient",
+  radius: "soft",
+  bgColor: "#f2ebe2",
+  grain: 0.95,
+  wash: 0.1,
+};
 
 function hashIdToColor(id) {
   const text = String(id || "viewer");
@@ -79,36 +117,18 @@ function lerp(from, to, factor) {
   return from + (to - from) * factor;
 }
 
-function loadStylePrefs() {
-  if (typeof window === "undefined") {
-    return {
-      bg: "paper",
-      font: "sentient",
-      radius: "soft",
-      bgColor: "#f2ebe2",
-      grain: 0.7,
-      wash: 0.18,
-    };
-  }
+function loadStylePrefsFromStorage() {
+  if (typeof window === "undefined") return DEFAULT_STYLE_PREFS;
 
   try {
     const raw = window.localStorage.getItem(STYLE_TOOL_KEY);
-    if (!raw) {
-      return {
-        bg: "paper",
-        font: "sentient",
-        radius: "soft",
-        bgColor: "#f2ebe2",
-        grain: 0.7,
-        wash: 0.18,
-      };
-    }
+    if (!raw) return DEFAULT_STYLE_PREFS;
     const parsed = JSON.parse(raw);
     return {
       bg: ["paper", "linen", "blueprint", "confetti", "kraft"].includes(parsed?.bg)
         ? parsed.bg
         : "paper",
-      font: ["sentient", "sans", "accent"].includes(parsed?.font)
+      font: ["sentient", "sans", "sponact"].includes(parsed?.font)
         ? parsed.font
         : "sentient",
       radius: ["soft", "square", "round"].includes(parsed?.radius)
@@ -128,14 +148,7 @@ function loadStylePrefs() {
           : 0.18,
     };
   } catch {
-    return {
-      bg: "paper",
-      font: "sentient",
-      radius: "soft",
-      bgColor: "#f2ebe2",
-      grain: 0.7,
-      wash: 0.18,
-    };
+    return DEFAULT_STYLE_PREFS;
   }
 }
 
@@ -149,7 +162,8 @@ export default function Home() {
   const [presenceRows, setPresenceRows] = useState([]);
   const [smoothedPeerCursors, setSmoothedPeerCursors] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
-  const [stylePrefs, setStylePrefs] = useState(() => loadStylePrefs());
+  const [stylePrefs, setStylePrefs] = useState(DEFAULT_STYLE_PREFS);
+  const [stylePrefsLoaded, setStylePrefsLoaded] = useState(false);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const cursorRef = useRef({ x: 120, y: 120 });
   const peerTargetsRef = useRef(new Map());
@@ -224,13 +238,20 @@ export default function Home() {
   }, [activeTab]);
 
   useEffect(() => {
+    const loaded = loadStylePrefsFromStorage();
+    setStylePrefs(loaded);
+    setStylePrefsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!stylePrefsLoaded) return;
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(STYLE_TOOL_KEY, JSON.stringify(stylePrefs));
     } catch {
       // Ignore storage write failures.
     }
-  }, [stylePrefs]);
+  }, [stylePrefs, stylePrefsLoaded]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -675,18 +696,18 @@ export default function Home() {
             onClick={() => setToolboxOpen((prev) => !prev)}
             aria-expanded={toolboxOpen}
             aria-controls="playground-panel"
-            title="Open playground"
+            title="Open theme controls"
           >
             <span className="style-toolbox-trigger-icon">◎</span>
-            <span className="style-toolbox-trigger-text">Playground</span>
+            <span className="style-toolbox-trigger-text">Themes</span>
           </button>
 
           {toolboxOpen ? (
             <div className="style-toolbox-panel" id="playground-panel">
               <div className="style-toolbox-head">
                 <div>
-                  <div className="style-toolbox-title">Playground</div>
-                  <div className="style-toolbox-subtitle">Pattern first, controls on demand</div>
+                  <div className="style-toolbox-title">Theme controls</div>
+                  <div className="style-toolbox-subtitle">Choose pattern, type, and shape</div>
                 </div>
                 <button
                   type="button"
@@ -699,21 +720,19 @@ export default function Home() {
               </div>
 
               <div className="style-toolbox-group">
-                <div className="style-toolbox-label">Patterns</div>
+                <div className="style-toolbox-label">Pattern</div>
                 <div className="style-swatch-grid">
-                  {[
-                    { value: "paper", label: "Paper", glyph: "::" },
-                    { value: "linen", label: "Linen", glyph: "##" },
-                    { value: "blueprint", label: "Blueprint", glyph: "+ +" },
-                    { value: "confetti", label: "Confetti", glyph: ".." },
-                    { value: "kraft", label: "Kraft", glyph: "//" },
-                  ].map((option) => (
+                  {PATTERN_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       className={`style-swatch${stylePrefs.bg === option.value ? " style-swatch--active" : ""}`}
                       onClick={() =>
-                        setStylePrefs((prev) => ({ ...prev, bg: option.value }))
+                        setStylePrefs((prev) => ({
+                          ...prev,
+                          bg: option.value,
+                          bgColor: option.bgColor,
+                        }))
                       }
                       title={option.label}
                       aria-pressed={stylePrefs.bg === option.value}
@@ -727,13 +746,9 @@ export default function Home() {
               </div>
 
               <div className="style-toolbox-group">
-                <div className="style-toolbox-label">Type and shape</div>
+                <div className="style-toolbox-label">Type</div>
                 <div className="style-chip-row">
-                  {[
-                    { value: "sentient", label: "Aa", title: "Sentient" },
-                    { value: "sans", label: "SS", title: "Sans" },
-                    { value: "accent", label: "Ax", title: "Accent mix" },
-                  ].map((option) => (
+                  {FONT_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
@@ -741,26 +756,8 @@ export default function Home() {
                       onClick={() =>
                         setStylePrefs((prev) => ({ ...prev, font: option.value }))
                       }
-                      title={option.title}
+                      title={option.label}
                       aria-pressed={stylePrefs.font === option.value}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                  {[
-                    { value: "soft", label: "[]", title: "Soft corners" },
-                    { value: "square", label: "][", title: "Square corners" },
-                    { value: "round", label: "()", title: "Round corners" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`style-chip-btn${stylePrefs.radius === option.value ? " style-chip-btn--active" : ""}`}
-                      onClick={() =>
-                        setStylePrefs((prev) => ({ ...prev, radius: option.value }))
-                      }
-                      title={option.title}
-                      aria-pressed={stylePrefs.radius === option.value}
                     >
                       {option.label}
                     </button>
@@ -768,47 +765,25 @@ export default function Home() {
                 </div>
               </div>
 
-              <details className="style-toolbox-advanced">
-                <summary className="style-toolbox-advanced-summary">Fine tune</summary>
-                <div className="style-toolbox-advanced-body">
-                  <label className="style-toolbox-field style-toolbox-field--inline">
-                    <span>Base color</span>
-                    <input
-                      type="color"
-                      value={stylePrefs.bgColor}
-                      onChange={(event) =>
-                        setStylePrefs((prev) => ({ ...prev, bgColor: event.target.value }))
+              <div className="style-toolbox-group">
+                <div className="style-toolbox-label">Shape</div>
+                <div className="style-chip-row">
+                  {SHAPE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`style-chip-btn${stylePrefs.radius === option.value ? " style-chip-btn--active" : ""}`}
+                      onClick={() =>
+                        setStylePrefs((prev) => ({ ...prev, radius: option.value }))
                       }
-                    />
-                  </label>
-                  <label className="style-toolbox-field">
-                    <span>Grain</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={stylePrefs.grain}
-                      onChange={(event) =>
-                        setStylePrefs((prev) => ({ ...prev, grain: Number(event.target.value) }))
-                      }
-                    />
-                  </label>
-                  <label className="style-toolbox-field">
-                    <span>Pattern strength</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={stylePrefs.wash}
-                      onChange={(event) =>
-                        setStylePrefs((prev) => ({ ...prev, wash: Number(event.target.value) }))
-                      }
-                    />
-                  </label>
+                      title={option.label}
+                      aria-pressed={stylePrefs.radius === option.value}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              </details>
+              </div>
             </div>
           ) : null}
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ModalShell from "./ModalShell";
 import Button from "../Button";
 
@@ -24,6 +25,14 @@ export default function DeleteConfirmDialog({
   onConfirm,
   onCancel,
 }) {
+  const [confirmText, setConfirmText] = useState("");
+  const canConfirm = confirmText.trim() === "DELETE";
+
+  function handleConfirm() {
+    if (!canConfirm) return;
+    onConfirm?.();
+  }
+
   return (
     <ModalShell
       title="Confirm delete"
@@ -35,7 +44,7 @@ export default function DeleteConfirmDialog({
           <Button variant="ghost" size="small" onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="danger" size="small" onClick={onConfirm}>
+          <Button variant="danger" size="small" onClick={handleConfirm} disabled={!canConfirm}>
             Delete
           </Button>
         </div>
@@ -46,6 +55,17 @@ export default function DeleteConfirmDialog({
         undone.
       </p>
       {detail && <p className="delete-confirm-detail">{detail}</p>}
+      <label className="delete-confirm-type-row">
+        <span className="delete-confirm-type-label">Type DELETE to confirm</span>
+        <input
+          type="text"
+          className="delete-confirm-type-input"
+          placeholder="DELETE"
+          value={confirmText}
+          onChange={(event) => setConfirmText(event.target.value)}
+          autoComplete="off"
+        />
+      </label>
     </ModalShell>
   );
 }

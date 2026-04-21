@@ -121,12 +121,12 @@ input[type="radio"] {
 .page-shell.style-bg-paper {
   background-color: var(--playground-bg, #f2ebe2);
   background-image:
-    linear-gradient(rgba(255, 252, 247, calc(1 - var(--playground-wash, 0.18))), rgba(255, 252, 247, calc(1 - var(--playground-wash, 0.18)))),
-    radial-gradient(circle at 18% 16%, rgba(197, 167, 140, calc(0.24 * var(--playground-grain, 0.7))) 0%, rgba(197, 167, 140, 0.00) 38%),
-    radial-gradient(circle at 82% 80%, rgba(188, 165, 148, calc(0.22 * var(--playground-grain, 0.7))) 0%, rgba(188, 165, 148, 0.00) 36%),
-    repeating-linear-gradient(0deg, rgba(108, 90, 70, calc(0.05 * var(--playground-grain, 0.7))) 0px, rgba(108, 90, 70, calc(0.05 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 26px),
-    repeating-linear-gradient(90deg, rgba(108, 90, 70, calc(0.035 * var(--playground-grain, 0.7))) 0px, rgba(108, 90, 70, calc(0.035 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 26px),
-    radial-gradient(circle, rgba(114, 98, 80, calc(0.09 * var(--playground-grain, 0.7))) 1px, transparent 1px);
+    linear-gradient(rgba(255, 252, 247, calc(0.34 * (1 - var(--playground-wash, 0.18)))), rgba(255, 252, 247, calc(0.34 * (1 - var(--playground-wash, 0.18))))),
+    radial-gradient(circle at 18% 16%, rgba(197, 167, 140, calc(0.50 * var(--playground-grain, 0.7))) 0%, rgba(197, 167, 140, 0.00) 38%),
+    radial-gradient(circle at 82% 80%, rgba(188, 165, 148, calc(0.46 * var(--playground-grain, 0.7))) 0%, rgba(188, 165, 148, 0.00) 36%),
+    repeating-linear-gradient(0deg, rgba(108, 90, 70, calc(0.11 * var(--playground-grain, 0.7))) 0px, rgba(108, 90, 70, calc(0.11 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 26px),
+    repeating-linear-gradient(90deg, rgba(108, 90, 70, calc(0.09 * var(--playground-grain, 0.7))) 0px, rgba(108, 90, 70, calc(0.09 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 26px),
+    radial-gradient(circle, rgba(114, 98, 80, calc(0.17 * var(--playground-grain, 0.7))) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 20px 20px;
   background-position: center, center, center, center, center, 0 0;
 }
@@ -134,45 +134,51 @@ input[type="radio"] {
 .page-shell.style-bg-linen {
   background-color: var(--playground-bg, #f1ebe2);
   background-image:
-    linear-gradient(rgba(255, 251, 246, calc(1 - var(--playground-wash, 0.18))), rgba(255, 251, 246, calc(1 - var(--playground-wash, 0.18)))),
-    repeating-linear-gradient(0deg, rgba(122, 98, 80, calc(0.06 * var(--playground-grain, 0.7))) 0px, rgba(122, 98, 80, calc(0.06 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 14px),
-    repeating-linear-gradient(90deg, rgba(122, 98, 80, calc(0.045 * var(--playground-grain, 0.7))) 0px, rgba(122, 98, 80, calc(0.045 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 14px),
-    repeating-linear-gradient(45deg, rgba(170, 146, 126, calc(0.04 * var(--playground-grain, 0.7))) 0px, rgba(170, 146, 126, calc(0.04 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 28px);
+    linear-gradient(rgba(255, 251, 246, calc(0.32 * (1 - var(--playground-wash, 0.18)))), rgba(255, 251, 246, calc(0.32 * (1 - var(--playground-wash, 0.18))))),
+    repeating-linear-gradient(0deg, rgba(122, 98, 80, calc(0.14 * var(--playground-grain, 0.7))) 0px, rgba(122, 98, 80, calc(0.14 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 14px),
+    repeating-linear-gradient(90deg, rgba(122, 98, 80, calc(0.12 * var(--playground-grain, 0.7))) 0px, rgba(122, 98, 80, calc(0.12 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 14px),
+    repeating-linear-gradient(45deg, rgba(170, 146, 126, calc(0.10 * var(--playground-grain, 0.7))) 0px, rgba(170, 146, 126, calc(0.10 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 28px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
 }
 
 .page-shell.style-bg-blueprint {
   background-color: var(--playground-bg, #e9eef4);
   background-image:
-    linear-gradient(rgba(247, 251, 255, calc(1 - var(--playground-wash, 0.18))), rgba(247, 251, 255, calc(1 - var(--playground-wash, 0.18)))),
-    repeating-linear-gradient(0deg, rgba(74, 108, 145, calc(0.12 * var(--playground-grain, 0.7))) 0px, rgba(74, 108, 145, calc(0.12 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 24px),
-    repeating-linear-gradient(90deg, rgba(74, 108, 145, calc(0.12 * var(--playground-grain, 0.7))) 0px, rgba(74, 108, 145, calc(0.12 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 24px),
-    radial-gradient(circle at 12% 18%, rgba(106, 142, 188, calc(0.18 * var(--playground-grain, 0.7))) 0%, rgba(106, 142, 188, 0) 42%);
+    linear-gradient(rgba(247, 251, 255, calc(0.26 * (1 - var(--playground-wash, 0.18)))), rgba(247, 251, 255, calc(0.26 * (1 - var(--playground-wash, 0.18))))),
+    repeating-linear-gradient(0deg, rgba(74, 108, 145, calc(0.24 * var(--playground-grain, 0.7))) 0px, rgba(74, 108, 145, calc(0.24 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 24px),
+    repeating-linear-gradient(90deg, rgba(74, 108, 145, calc(0.24 * var(--playground-grain, 0.7))) 0px, rgba(74, 108, 145, calc(0.24 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 24px),
+    radial-gradient(circle at 12% 18%, rgba(106, 142, 188, calc(0.32 * var(--playground-grain, 0.7))) 0%, rgba(106, 142, 188, 0) 42%);
   background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
 }
 
 .page-shell.style-bg-confetti {
-  background-color: var(--playground-bg, #f4efe7);
+  background-color: var(--playground-bg, #fcfdff);
   background-image:
-    linear-gradient(rgba(255, 250, 245, calc(1 - var(--playground-wash, 0.18))), rgba(255, 250, 245, calc(1 - var(--playground-wash, 0.18)))),
-    radial-gradient(circle at 12px 10px, rgba(191, 135, 92, calc(0.16 * var(--playground-grain, 0.7))) 2px, transparent 2.5px),
-    radial-gradient(circle at 42px 26px, rgba(102, 124, 144, calc(0.14 * var(--playground-grain, 0.7))) 1.5px, transparent 2px),
-    radial-gradient(circle at 24px 34px, rgba(149, 120, 84, calc(0.12 * var(--playground-grain, 0.7))) 1.7px, transparent 2px),
-    radial-gradient(circle at 60px 12px, rgba(172, 154, 130, calc(0.14 * var(--playground-grain, 0.7))) 1.8px, transparent 2.2px);
-  background-size: 100% 100%, 72px 48px, 72px 48px, 72px 48px, 72px 48px;
+    linear-gradient(rgba(255, 255, 255, calc(0.20 * (1 - var(--playground-wash, 0.18)))), rgba(255, 255, 255, calc(0.20 * (1 - var(--playground-wash, 0.18))))),
+    repeating-linear-gradient(0deg, rgba(76, 124, 182, calc(0.30 * var(--playground-grain, 0.7))) 0px, rgba(76, 124, 182, calc(0.30 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 26px),
+    repeating-linear-gradient(0deg, rgba(120, 162, 216, calc(0.14 * var(--playground-grain, 0.7))) 0px, rgba(120, 162, 216, calc(0.14 * var(--playground-grain, 0.7))) 1px, transparent 1px, transparent 13px);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
 }
 
 .page-shell.style-bg-kraft {
   background-color: var(--playground-bg, #e8dcc8);
   background-image:
-    linear-gradient(rgba(255, 249, 240, calc(1 - var(--playground-wash, 0.18))), rgba(255, 249, 240, calc(1 - var(--playground-wash, 0.18)))),
-    linear-gradient(135deg, rgba(145, 111, 74, calc(0.10 * var(--playground-grain, 0.7))) 25%, transparent 25%),
-    linear-gradient(225deg, rgba(145, 111, 74, calc(0.08 * var(--playground-grain, 0.7))) 25%, transparent 25%),
-    linear-gradient(45deg, rgba(145, 111, 74, calc(0.08 * var(--playground-grain, 0.7))) 25%, transparent 25%),
-    linear-gradient(315deg, rgba(145, 111, 74, calc(0.08 * var(--playground-grain, 0.7))) 25%, transparent 25%),
-    radial-gradient(circle, rgba(88, 62, 36, calc(0.06 * var(--playground-grain, 0.7))) 1px, transparent 1px);
+    linear-gradient(rgba(255, 249, 240, calc(0.24 * (1 - var(--playground-wash, 0.18)))), rgba(255, 249, 240, calc(0.24 * (1 - var(--playground-wash, 0.18))))),
+    linear-gradient(135deg, rgba(145, 111, 74, calc(0.20 * var(--playground-grain, 0.7))) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(145, 111, 74, calc(0.16 * var(--playground-grain, 0.7))) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(145, 111, 74, calc(0.16 * var(--playground-grain, 0.7))) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(145, 111, 74, calc(0.16 * var(--playground-grain, 0.7))) 25%, transparent 25%),
+    radial-gradient(circle, rgba(88, 62, 36, calc(0.12 * var(--playground-grain, 0.7))) 1px, transparent 1px);
   background-position: center, 8px 0, 8px 0, 0 0, 0 0, 0 0;
   background-size: 100% 100%, 16px 16px, 16px 16px, 16px 16px, 16px 16px, 18px 18px;
+}
+
+.page-shell.style-font-sentient,
+.page-shell.style-font-sentient button,
+.page-shell.style-font-sentient input,
+.page-shell.style-font-sentient textarea,
+.page-shell.style-font-sentient select {
+  font-family: var(--font-sentient), "Iowan Old Style", "Times New Roman", serif;
 }
 
 .page-shell.style-font-sans,
@@ -183,9 +189,11 @@ input[type="radio"] {
   font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
-.page-shell.style-font-accent .section-title,
-.page-shell.style-font-accent .card-section-title,
-.page-shell.style-font-accent .note-title {
+.page-shell.style-font-sponact,
+.page-shell.style-font-sponact button,
+.page-shell.style-font-sponact input,
+.page-shell.style-font-sponact textarea,
+.page-shell.style-font-sponact select {
   font-family: var(--font-sponact), var(--font-sentient), serif;
 }
 
@@ -205,56 +213,56 @@ input[type="radio"] {
 
 .style-toolbox {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
+  right: 10px;
+  bottom: 10px;
   z-index: 1200;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-items: end;
 }
 
 .style-toolbox-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   border: 1px solid rgba(120, 100, 80, 0.22);
   border-radius: 999px;
-  padding: 10px 14px;
+  padding: 7px 11px;
   background: rgba(253, 249, 244, 0.92);
   box-shadow: 0 8px 22px rgba(65, 50, 35, 0.18);
   backdrop-filter: blur(10px);
 }
 
 .style-toolbox-trigger-icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: conic-gradient(from 210deg, #9b8166, #e5d0b7, #7589a0, #9b8166);
   color: #fffdf9;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1;
 }
 
 .style-toolbox-trigger-text {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: #5a4b3f;
 }
 
 .style-toolbox-panel {
-  width: min(332px, calc(100vw - 24px));
-  padding: 14px;
-  border-radius: 18px;
+  width: min(268px, calc(100vw - 18px));
+  padding: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(120, 100, 80, 0.22);
   background: rgba(253, 249, 244, 0.93);
   box-shadow: 0 12px 32px rgba(65, 50, 35, 0.20);
   backdrop-filter: blur(12px);
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .style-toolbox-head {
@@ -265,7 +273,7 @@ input[type="radio"] {
 }
 
 .style-toolbox-title {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #7f6d59;
@@ -273,9 +281,9 @@ input[type="radio"] {
 }
 
 .style-toolbox-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: #7a6a5d;
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
 .style-toolbox-close {
@@ -289,11 +297,11 @@ input[type="radio"] {
 
 .style-toolbox-group {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .style-toolbox-label {
-  font-size: 11px;
+  font-size: 10px;
   color: #6f6154;
   font-weight: 700;
   text-transform: uppercase;
@@ -303,16 +311,16 @@ input[type="radio"] {
 .style-swatch-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .style-swatch {
   border: 1px solid rgba(132, 114, 97, 0.18);
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.54);
-  padding: 8px;
+  padding: 5px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
   text-align: left;
 }
 
@@ -322,13 +330,14 @@ input[type="radio"] {
 }
 
 .style-swatch-preview {
-  height: 42px;
-  border-radius: 10px;
+  height: 30px;
+  border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   background-color: #f2ebe2;
 }
 
 .style-swatch-preview--paper {
+  background-color: #f3efe6;
   background-image:
     repeating-linear-gradient(0deg, rgba(108, 90, 70, 0.06) 0px, rgba(108, 90, 70, 0.06) 1px, transparent 1px, transparent 12px),
     radial-gradient(circle, rgba(114, 98, 80, 0.10) 1px, transparent 1px);
@@ -336,28 +345,29 @@ input[type="radio"] {
 }
 
 .style-swatch-preview--linen {
+  background-color: #e3efe4;
   background-image:
     repeating-linear-gradient(0deg, rgba(122, 98, 80, 0.10) 0px, rgba(122, 98, 80, 0.10) 1px, transparent 1px, transparent 8px),
     repeating-linear-gradient(90deg, rgba(122, 98, 80, 0.08) 0px, rgba(122, 98, 80, 0.08) 1px, transparent 1px, transparent 8px);
 }
 
 .style-swatch-preview--blueprint {
-  background-color: #dbe6f4;
+  background-color: #d7e6ff;
   background-image:
     repeating-linear-gradient(0deg, rgba(74, 108, 145, 0.16) 0px, rgba(74, 108, 145, 0.16) 1px, transparent 1px, transparent 10px),
     repeating-linear-gradient(90deg, rgba(74, 108, 145, 0.16) 0px, rgba(74, 108, 145, 0.16) 1px, transparent 1px, transparent 10px);
 }
 
 .style-swatch-preview--confetti {
+  background-color: #fcfdff;
   background-image:
-    radial-gradient(circle at 12px 10px, rgba(191, 135, 92, 0.25) 2px, transparent 2.5px),
-    radial-gradient(circle at 42px 26px, rgba(102, 124, 144, 0.22) 1.5px, transparent 2px),
-    radial-gradient(circle at 24px 34px, rgba(149, 120, 84, 0.18) 1.7px, transparent 2px);
-  background-size: 56px 40px;
+    repeating-linear-gradient(0deg, rgba(76, 124, 182, 0.36) 0px, rgba(76, 124, 182, 0.36) 1px, transparent 1px, transparent 10px),
+    repeating-linear-gradient(0deg, rgba(120, 162, 216, 0.20) 0px, rgba(120, 162, 216, 0.20) 1px, transparent 1px, transparent 5px);
+  background-size: 100% 100%, 100% 100%;
 }
 
 .style-swatch-preview--kraft {
-  background-color: #e8dcc8;
+  background-color: #dfc18f;
   background-image:
     linear-gradient(135deg, rgba(145, 111, 74, 0.14) 25%, transparent 25%),
     linear-gradient(225deg, rgba(145, 111, 74, 0.10) 25%, transparent 25%),
@@ -368,13 +378,13 @@ input[type="radio"] {
 }
 
 .style-swatch-glyph {
-  font-size: 11px;
+  font-size: 9px;
   color: #866f5d;
   letter-spacing: 0.08em;
 }
 
 .style-swatch-label {
-  font-size: 11px;
+  font-size: 10px;
   color: #504338;
   font-weight: 600;
 }
@@ -382,18 +392,19 @@ input[type="radio"] {
 .style-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .style-chip-btn {
-  min-width: 44px;
+  min-width: 32px;
   border: 1px solid rgba(132, 114, 97, 0.18);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.54);
   color: #5e4d41;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 8px 10px;
+  padding: 6px 8px;
+  line-height: 1.2;
 }
 
 .style-chip-btn--active {
@@ -402,87 +413,14 @@ input[type="radio"] {
   border-color: #5e4d41;
 }
 
-.style-toolbox-advanced {
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid rgba(132, 114, 97, 0.14);
-  padding-top: 12px;
-}
-
-.style-toolbox-advanced-summary {
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  color: #6a5b4e;
-}
-
-.style-toolbox-advanced-body {
-  display: grid;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-.style-toolbox-field {
-  display: grid;
-  gap: 4px;
-}
-
-.style-toolbox-field > span {
-  font-size: 11px;
-  color: #6f6154;
-  font-weight: 600;
-}
-
-.style-toolbox-field input[type="range"] {
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 99px;
-  background: #d9cec3;
-  outline: none;
-  cursor: pointer;
-}
-
-.style-toolbox-field input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #3d2e22;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-  cursor: pointer;
-}
-
-.style-toolbox-field input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #3d2e22;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-  cursor: pointer;
-}
-
-.style-toolbox-field input[type="color"] {
-  width: 100%;
-  height: 36px;
-  border: 1px solid #d9cec3;
-  border-radius: 10px;
-  background: transparent;
-  padding: 3px;
-}
-
 @media (max-width: 980px) {
   .style-toolbox {
-    right: 10px;
-    bottom: 10px;
+    right: 8px;
+    bottom: 8px;
   }
 
   .style-toolbox-panel {
-    width: min(300px, calc(100vw - 20px));
+    width: min(252px, calc(100vw - 16px));
   }
 }
 
@@ -6323,6 +6261,35 @@ input[type="radio"] {
     gap: 8px;
     justify-content: flex-end;
     width: 100%;
+  }
+
+  .delete-confirm-type-row {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .delete-confirm-type-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #7a6d61;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .delete-confirm-type-input {
+    border: 1px solid #d9cec3;
+    border-radius: 6px;
+    padding: 7px 9px;
+    font: inherit;
+    font-size: 13px;
+    background: #fff;
+    color: #2a2a2a;
+  }
+
+  .delete-confirm-type-input:focus {
+    outline: none;
+    border-color: #b69e8a;
   }
 
   /* ─── Delete confirm dialog ─────────────────────────────────────────────── */
