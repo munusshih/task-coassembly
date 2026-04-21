@@ -1,6 +1,53 @@
 /* ─── Base ─────────────────────────────────────────────────────────────────── */
 
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+
+  /* ── Surface & background ── */
+  --bg:              #eeecea;
+  --surface:         #fff;
+  --surface-subtle:  #fdfcfb;
+  --surface-faint:   #faf9f8;
+
+  /* ── Borders ── */
+  --border:          #e5e3e1;
+  --border-subtle:   #f0edeb;
+  --border-faint:    #f5f3f1;
+  --border-input:    #ddd;
+
+  /* ── Text ── */
+  --text:            #1a1a1a;
+  --text-body:       #2a2a2a;
+  --text-secondary:  #888;
+  --text-muted:      #aaa;
+  --text-label:      #555;
+  --text-subtle:     #666;
+
+  /* ── Fill (chip/badge backgrounds) ── */
+  --fill:            #f2f0ee;
+  --fill-hover:      #ebe9e7;
+  --fill-active:     #e4e1de;
+
+  /* ── Brand ── */
+  --accent:          #1a1a1a;
+  --accent-fg:       #fff;
+  --danger:          #c5221f;
+  --danger-bg:       #fce8e6;
+  --success:         #2e7d32;
+  --success-bg:      #e8f5e9;
+
+  /* ── Radii ── */
+  --radius-xs:       4px;
+  --radius-sm:       6px;
+  --radius:          10px;
+  --radius-lg:       12px;
+  --radius-pill:     99px;
+
+  /* ── Shadows ── */
+  --shadow-card:     0 1px 4px rgba(0,0,0,0.07);
+  --shadow-modal:    0 8px 40px rgba(0,0,0,0.18);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -316,32 +363,219 @@ button { cursor: pointer; }
 
 /* ─── Section headers ────────────────────────────────────────────────────── */
 
-.section-title  { margin: 0 0 2px; font-size: 24px; font-weight: 700; }
-.section-subtitle { margin: 0; font-size: 13px; color: #888; }
+.section-title    { margin: 0 0 2px; font-size: 24px; font-weight: 700; }
+.section-subtitle { margin: 0; font-size: 13px; color: var(--text-secondary); }
+
+/* ─── Shared page headers ────────────────────────────────────────────────── */
+
+.page-header,
+.page-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-header-left,
+.page-topbar-left {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.page-header-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.page-header-right,
+.page-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── Count badge ────────────────────────────────────────────────────────── */
+/* Small pill used next to section titles to show item counts.               */
+
+.count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Card section ───────────────────────────────────────────────────────── */
+/* White card with header + body — the core structural pattern.              */
+
+.card-section {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.card-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.card-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-body);
+}
+
+/* ─── Shared add trigger ─────────────────────────────────────────────────── */
+/* Dashed "Add …" button used across pages as the primary creation entry.    */
+
+.add-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px dashed #d0d0cc;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s, color 0.15s;
+}
+.add-trigger:hover { border-color: #aaa; color: var(--text-secondary); }
+.add-trigger-icon  { font-size: 18px; line-height: 1; color: #ccc; flex-shrink: 0; }
+.add-trigger-label { font-size: 13px; }
+.add-trigger--inset {
+  width: calc(100% - 28px);
+  margin: 4px 14px 0;
+  padding: 7px 10px;
+  border-style: solid;
+}
+
+/* ─── Shared search input ────────────────────────────────────────────────── */
+
+.search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+  font: inherit;
+  color: var(--text);
+}
+
+.search-input {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: var(--surface);
+  color: var(--text);
+  width: 180px;
+}
+.search-input:focus { outline: none; border-color: #999; }
+.search-input::placeholder { color: var(--text-muted); }
+
+.search-clear {
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+}
+.search-clear:hover { color: var(--text-subtle); }
+
+.field-input,
+.field-select {
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 5px 10px;
+}
+
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+  outline: none;
+  border-color: #999;
+}
+
+.field-textarea {
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 6px 10px;
+}
+
+/* ─── Label / meta text ──────────────────────────────────────────────────── */
+
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* ─── Chip (inline tag/badge) ────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-label);
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.chip--sm { font-size: 10px; padding: 1px 7px; }
 
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
 
 .btn {
   border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-  color: #1a1a1a;
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text);
   padding: 5px 12px;
   font-size: 13px;
   white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.1s;
 }
-
-.btn--primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-.btn--ghost   { background: transparent; border-color: transparent; color: #666; }
-.btn--small   { padding: 3px 8px; font-size: 12px; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn--primary   { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn--ghost     { background: transparent; border-color: transparent; color: var(--text-subtle); }
+.btn--secondary { background: var(--fill); border-color: var(--border-input); color: var(--text-subtle); }
+.btn--secondary:hover { background: var(--fill-hover); border-color: #bbb; }
+.btn--danger    { background: var(--danger-bg); border-color: #f99; color: var(--danger); }
+.btn--danger:hover { background: #f99; border-color: #f66; color: #fff; }
+.btn--small     { padding: 3px 8px; font-size: 12px; }
+.btn:disabled   { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Members page ───────────────────────────────────────────────────────── */
 
 .members-page   { display: grid; gap: 24px; }
 .members-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
-.projects-view-toggle {
+.projects-view-toggle,
+.view-toggle-group {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
@@ -362,6 +596,15 @@ button { cursor: pointer; }
 }
 .view-toggle-btn:hover { color: #666; border-color: #bbb; }
 .view-toggle-btn--active { color: #1a1a1a; border-color: #bbb; background: #f5f5f3; }
+.view-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.view-toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+}
 
 .members-type-group { display: grid; gap: 12px; }
 .members-type-heading {
@@ -615,8 +858,7 @@ button { cursor: pointer; }
 }
 
 .icon-btn:hover { color: #444; }
-.icon-btn--delete { font-size: 17px; }
-.icon-btn--delete:hover { color: #e53e3e; }
+/* .icon-btn--delete is fully defined in the Rich Editor section below */
 
 /* ─── Edit mode ──────────────────────────────────────────────────────────── */
 
@@ -1771,7 +2013,8 @@ button { cursor: pointer; }
 .message--ok    { background: #eaf5ea; color: #2a6a2a; }
 .message--error { background: #fdf0f0; color: #8a1f1f; }
 
-.empty-state { margin: 0; color: #aaa; font-style: italic; font-size: 14px; }
+.empty-state { margin: 0; text-align: center; padding: 32px 20px; color: var(--text-muted); font-size: 14px; }
+.empty-state--inset { padding: 14px 12px; }
 
 @media (min-width: 1024px) {
   .workspace { grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
@@ -2025,21 +2268,10 @@ button { cursor: pointer; }
   gap: 20px;
 }
 
-/* Notes topbar */
-.notes-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.notes-topbar-left { display: flex; align-items: baseline; gap: 10px; }
-.notes-topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+/* Notes topbar — now uses shared .page-topbar classes */
+.notes-topbar       { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.notes-topbar-left  { display: flex; align-items: baseline; gap: 10px; }
+.notes-topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Create area */
 .note-create-area {
@@ -2113,14 +2345,7 @@ button { cursor: pointer; }
   color: #bbb;
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: #999;
-}
-
-.search-input::placeholder {
-  color: #bbb;
-}
+/* .search-input is defined globally — rules below removed to avoid conflict */
 
 .notes-sections {
   display: grid;
@@ -2419,62 +2644,16 @@ button { cursor: pointer; }
   gap: 16px;
 }
 
-.resources-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+/* resources-topbar / resources-topbar-left / resources-topbar-right 
+   now use shared .page-topbar classes — kept as aliases for backwards compat */
+.resources-topbar       { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.resources-topbar-left  { display: flex; align-items: baseline; gap: 10px; }
+.resources-count        { font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--fill); border-radius: var(--radius-pill); padding: 1px 8px; }
+.resources-topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-.resources-topbar-left {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
+/* .resource-search and .resource-search-clear replaced by shared .search-input / .search-clear */
 
-.resources-count {
-  font-size: 12px;
-  color: #b0b0a8;
-}
-
-.resources-topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.resource-search { width: 180px; }
-
-.resource-search-clear {
-  border: 0;
-  background: transparent;
-  font-size: 16px;
-  color: #bbb;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 2px;
-}
-.resource-search-clear:hover { color: #777; }
-
-/* Add trigger */
-.resource-add-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px dashed #d0d0cc;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  color: #bbb;
-  text-align: left;
-  transition: border-color 0.15s, color 0.15s;
-}
-.resource-add-trigger:hover { border-color: #aaa; color: #888; }
-.resource-add-plus { font-size: 20px; line-height: 1; color: #ccc; flex-shrink: 0; }
-.resource-add-placeholder { font-size: 13px; }
+/* Resource add trigger now uses shared .add-trigger classes */
 
 /* Add / Edit form panel */
 .resource-add-panel {
@@ -2733,28 +2912,22 @@ button { cursor: pointer; }
   grid-template-columns: minmax(0,1fr) minmax(0,1fr) 24px;
 }
 
-/* Shared input */
+/* Shared input — use design tokens to match search-input */
 .resource-input {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
-  color: #1a1a1a;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text);
   padding: 7px 10px;
   font: inherit;
   font-size: 13px;
 }
 .resource-input:focus { outline: none; border-color: #999; }
-.resource-input::placeholder { color: #bbb; }
+.resource-input::placeholder { color: var(--text-muted); }
 .resource-input--sm { padding: 5px 8px; font-size: 12px; }
 
 /* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: #bbb;
-  font-size: 14px;
-}
-
+/* .empty-state is defined earlier — kept stub for backwards compat */
 .empty-state p { margin: 0; }
 
 /* Status messages */
@@ -2836,14 +3009,8 @@ button { cursor: pointer; }
   color: #333;
 }
 
-.icon-btn--delete {
-  color: #d32f2f;
-}
-
-.icon-btn--delete:hover {
-  background: #ffebee;
-  color: #b71c1c;
-}
+.icon-btn--delete { color: #d32f2f; }
+.icon-btn--delete:hover { background: #ffebee; color: #b71c1c; }
 .toolbar-btn.is-active {
   background: #1a1a1a;
   color: #fff;
@@ -3001,35 +3168,7 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 
-/* ─── Button variants ────────────────────────────────────────────────────── */
-
-.btn--secondary {
-  background: #f5f5f3;
-  border-color: #ddd;
-  color: #666;
-}
-
-.btn--secondary:hover {
-  background: #eee;
-  border-color: #bbb;
-}
-
-.btn--danger {
-  background: #fee;
-  border-color: #f99;
-  color: #c00;
-}
-
-.btn--danger:hover {
-  background: #f99;
-  border-color: #f66;
-  color: #fff;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* .btn variants & .btn:disabled are all defined in the main Buttons section above */
 
 /* ─── Member directory page ─────────────────────────────────────────────── */
 
@@ -3556,6 +3695,7 @@ button { cursor: pointer; }
   align-items: start;
 }
 
+.board-section,
 .backlog-section {
   background: #fff;
   border-radius: 12px;
@@ -3563,6 +3703,7 @@ button { cursor: pointer; }
   overflow: hidden;
 }
 
+.board-section-head,
 .backlog-section-head {
   display: flex;
   align-items: center;
@@ -3571,21 +3712,20 @@ button { cursor: pointer; }
   border-bottom: 1px solid #f0edeb;
 }
 
+.board-section-title,
 .backlog-section-title {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.03em;
   color: #333;
 }
-
-.backlog-section-count {
-  font-size: 11px;
-  color: #aaa;
-  background: #f2f0ee;
-  border-radius: 99px;
-  padding: 1px 8px;
-  font-weight: 600;
+.board-section-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
+
+/* .backlog-section-count replaced by shared .count-badge */
 
 .backlog-lined-paper {
   padding: 6px 0 10px;
@@ -3682,20 +3822,7 @@ button { cursor: pointer; }
 }
 .backlog-add-input:focus { outline: none; border-color: #999; }
 
-.backlog-add-trigger {
-  display: block;
-  width: calc(100% - 28px);
-  margin: 4px 14px 0;
-  background: none;
-  border: none;
-  text-align: left;
-  font-size: 12.5px;
-  color: #aaa;
-  padding: 4px 2px;
-  cursor: pointer;
-  transition: color 0.12s;
-}
-.backlog-add-trigger:hover { color: #666; }
+/* backlog add trigger now uses shared .add-trigger--inset */
 
 /* ─── Wishes (reactions + comments) ─────────────────────────────────── */
 

@@ -8,6 +8,9 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
+import EmptyState from "./ui/EmptyState";
+import PageHeader from "./ui/PageHeader";
 
 function formatJson(value) {
   return JSON.stringify(value, null, 2);
@@ -95,8 +98,11 @@ export default function DataViewPage({ tabKey }) {
 
   return (
     <div>
-      <h2 className="section-title">{tabKey}</h2>
-      <p className="section-subtitle">{documents.length} document{documents.length !== 1 ? "s" : ""} in <code>{collectionName}</code></p>
+      <PageHeader
+        title={tabKey}
+        badge={`${documents.length} document${documents.length !== 1 ? "s" : ""}`}
+        subtitle={<>Collection: <code>{collectionName}</code></>}
+      />
 
       <section className="workspace">
         <div className="panel">
@@ -122,7 +128,7 @@ export default function DataViewPage({ tabKey }) {
                 </button>
               ))
             ) : (
-              <p className="empty-state">No documents.</p>
+              <EmptyState>No documents.</EmptyState>
             )}
           </div>
         </div>
@@ -134,12 +140,8 @@ export default function DataViewPage({ tabKey }) {
               <p>{selectedDocument ? selectedDocument.id : "—"}</p>
             </div>
             <div className="button-row">
-              <button type="button" className="btn btn--primary" onClick={handleSave} disabled={!selectedDocument}>
-                Save
-              </button>
-              <button type="button" className="btn btn--danger" onClick={handleDelete} disabled={!selectedDocument}>
-                Delete
-              </button>
+              <Button onClick={handleSave} disabled={!selectedDocument}>Save</Button>
+              <Button variant="danger" onClick={handleDelete} disabled={!selectedDocument}>Delete</Button>
             </div>
           </div>
           <textarea
@@ -156,9 +158,7 @@ export default function DataViewPage({ tabKey }) {
               <h3>New document</h3>
               <p>Create in {collectionName}</p>
             </div>
-            <button type="button" className="btn btn--primary" onClick={handleCreate}>
-              Create
-            </button>
+            <Button onClick={handleCreate}>Create</Button>
           </div>
           <textarea
             className="json-input"

@@ -8,8 +8,15 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON, EDIT_ICON } from "./icons";
+import EmptyState from "./ui/EmptyState";
+import InputField from "./ui/InputField";
+import ModalShell from "./ui/ModalShell";
+import PageHeader from "./ui/PageHeader";
+import SelectField from "./ui/SelectField";
+import TextareaField from "./ui/TextareaField";
 
 const TODO_TYPE = "memberTodo";
 const METRICS_CUTOFF_ISO = "2026-04-20";
@@ -657,12 +664,11 @@ export default function MemberDirectoryPage() {
 
   return (
     <div className="member-directory-page">
-      <div className="members-header">
-        <h2 className="section-title">Members</h2>
-        <p className="section-subtitle">
-          Manage member records, meeting ownership roles, and workload/project assignment snapshots.
-        </p>
-      </div>
+      <PageHeader
+        className="members-header"
+        title="Members"
+        subtitle="Manage member records, meeting ownership roles, and workload/project assignment snapshots."
+      />
 
       <div className="member-directory-kpis">
         <div className="member-directory-kpi">
@@ -695,7 +701,7 @@ export default function MemberDirectoryPage() {
           <div className="member-form-grid">
             <label className="member-form-field">
               <span>Name</span>
-              <input
+              <InputField
                 className="member-form-input"
                 value={newMember.name}
                 onChange={(e) => updateNewMemberField("name", e.target.value)}
@@ -704,7 +710,7 @@ export default function MemberDirectoryPage() {
             </label>
             <label className="member-form-field">
               <span>Type</span>
-              <select
+              <SelectField
                 className="member-form-input"
                 value={newMember.role}
                 onChange={(e) => updateNewMemberField("role", e.target.value)}
@@ -712,11 +718,11 @@ export default function MemberDirectoryPage() {
                 {MEMBER_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className="member-form-field">
               <span>Email</span>
-              <input
+              <InputField
                 className="member-form-input"
                 value={newMember.email}
                 onChange={(e) => updateNewMemberField("email", e.target.value)}
@@ -725,7 +731,7 @@ export default function MemberDirectoryPage() {
             </label>
             <label className="member-form-field">
               <span>Timezone</span>
-              <input
+              <InputField
                 className="member-form-input"
                 value={newMember.timezone}
                 onChange={(e) => updateNewMemberField("timezone", e.target.value)}
@@ -734,7 +740,7 @@ export default function MemberDirectoryPage() {
             </label>
             <label className="member-form-field">
               <span>Joined on</span>
-              <input
+              <InputField
                 type="date"
                 className="member-form-input"
                 value={newMember.joinedOn}
@@ -751,7 +757,7 @@ export default function MemberDirectoryPage() {
             </label>
             <label className="member-form-field member-form-field--full">
               <span>Notes</span>
-              <textarea
+              <TextareaField
                 className="member-form-input member-form-textarea"
                 value={newMember.notes}
                 onChange={(e) => updateNewMemberField("notes", e.target.value)}
@@ -760,16 +766,12 @@ export default function MemberDirectoryPage() {
             </label>
           </div>
           <div className="member-form-actions">
-            <button type="submit" className="btn btn--primary" disabled={!newMember.name.trim()}>
+            <Button type="submit" disabled={!newMember.name.trim()}>
               Save member
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setNewMember(emptyMemberForm())}
-            >
+            </Button>
+            <Button variant="ghost" onClick={() => setNewMember(emptyMemberForm())}>
               Clear
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -792,14 +794,14 @@ export default function MemberDirectoryPage() {
                         <strong className="rotation-month-title">{formatMonthKeyLabel(monthKey)}</strong>
                         <span className="rotation-month-key">{monthKey}</span>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--small"
+                      <Button
+                        variant="ghost"
+                        size="small"
                         onClick={() => handleSwitchRolesForMonth(monthKey)}
                         disabled={switchingMonthKey === monthKey || monthRotation.length < 2}
                       >
                         {switchingMonthKey === monthKey ? "Switching..." : "Switch roles"}
-                      </button>
+                      </Button>
                     </div>
 
                     <ul className="rotation-list">
@@ -831,7 +833,7 @@ export default function MemberDirectoryPage() {
       </div>
 
       <div className="member-directory-list">
-        {membersSorted.length === 0 && <p className="empty-state">No members yet.</p>}
+        {membersSorted.length === 0 && <EmptyState>No members yet.</EmptyState>}
 
         {membersSorted.map((member) => {
           const metric = memberMetrics[member.id] || {
@@ -1040,93 +1042,90 @@ export default function MemberDirectoryPage() {
       </div>
 
       {editingMember && (
-        <div className="edit-modal-overlay" onClick={cancelEdit}>
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="edit-modal-header">
-              <span className="edit-modal-title">{editingMember.data?.name || "Edit member"}</span>
-              <button type="button" className="edit-modal-close" onClick={cancelEdit}>✕</button>
-            </div>
-            <div className="edit-modal-body">
-              <div className="member-form-grid">
-                <label className="member-form-field">
-                  <span>Name</span>
-                  <input
-                    className="member-form-input"
-                    value={editDraft.name}
-                    onChange={(e) => updateEditField("name", e.target.value)}
-                    autoFocus
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Type</span>
-                  <select
-                    className="member-form-input"
-                    value={editDraft.role}
-                    onChange={(e) => updateEditField("role", e.target.value)}
-                  >
-                    {MEMBER_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="member-form-field">
-                  <span>Email</span>
-                  <input
-                    className="member-form-input"
-                    value={editDraft.email}
-                    onChange={(e) => updateEditField("email", e.target.value)}
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Timezone</span>
-                  <input
-                    className="member-form-input"
-                    value={editDraft.timezone}
-                    onChange={(e) => updateEditField("timezone", e.target.value)}
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Joined on</span>
-                  <input
-                    type="date"
-                    className="member-form-input"
-                    value={editDraft.joinedOn}
-                    onChange={(e) => updateEditField("joinedOn", e.target.value)}
-                  />
-                </label>
-                <label className="member-form-field member-form-field--toggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(editDraft.active)}
-                    onChange={(e) => updateEditField("active", e.target.checked)}
-                  />
-                  <span>Active member</span>
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Notes</span>
-                  <textarea
-                    className="member-form-input member-form-textarea"
-                    value={editDraft.notes}
-                    onChange={(e) => updateEditField("notes", e.target.value)}
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="edit-modal-footer">
-              <button
+        <ModalShell
+          title={editingMember.data?.name || "Edit member"}
+          onClose={cancelEdit}
+          footer={(
+            <>
+              <Button
                 type="button"
-                className="btn btn--primary btn--small"
+                size="small"
                 onClick={() => saveEdit(editingMember)}
                 disabled={!editDraft.name.trim()}
               >
                 Save
-              </button>
-              <button type="button" className="btn btn--ghost btn--small" onClick={cancelEdit}>
+              </Button>
+              <Button type="button" variant="ghost" size="small" onClick={cancelEdit}>
                 Cancel
-              </button>
-            </div>
+              </Button>
+            </>
+          )}
+        >
+          <div className="member-form-grid">
+            <label className="member-form-field">
+              <span>Name</span>
+              <InputField
+                className="member-form-input"
+                value={editDraft.name}
+                onChange={(e) => updateEditField("name", e.target.value)}
+                autoFocus
+              />
+            </label>
+            <label className="member-form-field">
+              <span>Type</span>
+              <SelectField
+                className="member-form-input"
+                value={editDraft.role}
+                onChange={(e) => updateEditField("role", e.target.value)}
+              >
+                {MEMBER_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </SelectField>
+            </label>
+            <label className="member-form-field">
+              <span>Email</span>
+              <InputField
+                className="member-form-input"
+                value={editDraft.email}
+                onChange={(e) => updateEditField("email", e.target.value)}
+              />
+            </label>
+            <label className="member-form-field">
+              <span>Timezone</span>
+              <InputField
+                className="member-form-input"
+                value={editDraft.timezone}
+                onChange={(e) => updateEditField("timezone", e.target.value)}
+              />
+            </label>
+            <label className="member-form-field">
+              <span>Joined on</span>
+              <InputField
+                type="date"
+                className="member-form-input"
+                value={editDraft.joinedOn}
+                onChange={(e) => updateEditField("joinedOn", e.target.value)}
+              />
+            </label>
+            <label className="member-form-field member-form-field--toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(editDraft.active)}
+                onChange={(e) => updateEditField("active", e.target.checked)}
+              />
+              <span>Active member</span>
+            </label>
+            <label className="member-form-field member-form-field--full">
+              <span>Notes</span>
+              <TextareaField
+                className="member-form-input member-form-textarea"
+                value={editDraft.notes}
+                onChange={(e) => updateEditField("notes", e.target.value)}
+              />
+            </label>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

@@ -8,8 +8,16 @@ import {
   replaceDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON } from "./icons";
+import AddTrigger from "./ui/AddTrigger";
+import BoardSection from "./ui/BoardSection";
+import ModalShell from "./ui/ModalShell";
+import PageHeader from "./ui/PageHeader";
+import InputField from "./ui/InputField";
+import SearchField from "./ui/SearchField";
+import SelectField from "./ui/SelectField";
 
 const TODO_TYPE = "memberTodo";
 const REACTION_EMOJIS = ["👍", "🔥", "💡", "❤️"];
@@ -92,32 +100,30 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
             💬{comments.length > 0 && <span className="wish-comment-count">{comments.length}</span>}
           </button>
           {pushing && (
-            <div className="edit-modal-overlay" onClick={() => { setPushing(false); setSelectedMember(""); }}>
-              <div className="edit-modal edit-modal--sm" onClick={(e) => e.stopPropagation()}>
-                <div className="edit-modal-header">
-                  <span className="edit-modal-title">Push to board</span>
-                  <button type="button" className="edit-modal-close" onClick={() => { setPushing(false); setSelectedMember(""); }}>✕</button>
-                </div>
-                <div className="edit-modal-body">
-                  <p className="push-modal-wish">{item.data.text}</p>
-                  <select
-                    className="backlog-member-select"
-                    value={selectedMember}
-                    onChange={(e) => setSelectedMember(e.target.value)}
-                    autoFocus
-                  >
-                    <option value="">Pick a member…</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="edit-modal-footer">
-                  <button type="button" className="btn btn--primary btn--small" onClick={handlePushConfirm} disabled={!selectedMember}>Push to board</button>
-                  <button type="button" className="btn btn--ghost btn--small" onClick={() => { setPushing(false); setSelectedMember(""); }}>Cancel</button>
-                </div>
-              </div>
-            </div>
+            <ModalShell
+              title="Push to board"
+              size="sm"
+              onClose={() => { setPushing(false); setSelectedMember(""); }}
+              footer={(
+                <>
+                  <Button size="small" onClick={handlePushConfirm} disabled={!selectedMember}>Push to board</Button>
+                  <Button variant="ghost" size="small" onClick={() => { setPushing(false); setSelectedMember(""); }}>Cancel</Button>
+                </>
+              )}
+            >
+              <p className="push-modal-wish">{item.data.text}</p>
+              <SelectField
+                className="backlog-member-select"
+                value={selectedMember}
+                onChange={(e) => setSelectedMember(e.target.value)}
+                autoFocus
+              >
+                <option value="">Pick a member…</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
+                ))}
+              </SelectField>
+            </ModalShell>
           )}
           {pushed ? (
             <span className="backlog-pushed-confirm">✓</span>
@@ -165,7 +171,7 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
               ))}
             </div>
             <div className="wish-comment-modal-footer">
-              <input
+              <InputField
                 className="wish-comment-input"
                 type="text"
                 placeholder="Add a comment…"
@@ -174,9 +180,7 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
                 onKeyDown={(e) => { if (e.key === "Enter") handleComment(); }}
                 autoFocus
               />
-              <button type="button" className="btn btn--primary btn--small" onClick={handleComment} disabled={!commentText.trim()}>
-                Post
-              </button>
+              <Button size="small" onClick={handleComment} disabled={!commentText.trim()}>Post</Button>
             </div>
           </div>
         </div>
@@ -212,12 +216,11 @@ function ProjectSection({ project, items, members, onAdd, onDelete, onPush, onRe
   }
 
   return (
-    <div className="backlog-section">
-      <div className="backlog-section-head">
-        <span className="backlog-section-title">{project?.data?.name || "Unassigned"}</span>
-        <span className="backlog-section-count">{items.length}</span>
-      </div>
-
+    <BoardSection
+      title={project?.data?.name || "Unassigned"}
+      badge={String(items.length)}
+      className="backlog-section"
+    >
       <div className="wish-list-area">
         {visibleItems.length > 0 && (
           <ul className="wish-list">
@@ -248,7 +251,7 @@ function ProjectSection({ project, items, members, onAdd, onDelete, onPush, onRe
 
         {addOpen ? (
           <div className="backlog-add-row">
-            <input
+            <InputField
               className="backlog-add-input"
               type="text"
               placeholder="Describe the wish or idea…"
@@ -260,16 +263,14 @@ function ProjectSection({ project, items, members, onAdd, onDelete, onPush, onRe
                 if (e.key === "Escape") { setAddOpen(false); setAddText(""); }
               }}
             />
-            <button type="button" className="btn btn--primary btn--small" onClick={handleAdd} disabled={!addText.trim()}>Add</button>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => { setAddOpen(false); setAddText(""); }}>Cancel</button>
+            <Button size="small" onClick={handleAdd} disabled={!addText.trim()}>Add</Button>
+            <Button variant="ghost" size="small" onClick={() => { setAddOpen(false); setAddText(""); }}>Cancel</Button>
           </div>
         ) : (
-          <button type="button" className="backlog-add-trigger" onClick={() => setAddOpen(true)}>
-            + Add wish
-          </button>
+          <AddTrigger label="Add wish" inset onClick={() => setAddOpen(true)} />
         )}
       </div>
-    </div>
+    </BoardSection>
   );
 }
 
@@ -373,24 +374,17 @@ export default function BacklogPage() {
 
   return (
     <div className="backlog-page">
-      <div className="resources-topbar">
-        <div className="resources-topbar-left">
-          <h2 className="section-title">Wishes</h2>
-          <span className="resources-count">{totalItems} wish{totalItems !== 1 ? "es" : ""}</span>
-        </div>
-        <div className="resources-topbar-right">
-          <input
-            type="text"
-            placeholder="Search…"
+      <PageHeader
+        title="Wishes"
+        badge={`${totalItems} wish${totalItems !== 1 ? "es" : ""}`}
+        right={(
+          <SearchField
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="resource-input resource-search"
+            onClear={() => setSearchQuery("")}
           />
-          {searchQuery && (
-            <button type="button" className="resource-search-clear" onClick={() => setSearchQuery("")}>×</button>
-          )}
-        </div>
-      </div>
+        )}
+      />
 
       <div className="backlog-grid">
         {sortedProjects.map((project) => (

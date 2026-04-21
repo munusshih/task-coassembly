@@ -1,2 +1,16 @@
-export const EDIT_ICON = "✎";
-export const DELETE_ICON = "×";
+export {
+  DELETE_ICON,
+  EDIT_ICON,
+  DATE_VIEW_ICON,
+  KANBAN_VIEW_ICON,
+  LIST_VIEW_ICON,
+  MEMBER_VIEW_ICON,
+  PROJECT_VIEW_ICON,
+  IconBacklog,
+  IconChartLine,
+  IconChecklist,
+  IconDocument,
+  IconFolder,
+  IconLink,
+  IconUsers,
+} from "./ui/icons";

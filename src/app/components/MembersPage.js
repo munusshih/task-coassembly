@@ -8,6 +8,15 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
+import IconButton from "./IconButton";
+import { DELETE_ICON, MEMBER_VIEW_ICON, PROJECT_VIEW_ICON } from "./icons";
+import AddTrigger from "./ui/AddTrigger";
+import BoardSection from "./ui/BoardSection";
+import EmptyState from "./ui/EmptyState";
+import Pill from "./ui/Pill";
+import SelectField from "./ui/SelectField";
+import ViewToggle from "./ui/ViewToggle";
 
 // ─── Constants ───────────────────────────────────────────────────────────────────────────────
 
@@ -362,7 +371,7 @@ function TaskItem({
           />
 
           <div className="todo-edit-meta">
-            <select
+            <SelectField
               className="meta-select"
               value={draft.timeUnits}
               onChange={(e) => onEditFieldChange("timeUnits", e.target.value)}
@@ -371,8 +380,8 @@ function TaskItem({
               {UNIT_OPTIONS.map((units) => (
                 <option key={units} value={units}>{formatUnitOption(units)}</option>
               ))}
-            </select>
-            <select
+            </SelectField>
+            <SelectField
               className="meta-select"
               value={draft.projectId}
               onChange={(e) => onEditFieldChange("projectId", e.target.value)}
@@ -386,7 +395,7 @@ function TaskItem({
                   {(selectedProject?.data?.name || draftProjectId) + " (not assigned)"}
                 </option>
               )}
-            </select>
+            </SelectField>
             {remainingHint ? <span className="meta-helper-chip">{remainingHint}</span> : null}
             <input
               type="date"
@@ -399,7 +408,7 @@ function TaskItem({
           <details className="todo-edit-disclosure" open={draft.subtasks.length > 0}>
             <summary className="todo-edit-disclosure-summary">
               <span className="todo-edit-section-title">Subtasks ({draft.subtasks.length})</span>
-              <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); onEditSubtaskAdd(); }}>+ Add</button>
+              <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); onEditSubtaskAdd(); }}>+ Add</Button>
             </summary>
             <div className="todo-edit-section">
               {draft.subtasks.length === 0 ? (
@@ -420,12 +429,13 @@ function TaskItem({
                         placeholder="Subtask"
                         onChange={(e) => onEditSubtaskChange(idx, "text", e.target.value)}
                       />
-                      <button
-                        type="button"
-                        className="icon-btn icon-btn--delete"
+                      <IconButton
+                        variant="delete"
                         title="Remove subtask"
                         onClick={() => onEditSubtaskRemove(idx)}
-                      >×</button>
+                      >
+                        {DELETE_ICON}
+                      </IconButton>
                     </div>
                   ))}
                 </div>
@@ -436,7 +446,7 @@ function TaskItem({
           <details className="todo-edit-disclosure" open={draft.links.length > 0}>
             <summary className="todo-edit-disclosure-summary">
               <span className="todo-edit-section-title">Links ({draft.links.length})</span>
-              <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); onEditLinkAdd(); }}>+ Add</button>
+              <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); onEditLinkAdd(); }}>+ Add</Button>
             </summary>
             <div className="todo-edit-section">
               {draft.links.length === 0 ? (
@@ -459,12 +469,13 @@ function TaskItem({
                           onChange={(e) => onEditLinkChange(idx, "url", e.target.value)}
                         />
                       </div>
-                      <button
-                        type="button"
-                        className="icon-btn icon-btn--delete"
+                      <IconButton
+                        variant="delete"
                         title="Remove link"
                         onClick={() => onEditLinkRemove(idx)}
-                      >×</button>
+                      >
+                        {DELETE_ICON}
+                      </IconButton>
                     </div>
                   ))}
                 </div>
@@ -473,15 +484,10 @@ function TaskItem({
           </details>
 
           <div className="todo-edit-actions">
-            <button
-              type="button"
-              className="btn btn--primary btn--small"
-              onClick={() => onEditSave(todo)}
-              disabled={!draft.title.trim()}
-            >
+            <Button type="button" size="small" onClick={() => onEditSave(todo)} disabled={!draft.title.trim()}>
               Save
-            </button>
-            <button type="button" className="btn btn--ghost btn--small" onClick={onEditCancel}>Cancel</button>
+            </Button>
+            <Button type="button" variant="ghost" size="small" onClick={onEditCancel}>Cancel</Button>
           </div>
         </div>
       </li>
@@ -505,14 +511,14 @@ function TaskItem({
           {(timeUnits || overtimeUnits || projectId || deadline) && (
             <div className="todo-chips">
               {timeUnits && (
-                <span className="chip">
+                <Pill>
                   {formatTimeUnits(timeUnits)}
                   {overtimeUnits ? <span className="chip-ot">+{formatTimeUnits(overtimeUnits)} OT</span> : null}
-                </span>
+                </Pill>
               )}
-              {!timeUnits && overtimeUnits && <span className="chip chip--ot">{formatTimeUnits(overtimeUnits)} OT</span>}
-              {projectName && <span className="chip">{projectName}</span>}
-              {deadline && <span className="chip">{formatDeadline(deadline)}</span>}
+              {!timeUnits && overtimeUnits && <Pill className="chip--ot">{formatTimeUnits(overtimeUnits)} OT</Pill>}
+              {projectName && <Pill>{projectName}</Pill>}
+              {deadline && <Pill>{formatDeadline(deadline)}</Pill>}
             </div>
           )}
           {(subtasks.length > 0 || links.length > 0) && (
@@ -561,13 +567,15 @@ function TaskItem({
           )}
         </div>
         <div className="todo-actions">
-          <button type="button" className="icon-btn icon-btn--delete" onClick={() => onDelete(todo)} title="Delete">×</button>
+          <IconButton type="button" variant="delete" onClick={() => onDelete(todo)} title="Delete">
+            {DELETE_ICON}
+          </IconButton>
         </div>
       </li>
       {showOT && (
         <li className="todo-ot-row">
           <span className="todo-ot-label">Extra time spent?</span>
-          <select
+          <SelectField
             className="meta-select"
             value={otUnits}
             onChange={(e) => setOtUnits(e.target.value)}
@@ -577,9 +585,9 @@ function TaskItem({
             {UNIT_OPTIONS.map((units) => (
               <option key={units} value={units}>{formatUnitOption(units)}</option>
             ))}
-          </select>
-          <button type="button" className="btn btn--primary btn--small" onClick={submitOT}>Save</button>
-          <button type="button" className="btn btn--ghost btn--small" onClick={() => setShowOT(false)}>Skip</button>
+          </SelectField>
+          <Button type="button" size="small" onClick={submitOT}>Save</Button>
+          <Button type="button" variant="ghost" size="small" onClick={() => setShowOT(false)}>Skip</Button>
         </li>
       )}
     </>
@@ -727,11 +735,11 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
   }
 
   return (
-    <div className="backlog-section">
-      <div className="backlog-section-head">
-        <span className="backlog-section-title">{project?.data?.name || "Unassigned"}</span>
-        <span className="backlog-section-count">{totalActive} active</span>
-      </div>
+    <BoardSection
+      title={project?.data?.name || "Unassigned"}
+      badge={`${totalActive} active`}
+      className="backlog-section"
+    >
       <div className="wish-list-area">
         {Object.keys(byMember).length === 0 && !addOpen && (
           <p className="todo-empty" style={{ padding: "8px 14px" }}>No active tasks.</p>
@@ -753,14 +761,16 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
                       {task.data.title || "Untitled"}
                     </span>
                     {task.data.timeUnits && (
-                      <span className="chip chip--xs">{formatTimeUnits(task.data.timeUnits)}</span>
+                      <Pill size="xs">{formatTimeUnits(task.data.timeUnits)}</Pill>
                     )}
-                    <button
+                    <IconButton
                       type="button"
-                      className="icon-btn icon-btn--delete"
+                      variant="delete"
                       onClick={() => onDelete(task)}
                       title="Delete"
-                    >×</button>
+                    >
+                      {DELETE_ICON}
+                    </IconButton>
                   </div>
                 </li>
               ))}
@@ -781,7 +791,7 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
                 if (e.key === "Escape") { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }
               }}
             />
-            <select
+            <SelectField
               className="backlog-member-select"
               value={addMemberId}
               onChange={(e) => setAddMemberId(e.target.value)}
@@ -790,17 +800,15 @@ function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelet
               {members.map((m) => (
                 <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
               ))}
-            </select>
-            <button type="button" className="btn btn--primary btn--small" onClick={handleAdd} disabled={!addTitle.trim() || !addMemberId}>Add</button>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }}>Cancel</button>
+            </SelectField>
+            <Button type="button" size="small" onClick={handleAdd} disabled={!addTitle.trim() || !addMemberId}>Add</Button>
+            <Button type="button" variant="ghost" size="small" onClick={() => { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }}>Cancel</Button>
           </div>
         ) : (
-          <button type="button" className="backlog-add-trigger" onClick={() => setAddOpen(true)}>
-            + Add task
-          </button>
+          <AddTrigger label="Add task" inset onClick={() => setAddOpen(true)} />
         )}
       </div>
-    </div>
+    </BoardSection>
   );
 }
 
@@ -1069,18 +1077,18 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  <select className="meta-select" value={addTime} onChange={(e) => patchUi({ addTime: e.target.value })}>
+                  <SelectField className="meta-select" value={addTime} onChange={(e) => patchUi({ addTime: e.target.value })}>
                     <option value="">units</option>
                     {UNIT_OPTIONS.map((units) => (
                       <option key={units} value={units}>{formatUnitOption(units)}</option>
                     ))}
-                  </select>
-                  <select className="meta-select" value={addProject} onChange={(e) => patchUi({ addProject: e.target.value })}>
+                  </SelectField>
+                  <SelectField className="meta-select" value={addProject} onChange={(e) => patchUi({ addProject: e.target.value })}>
                     <option value="">project</option>
                     {assignableProjects.map((p) => (
                       <option key={p.id} value={p.id}>{p.data.name || p.id}</option>
                     ))}
-                  </select>
+                  </SelectField>
                   {addRemainingHint ? <span className="meta-helper-chip">{addRemainingHint}</span> : null}
                   <input
                     type="date"
@@ -1095,7 +1103,7 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                 <details className="todo-edit-disclosure" open={addSubtasks.length > 0}>
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">Subtasks ({addSubtasks.length})</span>
-                    <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); addAddSubtask(); }}>+ Add</button>
+                    <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); addAddSubtask(); }}>+ Add</Button>
                   </summary>
                   <div className="todo-edit-section">
                     {addSubtasks.length === 0 ? (
@@ -1116,12 +1124,14 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                               placeholder="Subtask"
                               onChange={(e) => setAddSubtask(idx, "text", e.target.value)}
                             />
-                            <button
+                            <IconButton
                               type="button"
-                              className="icon-btn icon-btn--delete"
+                              variant="delete"
                               title="Remove subtask"
                               onClick={() => removeAddSubtask(idx)}
-                            >×</button>
+                            >
+                              {DELETE_ICON}
+                            </IconButton>
                           </div>
                         ))}
                       </div>
@@ -1132,7 +1142,7 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                 <details className="todo-edit-disclosure" open={addLinks.length > 0}>
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">Links ({addLinks.length})</span>
-                    <button type="button" className="btn btn--ghost btn--small" onClick={(e) => { e.preventDefault(); addAddLink(); }}>+ Add</button>
+                    <Button type="button" variant="ghost" size="small" onClick={(e) => { e.preventDefault(); addAddLink(); }}>+ Add</Button>
                   </summary>
                   <div className="todo-edit-section">
                     {addLinks.length === 0 ? (
@@ -1155,12 +1165,14 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                                 onChange={(e) => setAddLink(idx, "url", e.target.value)}
                               />
                             </div>
-                            <button
+                            <IconButton
                               type="button"
-                              className="icon-btn icon-btn--delete"
+                              variant="delete"
                               title="Remove link"
                               onClick={() => removeAddLink(idx)}
-                            >×</button>
+                            >
+                              {DELETE_ICON}
+                            </IconButton>
                           </div>
                         ))}
                       </div>
@@ -1170,17 +1182,12 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
               </div>
 
               <div className="notepad-add-actions">
-                <button
-                  type="button"
-                  className="btn btn--primary btn--small"
-                  onClick={submitAdd}
-                  disabled={!addTitle.trim()}
-                >
+                <Button type="button" size="small" onClick={submitAdd} disabled={!addTitle.trim()}>
                   Save
-                </button>
-                <button type="button" className="btn btn--ghost btn--small" onClick={cancelAdd}>
+                </Button>
+                <Button type="button" variant="ghost" size="small" onClick={cancelAdd}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1201,8 +1208,8 @@ function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubta
                     <div className="todo-content">
                       <span className="todo-text todo-text--done">{todo.data.title || "Untitled"}</span>
                       <div className="todo-chips">
-                        {t > 0 && <span className="chip">{formatTimeUnits(t)}{ot > 0 && <span className="chip-ot">+{formatTimeUnits(ot)} OT</span>}</span>}
-                        {projName && <span className="chip">{projName}</span>}
+                        {t > 0 && <Pill>{formatTimeUnits(t)}{ot > 0 && <span className="chip-ot">+{formatTimeUnits(ot)} OT</span>}</Pill>}
+                        {projName && <Pill>{projName}</Pill>}
                       </div>
                     </div>
                   </li>
@@ -1489,6 +1496,19 @@ export default function MembersPage() {
     return groups;
   }, [members]);
 
+  const memberViewOptions = [
+    {
+      value: "member",
+      title: "Member view",
+      icon: MEMBER_VIEW_ICON,
+    },
+    {
+      value: "project",
+      title: "Project view",
+      icon: PROJECT_VIEW_ICON,
+    },
+  ];
+
   return (
     <div className="members-page">
       <div className="members-week-bar">
@@ -1497,25 +1517,14 @@ export default function MembersPage() {
           <h2 className="members-week-title">{relativeWeekTitle(selectedWeek)}</h2>
         </div>
         <div className="members-week-bar-right">
-          <div className="projects-view-toggle">
-            <button
-              type="button"
-              className={"view-toggle-btn" + (memberViewMode === "member" ? " view-toggle-btn--active" : "")}
-              onClick={() => setMemberViewMode("member")}
-              title="Member view"
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
-            </button>
-            <button
-              type="button"
-              className={"view-toggle-btn" + (memberViewMode === "project" ? " view-toggle-btn--active" : "")}
-              onClick={() => setMemberViewMode("project")}
-              title="Project view"
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 3.5h4l1.5 2h5.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/></svg>
-            </button>
-          </div>
-          <select
+          <ViewToggle
+            className="projects-view-toggle"
+            value={memberViewMode}
+            onChange={setMemberViewMode}
+            options={memberViewOptions}
+            ariaLabel="Member board view"
+          />
+          <SelectField
             className="week-select"
             value={selectedWeek}
             onChange={(e) => setSelectedWeek(e.target.value)}
@@ -1528,11 +1537,11 @@ export default function MembersPage() {
                 </option>
               );
             })}
-          </select>
+          </SelectField>
         </div>
       </div>
 
-      {members.length === 0 && <p className="empty-state">No members found in Firestore.</p>}
+      {members.length === 0 && <EmptyState>No members found in Firestore.</EmptyState>}
 
       {memberViewMode === "project" ? (
         <div className="backlog-grid">

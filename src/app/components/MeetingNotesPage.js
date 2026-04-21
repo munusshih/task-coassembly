@@ -8,9 +8,21 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
-import { DELETE_ICON, EDIT_ICON } from "./icons";
+import {
+  DATE_VIEW_ICON,
+  DELETE_ICON,
+  EDIT_ICON,
+  PROJECT_VIEW_ICON,
+} from "./icons";
+import EmptyState from "./ui/EmptyState";
+import InputField from "./ui/InputField";
+import PageHeader from "./ui/PageHeader";
+import SearchField from "./ui/SearchField";
+import SelectField from "./ui/SelectField";
+import ViewToggle from "./ui/ViewToggle";
 
 const NOTE_SCOPE_DATE = "date";
 const NOTE_SCOPE_PROJECT = "project";
@@ -557,7 +569,7 @@ export default function MeetingNotesPage() {
         {ROLE_FIELDS.map((field) => (
           <label key={field.key} className="note-meta-field">
             <span>{field.label}</span>
-            <select
+            <SelectField
               className="note-meta-input"
               value={meta[field.key] || ""}
               onChange={(e) => onChange(field.key, e.target.value)}
@@ -568,7 +580,7 @@ export default function MeetingNotesPage() {
                   {member?.data?.name || member.id}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
         ))}
         {normalizeScopeType(normalizedMeta.scopeType) === NOTE_SCOPE_PROJECT && (
@@ -719,7 +731,7 @@ export default function MeetingNotesPage() {
                     <div className="note-editor-meta">
                       <label className="note-meta-field note-meta-field--wide">
                         <span>Title</span>
-                        <input
+                        <InputField
                           type="text"
                           className="note-meta-input"
                           value={editMeta.title}
@@ -729,7 +741,7 @@ export default function MeetingNotesPage() {
 
                       <label className="note-meta-field">
                         <span>Type</span>
-                        <select
+                        <SelectField
                           className="note-meta-input"
                           value={editMeta.scopeType}
                           onChange={(event) => {
@@ -743,13 +755,13 @@ export default function MeetingNotesPage() {
                         >
                           <option value={NOTE_SCOPE_DATE}>Date-based</option>
                           <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-                        </select>
+                        </SelectField>
                       </label>
 
                       {normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT && (
                         <label className="note-meta-field">
                           <span>Project</span>
-                          <select
+                          <SelectField
                             className="note-meta-input"
                             value={editMeta.projectId}
                             onChange={(event) => {
@@ -769,7 +781,7 @@ export default function MeetingNotesPage() {
                                 {project?.data?.name || project.id}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                         </label>
                       )}
 
@@ -788,22 +800,18 @@ export default function MeetingNotesPage() {
                       showDateObjectButton={normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT}
                     />
                     <div className="note-editor-actions">
-                      <button
-                        className="btn btn--primary"
-                        onClick={() => handleSaveEdit(note.id)}
-                        disabled={!editMeta.title.trim()}
-                      >
+                      <Button onClick={() => handleSaveEdit(note.id)} disabled={!editMeta.title.trim()}>
                         Save
-                      </button>
-                      <button
-                        className="btn btn--ghost"
+                      </Button>
+                      <Button
+                        variant="ghost"
                         onClick={() => {
                           setEditingId(null);
                           setViewingId(note.id);
                         }}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -825,48 +833,45 @@ export default function MeetingNotesPage() {
       ].reduce((count, list) => count + (list.length ? 1 : 0), 0)
       : groupedNotesByProject.length;
 
+  const groupingOptions = [
+    {
+      value: "date",
+      title: "Group by date",
+      icon: DATE_VIEW_ICON,
+    },
+    {
+      value: "project",
+      title: "Group by project",
+      icon: PROJECT_VIEW_ICON,
+    },
+  ];
+
   return (
     <div className="notes-page">
-      <div className="notes-topbar">
-        <div className="notes-topbar-left">
-          <h2 className="section-title">Notes / doc</h2>
-          <span className="resources-count">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
-        </div>
-        <div className="notes-topbar-right">
-          <input
-            type="text"
-            placeholder="Search…"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="resource-input resource-search"
-          />
-          {searchQuery && (
-            <button type="button" className="resource-search-clear" onClick={() => setSearchQuery("")}>×</button>
-          )}
-          <div className="projects-view-toggle">
-            <button
-              type="button"
-              className={"view-toggle-btn" + (groupMode === "date" ? " view-toggle-btn--active" : "")}
-              onClick={() => setGroupMode("date")}
-              title="Group by date"
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1.5" y="1.5" width="11" height="11" rx="2"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="7.5" x2="10" y2="7.5"/><line x1="4" y1="10" x2="8" y2="10"/></svg>
-            </button>
-            <button
-              type="button"
-              className={"view-toggle-btn" + (groupMode === "project" ? " view-toggle-btn--active" : "")}
-              onClick={() => setGroupMode("project")}
-              title="Group by project"
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1.5 3.5h4l1.5 2h5.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Notes / doc"
+        badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
+        right={(
+          <>
+            <SearchField
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onClear={() => setSearchQuery("")}
+            />
+            <ViewToggle
+              className="projects-view-toggle"
+              value={groupMode}
+              onChange={setGroupMode}
+              options={groupingOptions}
+              ariaLabel="Note grouping"
+            />
+          </>
+        )}
+      />
 
       <div className="note-create-area">
         <div className="note-create-row">
-          <input
+          <InputField
             type="text"
             placeholder="New note title…"
             value={newTitle}
@@ -876,7 +881,7 @@ export default function MeetingNotesPage() {
             }}
             className="new-note-input"
           />
-          <select
+          <SelectField
             className="note-meta-input"
             value={newScopeType}
             onChange={(event) => {
@@ -892,9 +897,9 @@ export default function MeetingNotesPage() {
           >
             <option value={NOTE_SCOPE_DATE}>Date-based</option>
             <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-          </select>
+          </SelectField>
           {newScopeType === NOTE_SCOPE_PROJECT && (
-            <select
+            <SelectField
               className="note-meta-input"
               value={newProjectId}
               onChange={(event) => {
@@ -914,15 +919,11 @@ export default function MeetingNotesPage() {
                   {project?.data?.name || project.id}
                 </option>
               ))}
-            </select>
+            </SelectField>
           )}
-          <button
-            className="btn btn--primary"
-            onClick={handleCreateNote}
-            disabled={!newTitle.trim()}
-          >
+          <Button onClick={handleCreateNote} disabled={!newTitle.trim()}>
             Create
-          </button>
+          </Button>
         </div>
 
         <details className="note-roles-disclosure">
@@ -961,10 +962,10 @@ export default function MeetingNotesPage() {
         )}
 
         {notes.length === 0 && (
-          <p className="empty-state">No notes yet. Create one to get started!</p>
+          <EmptyState>No notes yet. Create one to get started!</EmptyState>
         )}
         {notes.length > 0 && totalSectionsInCurrentMode === 0 && (
-          <p className="empty-state">No notes match the current filters.</p>
+          <EmptyState>No notes match the current filters.</EmptyState>
         )}
       </div>
     </div>

@@ -8,8 +8,14 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import Button from "./Button";
 import IconButton from "./IconButton";
-import { DELETE_ICON, EDIT_ICON } from "./icons";
+import { DELETE_ICON, EDIT_ICON, KANBAN_VIEW_ICON, LIST_VIEW_ICON } from "./icons";
+import EmptyState from "./ui/EmptyState";
+import SelectField from "./ui/SelectField";
+import ModalShell from "./ui/ModalShell";
+import PageHeader from "./ui/PageHeader";
+import ViewToggle from "./ui/ViewToggle";
 
 // ─ Constants ───────────────────────────────────────────────────────────────────────────────────
 
@@ -233,9 +239,9 @@ function StagePlanEdit({ stagePlans, onChange }) {
           <IconButton variant="delete" onClick={() => removeStage(i)}>{DELETE_ICON}</IconButton>
         </div>
       ))}
-      <button type="button" className="btn btn--ghost btn--small stage-add-btn" onClick={addStage}>
+      <Button type="button" variant="ghost" size="small" className="stage-add-btn" onClick={addStage}>
         + Add stage
-      </button>
+      </Button>
     </div>
   );
 }
@@ -509,14 +515,12 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
     return (
       <li className="project-row">
-        <div className="edit-modal-overlay" onClick={() => setEditing(false)}>
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="edit-modal-header">
-              <span className="edit-modal-title">{form.name || "Edit project"}</span>
-              <button type="button" className="edit-modal-close" onClick={() => setEditing(false)}>✕</button>
-            </div>
-            <form className="project-edit-form" onSubmit={handleSave}>
-          <div className="edit-modal-body">
+        <ModalShell
+          title={form.name || "Edit project"}
+          onClose={() => setEditing(false)}
+          bodyClassName="project-edit-modal-body"
+        >
+          <form className="project-edit-form" onSubmit={handleSave}>
           {/* Section 1: Core info */}
           <div className="edit-field-grid">
             <label className="edit-field-group edit-field-group--wide">
@@ -533,17 +537,17 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             </label>
             <label className="edit-field-group">
               <span className="edit-field-label">Kind</span>
-              <select className="project-field" value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
+              <SelectField className="project-field" value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
                 <option value="">Select…</option>
                 {PROJECT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className="edit-field-group">
               <span className="edit-field-label">Status</span>
-              <select className="project-field" value={form.status} onChange={(e) => setField("status", e.target.value)}>
+              <SelectField className="project-field" value={form.status} onChange={(e) => setField("status", e.target.value)}>
                 <option value="">Select…</option>
                 {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className="edit-field-group">
               <span className="edit-field-label">Start date</span>
@@ -566,19 +570,19 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   value={form.budget}
                   onChange={(e) => setField("budget", e.target.value)}
                 />
-                <select
+                <SelectField
                   className="project-field project-field--currency"
                   value={form.budgetCurrency}
                   onChange={(e) => setField("budgetCurrency", e.target.value)}
                 >
                   <option value="TWD">TWD</option>
                   <option value="USD">USD</option>
-                </select>
+                </SelectField>
               </div>
             </div>
             <label className="edit-field-group">
               <span className="edit-field-label">Donation %</span>
-              <select
+              <SelectField
                 className="project-field"
                 value={form.donationPercent}
                 onChange={(e) => setField("donationPercent", e.target.value)}
@@ -586,7 +590,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                 {DONATION_OPTIONS.map((pct) => (
                   <option key={pct} value={pct}>{pct}%</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             {formInternalOrAdmin && (
               <label className="edit-field-group">
@@ -654,14 +658,12 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             </details>
           )}
 
-          </div>{/* edit-modal-body */}
           <div className="edit-modal-footer">
-            <button type="submit" className="btn btn--primary btn--small" disabled={!form.name.trim()}>Save</button>
-            <button type="button" className="btn btn--ghost btn--small" onClick={() => setEditing(false)}>Cancel</button>
+            <Button type="submit" size="small" disabled={!form.name.trim()}>Save</Button>
+            <Button type="button" variant="ghost" size="small" onClick={() => setEditing(false)}>Cancel</Button>
           </div>
-        </form>
-          </div>{/* edit-modal */}
-        </div>{/* edit-modal-overlay */}
+          </form>
+        </ModalShell>
       </li>
     );
   }
@@ -1131,41 +1133,41 @@ export default function ProjectsPage() {
     [projects]
   );
 
+  const projectViewOptions = [
+    {
+      value: "list",
+      title: "List view",
+      icon: LIST_VIEW_ICON,
+    },
+    {
+      value: "kanban",
+      title: "Kanban view",
+      icon: KANBAN_VIEW_ICON,
+    },
+  ];
+
+  const numberFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  const projectSubtitle = totalBudgetTWD > 0
+    ? `NT$${numberFmt.format(totalBudgetTWD)} total · Pool NT$${numberFmt.format(totalCompanyPoolTWD)} · Member budget NT$${numberFmt.format(totalMemberDistributableTWD)}`
+    : "Budget, staffing, and delivery capacity overview";
+
   return (
     <div className="projects-page">
-      <div className="members-header">
-        <div>
-          <h2 className="section-title">Projects</h2>
-          <p className="section-subtitle">
-            {projects.length} project{projects.length !== 1 ? "s" : ""}
-            {totalBudgetTWD > 0 && (
-              <>
-                {" "}&middot; NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalBudgetTWD)} total
-                {" "}&middot; Pool NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalCompanyPoolTWD)}
-                {" "}&middot; Member budget NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalMemberDistributableTWD)}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="projects-view-toggle">
-          <button
-            type="button"
-            className={"view-toggle-btn" + (viewMode === "list" ? " view-toggle-btn--active" : "")}
-            onClick={() => setViewMode("list")}
-            title="List view"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg>
-          </button>
-          <button
-            type="button"
-            className={"view-toggle-btn" + (viewMode === "kanban" ? " view-toggle-btn--active" : "")}
-            onClick={() => setViewMode("kanban")}
-            title="Kanban view"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1" y="2" width="3.5" height="10" rx="1"/><rect x="5.25" y="2" width="3.5" height="7" rx="1"/><rect x="9.5" y="2" width="3.5" height="5" rx="1"/></svg>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        className="members-header"
+        title="Projects"
+        badge={`${projects.length} project${projects.length !== 1 ? "s" : ""}`}
+        subtitle={projectSubtitle}
+        right={(
+          <ViewToggle
+            className="projects-view-toggle"
+            value={viewMode}
+            onChange={setViewMode}
+            options={projectViewOptions}
+            ariaLabel="Project view"
+          />
+        )}
+      />
 
       <form className="project-add-form" onSubmit={handleAdd}>
         <input
@@ -1176,14 +1178,14 @@ export default function ProjectsPage() {
           onChange={(e) => setField("name", e.target.value)}
           required
         />
-        <select className="project-field project-field--kind" value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
+        <SelectField className="project-field project-field--kind" value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
           <option value="">Kind…</option>
           {PROJECT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-        <select className="project-field project-field--status" value={form.status} onChange={(e) => setField("status", e.target.value)}>
+        </SelectField>
+        <SelectField className="project-field project-field--status" value={form.status} onChange={(e) => setField("status", e.target.value)}>
           <option value="">Status…</option>
           {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        </SelectField>
         <div className="project-budget-group">
           <input
             className="project-field project-field--budget"
@@ -1194,12 +1196,12 @@ export default function ProjectsPage() {
             value={form.budget}
             onChange={(e) => setField("budget", e.target.value)}
           />
-          <select className="project-field project-field--currency" value={form.budgetCurrency} onChange={(e) => setField("budgetCurrency", e.target.value)}>
+          <SelectField className="project-field project-field--currency" value={form.budgetCurrency} onChange={(e) => setField("budgetCurrency", e.target.value)}>
             <option value="TWD">TWD</option>
             <option value="USD">USD</option>
-          </select>
+          </SelectField>
         </div>
-        <select
+        <SelectField
           className="project-field project-field--donation"
           value={form.donationPercent}
           onChange={(e) => setField("donationPercent", e.target.value)}
@@ -1208,7 +1210,7 @@ export default function ProjectsPage() {
           {DONATION_OPTIONS.map((pct) => (
             <option key={pct} value={pct}>{pct}% donation</option>
           ))}
-        </select>
+        </SelectField>
         {isInternalOrAdminKind(form.kind) && (
           <input
             className="project-field"
@@ -1221,13 +1223,13 @@ export default function ProjectsPage() {
             title="Projected hourly wage for Internal/Admin projects (TWD)"
           />
         )}
-        <button type="submit" className="btn btn--primary" disabled={saving || !form.name.trim()}>
+        <Button type="submit" disabled={saving || !form.name.trim()}>
           Add project
-        </button>
+        </Button>
       </form>
 
       {projects.length === 0 ? (
-        <p className="empty-state">No projects yet.</p>
+        <EmptyState>No projects yet.</EmptyState>
       ) : viewMode === "kanban" ? (
         <ProjectKanbanBoard projects={projects} allTasks={allTasks} />
       ) : (

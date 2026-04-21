@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   subscribeCollection,
   createDocument,
@@ -11,6 +11,13 @@ import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON, EDIT_ICON } from "./icons";
+import AddTrigger from "./ui/AddTrigger";
+import EmptyState from "./ui/EmptyState";
+import InputField from "./ui/InputField";
+import ModalShell from "./ui/ModalShell";
+import PageHeader from "./ui/PageHeader";
+import SearchField from "./ui/SearchField";
+import SelectField from "./ui/SelectField";
 
 const DEFAULT_CATEGORIES = ["general", "admin", "projects", "finance", "others"];
 
@@ -41,14 +48,14 @@ function SubLinkEditor({ subLinks, onChange }) {
     <div className="resource-sublinks-editor">
       {subLinks.map((sl, i) => (
         <div key={i} className="resource-sublink-row">
-          <input
+          <InputField
             className="resource-input resource-input--sm"
             type="text"
             placeholder="Label"
             value={sl.label}
             onChange={(e) => update(i, "label", e.target.value)}
           />
-          <input
+          <InputField
             className="resource-input resource-input--sm"
             type="url"
             placeholder="https://…"
@@ -71,7 +78,7 @@ function ResourceForm({ form, setForm, categoryOptions, onSave, onCancel, saveLa
   return (
     <div className="resource-form">
       <div className="resource-form-main">
-        <input
+        <InputField
           className="resource-input"
           type="text"
           placeholder="Name *"
@@ -79,14 +86,14 @@ function ResourceForm({ form, setForm, categoryOptions, onSave, onCancel, saveLa
           autoFocus
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
-        <input
+        <InputField
           className="resource-input"
           type="url"
           placeholder="URL * (https://…)"
           value={form.url}
           onChange={(e) => setForm({ ...form, url: e.target.value })}
         />
-        <select
+        <SelectField
           className="resource-input"
           value={form.category}
           onChange={(e) => setForm({ ...form, category: e.target.value, customCategory: "" })}
@@ -94,10 +101,10 @@ function ResourceForm({ form, setForm, categoryOptions, onSave, onCancel, saveLa
           {categoryOptions.map((cat) => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
-        </select>
+        </SelectField>
       </div>
       {form.category === "others" && (
-        <input
+        <InputField
           className="resource-input"
           type="text"
           placeholder="New category name"
@@ -105,7 +112,7 @@ function ResourceForm({ form, setForm, categoryOptions, onSave, onCancel, saveLa
           onChange={(e) => setForm({ ...form, customCategory: e.target.value })}
         />
       )}
-      <input
+      <InputField
         className="resource-input"
         type="text"
         placeholder="Description (optional)"
@@ -236,30 +243,20 @@ export default function ResourcesPage() {
 
   return (
     <div className="resources-page">
-      <div className="resources-topbar">
-        <div className="resources-topbar-left">
-          <h2 className="section-title">Resources</h2>
-          <span className="resources-count">{links.length} link{links.length !== 1 ? "s" : ""}</span>
-        </div>
-        <div className="resources-topbar-right">
-          <input
-            type="text"
-            placeholder="Search…"
+      <PageHeader
+        title="Resources"
+        badge={`${links.length} link${links.length !== 1 ? "s" : ""}`}
+        right={(
+          <SearchField
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="resource-input resource-search"
+            onClear={() => setSearchQuery("")}
           />
-          {searchQuery && (
-            <button type="button" className="resource-search-clear" onClick={() => setSearchQuery("")}>×</button>
-          )}
-        </div>
-      </div>
+        )}
+      />
 
       {/* Add resource trigger */}
-      <button type="button" className="resource-add-trigger" onClick={() => setAddOpen(true)}>
-        <span className="resource-add-plus">+</span>
-        <span className="resource-add-placeholder">Add a resource…</span>
-      </button>
+      <AddTrigger label="Add a resource…" onClick={() => setAddOpen(true)} />
 
       {/* Sticky note grid */}
       {filteredLinks.length > 0 ? (
@@ -310,29 +307,24 @@ export default function ResourcesPage() {
           ))}
         </div>
       ) : (
-        <p className="empty-state">{searchQuery ? "No results." : "No resources yet. Add one above!"}</p>
+        <EmptyState>{searchQuery ? "No results." : "No resources yet. Add one above!"}</EmptyState>
       )}
 
       {/* Add / Edit modal */}
       {(addOpen || editingId !== null) && (
-        <div className="edit-modal-overlay" onClick={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}>
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="edit-modal-header">
-              <span className="edit-modal-title">{editingId ? "Edit resource" : "Add resource"}</span>
-              <button type="button" className="edit-modal-close" onClick={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}>✕</button>
-            </div>
-            <div className="edit-modal-body">
-              <ResourceForm
-                form={editingId ? editForm : addForm}
-                setForm={editingId ? setEditForm : setAddForm}
-                categoryOptions={categoryOptions}
-                onSave={editingId ? handleSaveEdit : handleCreate}
-                onCancel={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}
-                saveLabel={editingId ? "Save" : "Add resource"}
-              />
-            </div>
-          </div>
-        </div>
+        <ModalShell
+          title={editingId ? "Edit resource" : "Add resource"}
+          onClose={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}
+        >
+          <ResourceForm
+            form={editingId ? editForm : addForm}
+            setForm={editingId ? setEditForm : setAddForm}
+            categoryOptions={categoryOptions}
+            onSave={editingId ? handleSaveEdit : handleCreate}
+            onCancel={() => { setAddOpen(false); setAddForm(EMPTY_FORM); setEditingId(null); }}
+            saveLabel={editingId ? "Save" : "Add resource"}
+          />
+        </ModalShell>
       )}
     </div>
   );
