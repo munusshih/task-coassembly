@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   subscribeCollection,
   createDocument,
@@ -10,7 +10,7 @@ import {
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
-import { DELETE_ICON } from "./icons";
+import { DELETE_ICON, EDIT_ICON } from "./icons";
 import BoardSection from "./ui/BoardSection";
 import CollectionLayout from "./ui/CollectionLayout";
 import CreateBar from "./ui/CreateBar";
@@ -22,7 +22,9 @@ import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import TabPage from "./ui/TabPage";
+import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import { renderTextWithLinks } from "./ui/linkifyText";
 
 const TODO_TYPE = "memberTodo";
 const REACTION_OPTIONS = [
@@ -53,12 +55,39 @@ function setLocalReactions(itemId, emojis) {
   } catch {}
 }
 
-function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
+function formatCommentTime(ts) {
+  if (!Number.isFinite(Number(ts))) return "";
+  try {
+    return new Date(Number(ts)).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function WishItem({
+  item,
+  members,
+  currentUsername,
+  sessionChecked,
+  onSessionExpired,
+  onDelete,
+  onPush,
+  onReact,
+  onComment,
+}) {
   const [pushing, setPushing] = useState(false);
   const [selectedMember, setSelectedMember] = useState("");
   const [pushed, setPushed] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [commentDeleteTarget, setCommentDeleteTarget] = useState(null);
   const [myReactions, setMyReactions] = useState(() =>
     getLocalReactions(item.id),
   );
@@ -89,11 +118,89 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
   }
 
   async function handleComment() {
+    if (!sessionChecked) return;
+    if (!currentUsername) {
+      onSessionExpired?.();
+      return;
+    }
     const text = commentText.trim();
     if (!text) return;
-    const newComments = [...comments, { text, ts: Date.now() }];
+    const now = Date.now();
+    const author = (currentUsername || "").trim().toLowerCase();
+    const newComments = [
+      ...comments,
+      {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `comment-${now}-${Math.random().toString(36).slice(2, 8)}`,
+        text,
+        ts: now,
+        authorUsername: author || null,
+      },
+    ];
     setCommentText("");
     await onComment(item, newComments);
+  }
+
+  function getCommentId(comment, index) {
+    return comment?.id || `legacy-${Number(comment?.ts) || 0}-${index}`;
+  }
+
+  function isOwnComment(comment) {
+    const author = String(comment?.authorUsername || "")
+      .trim()
+      .toLowerCase();
+    const me = String(currentUsername || "")
+      .trim()
+      .toLowerCase();
+    return !!author && !!me && author === me;
+  }
+
+  function getCommentAuthorLabel(comment) {
+    const author = String(comment?.authorUsername || "").trim();
+    if (!author) return "Legacy";
+    if (isOwnComment(comment)) return "You";
+    return author;
+  }
+
+  async function handleDeleteComment(commentId) {
+    if (!sessionChecked) return;
+    if (!currentUsername) {
+      onSessionExpired?.();
+      return;
+    }
+    const newComments = comments.filter(
+      (c, i) => getCommentId(c, i) !== commentId,
+    );
+    await onComment(item, newComments);
+  }
+
+  function requestDeleteComment(commentId, commentTextValue) {
+    setCommentDeleteTarget({
+      label: "this comment",
+      detail: String(commentTextValue || "").slice(0, 180),
+      onConfirm: async () => {
+        await handleDeleteComment(commentId);
+      },
+    });
+  }
+
+  async function handleSaveCommentEdit(commentId) {
+    if (!sessionChecked) return;
+    if (!currentUsername) {
+      onSessionExpired?.();
+      return;
+    }
+    const nextText = editingCommentText.trim();
+    if (!nextText) return;
+    const updated = comments.map((c, i) => {
+      if (getCommentId(c, i) !== commentId) return c;
+      return { ...c, text: nextText, editedAt: Date.now() };
+    });
+    await onComment(item, updated);
+    setEditingCommentId(null);
+    setEditingCommentText("");
   }
 
   async function handlePushConfirm() {
@@ -124,7 +231,21 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
             onClick={() => setCommentsOpen((o) => !o)}
             title="Comments"
           >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{display:"block"}}><path d="M2 2h12v9H9l-3 3v-3H2V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/></svg>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{ display: "block" }}
+            >
+              <path
+                d="M2 2h12v9H9l-3 3v-3H2V2z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
             {comments.length > 0 && (
               <span className="wish-comment-count">{comments.length}</span>
             )}
@@ -244,21 +365,112 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
               {comments.length === 0 && (
                 <p className="wish-no-comments">No comments yet.</p>
               )}
-              {comments.map((c, i) => (
-                <div key={i} className="wish-comment-item">
-                  <span className="wish-comment-text">{c.text}</span>
-                </div>
-              ))}
+              {comments.map((c, i) => {
+                const commentId = getCommentId(c, i);
+                const own = isOwnComment(c);
+                const isEditing = editingCommentId === commentId;
+                const tsLabel = formatCommentTime(c?.ts);
+                return (
+                  <div key={commentId} className="wish-comment-item">
+                    <div className="wish-comment-meta-row">
+                      <span className="wish-comment-author">
+                        {getCommentAuthorLabel(c)}
+                      </span>
+                      {tsLabel && (
+                        <span className="wish-comment-time">{tsLabel}</span>
+                      )}
+                    </div>
+                    {isEditing ? (
+                      <div className="wish-comment-edit-row">
+                        <TextareaField
+                          className="wish-comment-input wish-comment-input--edit"
+                          value={editingCommentText}
+                          rows={3}
+                          onChange={(e) =>
+                            setEditingCommentText(e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                              handleSaveCommentEdit(commentId);
+                            }
+                            if (e.key === "Escape") {
+                              setEditingCommentId(null);
+                              setEditingCommentText("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="wish-comment-actions">
+                          <Button
+                            size="small"
+                            onClick={() => handleSaveCommentEdit(commentId)}
+                            disabled={!editingCommentText.trim()}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => {
+                              setEditingCommentId(null);
+                              setEditingCommentText("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="wish-comment-content-row">
+                        <span className="wish-comment-text">
+                          {renderTextWithLinks(
+                            c.text,
+                            `wish-comment-${commentId}`,
+                          )}
+                        </span>
+                        {own && (
+                          <div className="wish-comment-actions">
+                            <IconButton
+                              className="wish-comment-action-icon"
+                              onClick={() => {
+                                setEditingCommentId(commentId);
+                                setEditingCommentText(c.text || "");
+                              }}
+                              title="Edit comment"
+                              aria-label="Edit comment"
+                            >
+                              {EDIT_ICON}
+                            </IconButton>
+                            <IconButton
+                              variant="delete"
+                              className="wish-comment-action-icon"
+                              onClick={() =>
+                                requestDeleteComment(commentId, c.text)
+                              }
+                              title="Delete comment"
+                              aria-label="Delete comment"
+                            >
+                              {DELETE_ICON}
+                            </IconButton>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div className="wish-comment-modal-footer">
-              <InputField
+              <TextareaField
                 className="wish-comment-input"
-                type="text"
                 placeholder="Add a comment…"
                 value={commentText}
+                rows={3}
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleComment();
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    handleComment();
+                  }
                 }}
                 autoFocus
               />
@@ -273,6 +485,21 @@ function WishItem({ item, members, onDelete, onPush, onReact, onComment }) {
           </div>
         </div>
       )}
+
+      {commentDeleteTarget && (
+        <DeleteConfirmDialog
+          label={commentDeleteTarget.label}
+          detail={commentDeleteTarget.detail}
+          onConfirm={async () => {
+            try {
+              await commentDeleteTarget.onConfirm();
+            } finally {
+              setCommentDeleteTarget(null);
+            }
+          }}
+          onCancel={() => setCommentDeleteTarget(null)}
+        />
+      )}
     </li>
   );
 }
@@ -281,6 +508,9 @@ function ProjectSection({
   project,
   items,
   members,
+  currentUsername,
+  sessionChecked,
+  onSessionExpired,
   onAdd,
   onDelete,
   onPush,
@@ -335,6 +565,9 @@ function ProjectSection({
                 key={item.id}
                 item={item}
                 members={members}
+                currentUsername={currentUsername}
+                sessionChecked={sessionChecked}
+                onSessionExpired={onSessionExpired}
                 onDelete={onDelete}
                 onPush={onPush}
                 onReact={onReact}
@@ -411,6 +644,23 @@ export default function BacklogPage() {
   const [members, setMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [currentUsername, setCurrentUsername] = useState("");
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const forcingLogoutRef = useRef(false);
+
+  async function handleSessionExpired() {
+    if (forcingLogoutRef.current) return;
+    forcingLogoutRef.current = true;
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.location.assign("/login?expired=1");
+    }
+  }
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -421,6 +671,39 @@ export default function BacklogPage() {
       u1();
       u2();
       u3();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) {
+          if (!cancelled) handleSessionExpired();
+          return;
+        }
+        const payload = await res.json();
+        if (cancelled) return;
+        const username = String(payload?.username || "")
+          .trim()
+          .toLowerCase();
+        if (!username) {
+          handleSessionExpired();
+          return;
+        }
+        setCurrentUsername(username);
+      } catch {
+        if (!cancelled) handleSessionExpired();
+      } finally {
+        if (!cancelled) setSessionChecked(true);
+      }
+    }
+
+    loadSession();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -548,6 +831,9 @@ export default function BacklogPage() {
             project={project}
             items={groupedItems[project.id] || []}
             members={members}
+            currentUsername={currentUsername}
+            sessionChecked={sessionChecked}
+            onSessionExpired={handleSessionExpired}
             onAdd={handleAdd}
             onDelete={handleDelete}
             onPush={handlePush}
@@ -560,6 +846,9 @@ export default function BacklogPage() {
           project={null}
           items={groupedItems["__none__"] || []}
           members={members}
+          currentUsername={currentUsername}
+          sessionChecked={sessionChecked}
+          onSessionExpired={handleSessionExpired}
           onAdd={handleAdd}
           onDelete={handleDelete}
           onPush={handlePush}

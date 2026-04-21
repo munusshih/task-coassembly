@@ -125,7 +125,9 @@ function loadStylePrefsFromStorage() {
     if (!raw) return DEFAULT_STYLE_PREFS;
     const parsed = JSON.parse(raw);
     return {
-      bg: ["paper", "linen", "blueprint", "confetti", "kraft"].includes(parsed?.bg)
+      bg: ["paper", "linen", "blueprint", "confetti", "kraft"].includes(
+        parsed?.bg,
+      )
         ? parsed.bg
         : "paper",
       font: ["sentient", "sans", "sponact"].includes(parsed?.font)
@@ -135,17 +137,16 @@ function loadStylePrefsFromStorage() {
         ? parsed.radius
         : "soft",
       bgColor:
-        typeof parsed?.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(parsed.bgColor)
+        typeof parsed?.bgColor === "string" &&
+        /^#[0-9a-fA-F]{6}$/.test(parsed.bgColor)
           ? parsed.bgColor
           : "#f2ebe2",
-      grain:
-        Number.isFinite(Number(parsed?.grain))
-          ? Math.min(1, Math.max(0, Number(parsed.grain)))
-          : 0.7,
-      wash:
-        Number.isFinite(Number(parsed?.wash))
-          ? Math.min(1, Math.max(0, Number(parsed.wash)))
-          : 0.18,
+      grain: Number.isFinite(Number(parsed?.grain))
+        ? Math.min(1, Math.max(0, Number(parsed.grain)))
+        : 0.7,
+      wash: Number.isFinite(Number(parsed?.wash))
+        ? Math.min(1, Math.max(0, Number(parsed.wash)))
+        : 0.18,
     };
   } catch {
     return DEFAULT_STYLE_PREFS;
@@ -560,6 +561,13 @@ export default function Home() {
     [tabComments, activeTab],
   );
 
+  const selectedPattern = useMemo(
+    () =>
+      PATTERN_OPTIONS.find((option) => option.value === stylePrefs.bg) ||
+      PATTERN_OPTIONS[0],
+    [stylePrefs.bg],
+  );
+
   useEffect(() => {
     if (!firebaseReady || !identity) return;
 
@@ -689,7 +697,11 @@ export default function Home() {
           ))}
         </div>
 
-        <div className={`style-toolbox${toolboxOpen ? " style-toolbox--open" : ""}`} role="region" aria-label="Style toolbox">
+        <div
+          className={`style-toolbox${toolboxOpen ? " style-toolbox--open" : ""}`}
+          role="region"
+          aria-label="Style toolbox"
+        >
           <button
             type="button"
             className="style-toolbox-trigger"
@@ -698,7 +710,12 @@ export default function Home() {
             aria-controls="playground-panel"
             title="Open theme controls"
           >
-            <span className="style-toolbox-trigger-icon">◎</span>
+            <span
+              className={`style-toolbox-trigger-icon style-toolbox-trigger-icon--${selectedPattern.value}`}
+              aria-hidden="true"
+            >
+              {selectedPattern.glyph}
+            </span>
             <span className="style-toolbox-trigger-text">Themes</span>
           </button>
 
@@ -707,7 +724,9 @@ export default function Home() {
               <div className="style-toolbox-head">
                 <div>
                   <div className="style-toolbox-title">Theme controls</div>
-                  <div className="style-toolbox-subtitle">Choose pattern, type, and shape</div>
+                  <div className="style-toolbox-subtitle">
+                    Choose pattern, type, and shape
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -737,7 +756,9 @@ export default function Home() {
                       title={option.label}
                       aria-pressed={stylePrefs.bg === option.value}
                     >
-                      <span className={`style-swatch-preview style-swatch-preview--${option.value}`} />
+                      <span
+                        className={`style-swatch-preview style-swatch-preview--${option.value}`}
+                      />
                       <span className="style-swatch-glyph">{option.glyph}</span>
                       <span className="style-swatch-label">{option.label}</span>
                     </button>
@@ -754,7 +775,10 @@ export default function Home() {
                       type="button"
                       className={`style-chip-btn${stylePrefs.font === option.value ? " style-chip-btn--active" : ""}`}
                       onClick={() =>
-                        setStylePrefs((prev) => ({ ...prev, font: option.value }))
+                        setStylePrefs((prev) => ({
+                          ...prev,
+                          font: option.value,
+                        }))
                       }
                       title={option.label}
                       aria-pressed={stylePrefs.font === option.value}
@@ -774,7 +798,10 @@ export default function Home() {
                       type="button"
                       className={`style-chip-btn${stylePrefs.radius === option.value ? " style-chip-btn--active" : ""}`}
                       onClick={() =>
-                        setStylePrefs((prev) => ({ ...prev, radius: option.value }))
+                        setStylePrefs((prev) => ({
+                          ...prev,
+                          radius: option.value,
+                        }))
                       }
                       title={option.label}
                       aria-pressed={stylePrefs.radius === option.value}

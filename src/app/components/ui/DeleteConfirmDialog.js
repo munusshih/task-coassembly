@@ -44,7 +44,12 @@ export default function DeleteConfirmDialog({
           <Button variant="ghost" size="small" onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="danger" size="small" onClick={handleConfirm} disabled={!canConfirm}>
+          <Button
+            variant="danger"
+            size="small"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+          >
             Delete
           </Button>
         </div>
@@ -56,7 +61,9 @@ export default function DeleteConfirmDialog({
       </p>
       {detail && <p className="delete-confirm-detail">{detail}</p>}
       <label className="delete-confirm-type-row">
-        <span className="delete-confirm-type-label">Type DELETE to confirm</span>
+        <span className="delete-confirm-type-label">
+          Type DELETE to confirm
+        </span>
         <input
           type="text"
           className="delete-confirm-type-input"

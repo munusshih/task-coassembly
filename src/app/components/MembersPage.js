@@ -1560,16 +1560,22 @@ function MemberCard({
 
       {isCurrentWeek && (
         <div className="member-card-footer">
-          {activeTodos.length > 0 && (
-            <button
-              type="button"
-              className="flush-btn"
-              onClick={() => onArchiveAll(member.id)}
-            >
-              Flush completed
-            </button>
-          )}
-          <ArchiveSection archivedTodos={archivedTodos} projects={projects} />
+          <div className="member-archive-controls">
+            {activeTodos.length > 0 && (
+              <div className="member-archive-controls-row">
+                <button
+                  type="button"
+                  className="flush-btn"
+                  onClick={() => onArchiveAll(member.id)}
+                >
+                  Flush completed
+                </button>
+              </div>
+            )}
+            <div className="member-archive-controls-row">
+              <ArchiveSection archivedTodos={archivedTodos} projects={projects} />
+            </div>
+          </div>
         </div>
       )}
     </EntityCard>

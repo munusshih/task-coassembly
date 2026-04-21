@@ -19,16 +19,26 @@ export default function ModalShell({
     .filter(Boolean)
     .join(" ");
 
-  const bodyClasses = ["edit-modal-body", bodyClassName].filter(Boolean).join(" ");
+  const bodyClasses = ["edit-modal-body", bodyClassName]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="edit-modal-overlay" onClick={onClose}>
-      <div className={modalClasses} onClick={(event) => event.stopPropagation()}>
+      <div
+        className={modalClasses}
+        onClick={(event) => event.stopPropagation()}
+      >
         {(title || onClose) && (
           <div className="edit-modal-header">
             <span className="edit-modal-title">{title}</span>
             {onClose ? (
-              <button type="button" className="edit-modal-close" onClick={onClose} title={closeTitle}>
+              <button
+                type="button"
+                className="edit-modal-close"
+                onClick={onClose}
+                title={closeTitle}
+              >
                 ✕
               </button>
             ) : null}

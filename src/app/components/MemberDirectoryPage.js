@@ -22,6 +22,7 @@ import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 import { memberDirectoryTexture } from "./ui/paperTextures";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import { renderTextWithLinks } from "./ui/linkifyText";
 
 const TODO_TYPE = "memberTodo";
 const METRICS_CUTOFF_ISO = "2026-04-20";
@@ -1312,7 +1313,12 @@ export default function MemberDirectoryPage() {
                     )}
 
                     {member?.data?.notes && (
-                      <p className="member-notes">{member.data.notes}</p>
+                      <p className="member-notes">
+                        {renderTextWithLinks(
+                          member.data.notes,
+                          `member-note-${member.id}`,
+                        )}
+                      </p>
                     )}
                   </div>
                 )}

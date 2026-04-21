@@ -54,7 +54,7 @@ function hashText(value) {
   const text = String(value || "");
   let hash = 0;
   for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash = (hash << 5) - hash + text.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
@@ -563,7 +563,11 @@ export default function MeetingNotesPage() {
     try {
       await createDocument("meetingNotes", {
         title: newTitle.trim(),
-        content: buildStarterNoteContent(newTitle.trim(), scopeType, projectName),
+        content: buildStarterNoteContent(
+          newTitle.trim(),
+          scopeType,
+          projectName,
+        ),
         scopeType,
         projectId:
           scopeType === NOTE_SCOPE_PROJECT ? newProjectId || null : null,
@@ -712,8 +716,8 @@ export default function MeetingNotesPage() {
     const participantIds = normalizeIdList(noteData?.meetingParticipantIds);
     if (participantIds.length === 0) return null;
 
-    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter((id) =>
-      participantIds.includes(id),
+    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter(
+      (id) => participantIds.includes(id),
     );
     const presentIds = participantIds.filter((id) => !absentIds.includes(id));
 
@@ -724,12 +728,17 @@ export default function MeetingNotesPage() {
           <div className="note-attendance-chips">
             {presentIds.length ? (
               presentIds.map((id) => (
-                <span key={`present-${id}`} className="note-role-chip note-role-chip--meeting">
+                <span
+                  key={`present-${id}`}
+                  className="note-role-chip note-role-chip--meeting"
+                >
                   {roleLabel(id)}
                 </span>
               ))
             ) : (
-              <span className="note-role-chip note-role-chip--empty">None marked present</span>
+              <span className="note-role-chip note-role-chip--empty">
+                None marked present
+              </span>
             )}
           </div>
         </div>
@@ -738,7 +747,10 @@ export default function MeetingNotesPage() {
             <span className="note-attendance-label">Missing this meeting</span>
             <div className="note-attendance-chips">
               {absentIds.map((id) => (
-                <span key={`absent-${id}`} className="note-role-chip note-role-chip--absent">
+                <span
+                  key={`absent-${id}`}
+                  className="note-role-chip note-role-chip--absent"
+                >
                   {roleLabel(id)}
                 </span>
               ))}
@@ -1125,174 +1137,178 @@ export default function MeetingNotesPage() {
         )}
       </CollectionLayout>
 
-        {activeNote && (
-          <ModalShell
-            title={editingId === activeNote.id ? "Edit note" : "Note details"}
-            size="lg"
-            className={editingId === activeNote.id ? "" : "note-detail-modal"}
-            onClose={() => {
-              setViewingId(null);
-              setEditingId(null);
-            }}
-          >
-            {editingId === activeNote.id ? (
-              <div className="note-editor-row">
-                <div className="note-editor-meta">
-                  <label className="note-meta-field note-meta-field--wide">
-                    <span>Title</span>
-                    <InputField
-                      type="text"
-                      className="note-meta-input"
-                      value={editMeta.title}
-                      onChange={(event) =>
-                        updateEditMeta("title", event.target.value)
-                      }
-                    />
-                  </label>
+      {activeNote && (
+        <ModalShell
+          title={editingId === activeNote.id ? "Edit note" : "Note details"}
+          size="lg"
+          className={editingId === activeNote.id ? "" : "note-detail-modal"}
+          onClose={() => {
+            setViewingId(null);
+            setEditingId(null);
+          }}
+        >
+          {editingId === activeNote.id ? (
+            <div className="note-editor-row">
+              <div className="note-editor-meta">
+                <label className="note-meta-field note-meta-field--wide">
+                  <span>Title</span>
+                  <InputField
+                    type="text"
+                    className="note-meta-input"
+                    value={editMeta.title}
+                    onChange={(event) =>
+                      updateEditMeta("title", event.target.value)
+                    }
+                  />
+                </label>
 
+                <label className="note-meta-field">
+                  <span>Type</span>
+                  <SelectField
+                    className="note-meta-input"
+                    value={editMeta.scopeType}
+                    onChange={(event) => {
+                      const nextScope = normalizeScopeType(event.target.value);
+                      setEditMeta((prev) => ({
+                        ...prev,
+                        scopeType: nextScope,
+                        projectId:
+                          nextScope === NOTE_SCOPE_PROJECT
+                            ? prev.projectId
+                            : "",
+                      }));
+                    }}
+                  >
+                    <option value={NOTE_SCOPE_DATE}>Date-based</option>
+                    <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
+                  </SelectField>
+                </label>
+
+                {normalizeScopeType(editMeta.scopeType) ===
+                  NOTE_SCOPE_PROJECT && (
                   <label className="note-meta-field">
-                    <span>Type</span>
+                    <span>Project</span>
                     <SelectField
                       className="note-meta-input"
-                      value={editMeta.scopeType}
+                      value={editMeta.projectId}
                       onChange={(event) => {
-                        const nextScope = normalizeScopeType(
-                          event.target.value,
+                        const projectId = event.target.value;
+                        const projectTeamIds = getProjectTeamMemberIds(
+                          projectId,
+                          projects,
                         );
                         setEditMeta((prev) => ({
                           ...prev,
-                          scopeType: nextScope,
-                          projectId:
-                            nextScope === NOTE_SCOPE_PROJECT
-                              ? prev.projectId
-                              : "",
+                          projectId,
+                          meetingParticipantIds: projectTeamIds,
+                          absentParticipantIds: [],
                         }));
                       }}
                     >
-                      <option value={NOTE_SCOPE_DATE}>Date-based</option>
-                      <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
+                      <option value="">No project selected</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project?.data?.name || project.id}
+                        </option>
+                      ))}
                     </SelectField>
                   </label>
-
-                  {normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT && (
-                    <label className="note-meta-field">
-                      <span>Project</span>
-                      <SelectField
-                        className="note-meta-input"
-                        value={editMeta.projectId}
-                        onChange={(event) => {
-                          const projectId = event.target.value;
-                          const projectTeamIds = getProjectTeamMemberIds(
-                            projectId,
-                            projects,
-                          );
-                          setEditMeta((prev) => ({
-                            ...prev,
-                            projectId,
-                            meetingParticipantIds: projectTeamIds,
-                            absentParticipantIds: [],
-                          }));
-                        }}
-                      >
-                        <option value="">No project selected</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project?.data?.name || project.id}
-                          </option>
-                        ))}
-                      </SelectField>
-                    </label>
-                  )}
-
-                  {renderRoleSelectors(editMeta, updateEditMeta)}
-                </div>
-
-                <RichEditor
-                  value={editContent}
-                  onChange={setEditContent}
-                  members={members}
-                  projects={projects}
-                  tasks={tasks}
-                  resources={resources}
-                  notes={notes}
-                  currentNoteId={activeNote.id}
-                  showDateObjectButton={
-                    normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT
-                  }
-                />
-                <div className="note-editor-actions">
-                  <Button
-                    onClick={() => handleSaveEdit(activeNote.id)}
-                    disabled={!editMeta.title.trim()}
-                  >
-                    Save
-                  </Button>
-                  <Button variant="ghost" onClick={() => setEditingId(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="note-preview-row">
-                <div className="note-preview-header">
-                  <div className="note-preview-title-block">
-                    <h3 className="note-preview-title">
-                      {formatDateInTitle(activeNote?.data?.createdAt)} · {activeNote?.data?.title || "Untitled"}
-                    </h3>
-                    <p className="note-preview-updated">
-                      {activeNote?.data?.updatedAt
-                        ? `Updated ${new Date(Number(activeNote.data.updatedAt)).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="note-editor-actions note-editor-actions--preview">
-                    <Button onClick={() => startEditing(activeNote)}>Edit</Button>
-                    <Button variant="ghost" onClick={() => setViewingId(null)}>
-                      Close
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="note-preview-meta">
-                  <div className="note-meta-line">
-                    <span className="note-scope-chip">
-                      {normalizeScopeType(activeNote?.data?.scopeType) === NOTE_SCOPE_PROJECT
-                        ? "project-based"
-                        : "date-based"}
-                    </span>
-                    {normalizeScopeType(activeNote?.data?.scopeType) === NOTE_SCOPE_PROJECT && (
-                      <span className="note-project-chip">
-                        {projectLabel(activeNote?.data?.projectId || "")}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="note-role-line">
-                    {renderRoleSummary(activeNote?.data)}
-                  </div>
-
-                  {renderMeetingAttendanceDetail(activeNote?.data)}
-                </div>
-
-                {activeNote?.data?.content ? (
-                  <div
-                    className="note-preview-content"
-                    dangerouslySetInnerHTML={{ __html: activeNote.data.content }}
-                  />
-                ) : (
-                  <p className="note-empty">
-                    No content yet. Click Edit to add content.
-                  </p>
                 )}
+
+                {renderRoleSelectors(editMeta, updateEditMeta)}
               </div>
-            )}
-          </ModalShell>
-        )}
+
+              <RichEditor
+                value={editContent}
+                onChange={setEditContent}
+                members={members}
+                projects={projects}
+                tasks={tasks}
+                resources={resources}
+                notes={notes}
+                currentNoteId={activeNote.id}
+                showDateObjectButton={
+                  normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT
+                }
+              />
+              <div className="note-editor-actions">
+                <Button
+                  onClick={() => handleSaveEdit(activeNote.id)}
+                  disabled={!editMeta.title.trim()}
+                >
+                  Save
+                </Button>
+                <Button variant="ghost" onClick={() => setEditingId(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="note-preview-row">
+              <div className="note-preview-header">
+                <div className="note-preview-title-block">
+                  <h3 className="note-preview-title">
+                    {formatDateInTitle(activeNote?.data?.createdAt)} ·{" "}
+                    {activeNote?.data?.title || "Untitled"}
+                  </h3>
+                  <p className="note-preview-updated">
+                    {activeNote?.data?.updatedAt
+                      ? `Updated ${new Date(
+                          Number(activeNote.data.updatedAt),
+                        ).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="note-editor-actions note-editor-actions--preview">
+                  <Button onClick={() => startEditing(activeNote)}>Edit</Button>
+                  <Button variant="ghost" onClick={() => setViewingId(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              <div className="note-preview-meta">
+                <div className="note-meta-line">
+                  <span className="note-scope-chip">
+                    {normalizeScopeType(activeNote?.data?.scopeType) ===
+                    NOTE_SCOPE_PROJECT
+                      ? "project-based"
+                      : "date-based"}
+                  </span>
+                  {normalizeScopeType(activeNote?.data?.scopeType) ===
+                    NOTE_SCOPE_PROJECT && (
+                    <span className="note-project-chip">
+                      {projectLabel(activeNote?.data?.projectId || "")}
+                    </span>
+                  )}
+                </div>
+
+                <div className="note-role-line">
+                  {renderRoleSummary(activeNote?.data)}
+                </div>
+
+                {renderMeetingAttendanceDetail(activeNote?.data)}
+              </div>
+
+              {activeNote?.data?.content ? (
+                <div
+                  className="note-preview-content"
+                  dangerouslySetInnerHTML={{ __html: activeNote.data.content }}
+                />
+              ) : (
+                <p className="note-empty">
+                  No content yet. Click Edit to add content.
+                </p>
+              )}
+            </div>
+          )}
+        </ModalShell>
+      )}
 
       {deleteTarget && (
         <DeleteConfirmDialog
