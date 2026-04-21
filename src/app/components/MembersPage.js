@@ -680,6 +680,130 @@ function ArchiveSection({ archivedTodos, projects }) {
   );
 }
 
+// ─── ProjectGroupCard ─────────────────────────────────────────────────────────────────────────
+
+function ProjectGroupCard({ project, tasks, members, onCreate, onToggle, onDelete }) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [addTitle, setAddTitle] = useState("");
+  const [addMemberId, setAddMemberId] = useState("");
+
+  const memberNameById = useMemo(() => {
+    const map = {};
+    members.forEach((m) => { map[m.id] = m.data?.name || m.id; });
+    return map;
+  }, [members]);
+
+  const byMember = useMemo(() => {
+    const map = {};
+    sortTodos(tasks.filter((t) => !t.data.completed)).forEach((t) => {
+      const mid = t.data.memberId;
+      if (!map[mid]) map[mid] = [];
+      map[mid].push(t);
+    });
+    sortTodos(tasks.filter((t) => t.data.completed)).forEach((t) => {
+      const mid = t.data.memberId;
+      if (!map[mid]) map[mid] = [];
+      if (!map[mid].find((x) => x.id === t.id)) map[mid].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  const totalActive = tasks.filter((t) => !t.data.completed).length;
+
+  async function handleAdd() {
+    const title = addTitle.trim();
+    if (!title || !addMemberId) return;
+    await onCreate(addMemberId, {
+      title,
+      timeUnits: null,
+      projectId: project?.id || null,
+      deadline: null,
+      subtasks: [],
+      links: [],
+    });
+    setAddTitle("");
+    setAddMemberId("");
+    setAddOpen(false);
+  }
+
+  return (
+    <div className="backlog-section">
+      <div className="backlog-section-head">
+        <span className="backlog-section-title">{project?.data?.name || "Unassigned"}</span>
+        <span className="backlog-section-count">{totalActive} active</span>
+      </div>
+      <div className="wish-list-area">
+        {Object.keys(byMember).length === 0 && !addOpen && (
+          <p className="todo-empty" style={{ padding: "8px 14px" }}>No active tasks.</p>
+        )}
+        {Object.entries(byMember).map(([mid, memberTasks]) => (
+          <div key={mid} className="project-member-group">
+            <div className="project-member-label">{memberNameById[mid] || mid}</div>
+            <ul className="wish-list">
+              {memberTasks.map((task) => (
+                <li key={task.id} className="wish-item wish-item--task">
+                  <div className="wish-item-main">
+                    <input
+                      type="checkbox"
+                      className="wish-task-check"
+                      checked={Boolean(task.data.completed)}
+                      onChange={(e) => onToggle(task, e.target.checked)}
+                    />
+                    <span className={task.data.completed ? "wish-item-text todo-text--done" : "wish-item-text"}>
+                      {task.data.title || "Untitled"}
+                    </span>
+                    {task.data.timeUnits && (
+                      <span className="chip chip--xs">{formatTimeUnits(task.data.timeUnits)}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn--delete"
+                      onClick={() => onDelete(task)}
+                      title="Delete"
+                    >×</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {addOpen ? (
+          <div className="backlog-add-row" style={{ flexWrap: "wrap", padding: "8px 14px 6px" }}>
+            <input
+              className="backlog-add-input"
+              type="text"
+              placeholder="Task title…"
+              value={addTitle}
+              autoFocus
+              onChange={(e) => setAddTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }
+              }}
+            />
+            <select
+              className="backlog-member-select"
+              value={addMemberId}
+              onChange={(e) => setAddMemberId(e.target.value)}
+            >
+              <option value="">Member…</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>{m.data?.name || m.id}</option>
+              ))}
+            </select>
+            <button type="button" className="btn btn--primary btn--small" onClick={handleAdd} disabled={!addTitle.trim() || !addMemberId}>Add</button>
+            <button type="button" className="btn btn--ghost btn--small" onClick={() => { setAddOpen(false); setAddTitle(""); setAddMemberId(""); }}>Cancel</button>
+          </div>
+        ) : (
+          <button type="button" className="backlog-add-trigger" onClick={() => setAddOpen(true)}>
+            + Add task
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── MemberCard ───────────────────────────────────────────────────────────────────────────────
 
 function MemberCard({ member, todos, projects, onCreate, onToggle, onToggleSubtask, onSaveEdit, onDelete, onArchiveAll, onOvertimeSave, onProjectRemaining, selectedWeek }) {
@@ -1111,6 +1235,7 @@ export default function MembersPage() {
   const [projects, setProjects] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
+  const [memberViewMode, setMemberViewMode] = useState("member"); // "member" | "project"
 
   useEffect(() => {
     const cached = readTaskBoardCache();
@@ -1152,6 +1277,22 @@ export default function MembersPage() {
       if (!mid) continue;
       if (!g[mid]) g[mid] = [];
       g[mid].push(t);
+    }
+    return g;
+  }, [allTasks]);
+
+  const sortedProjectsForView = useMemo(() =>
+    [...projects].sort((a, b) => (a.data?.name || "").localeCompare(b.data?.name || "")),
+    [projects]
+  );
+
+  const tasksByProject = useMemo(() => {
+    const g = {};
+    for (const t of allTasks) {
+      if (t.data.archived) continue;
+      const pid = t.data.projectId || "__none__";
+      if (!g[pid]) g[pid] = [];
+      g[pid].push(t);
     }
     return g;
   }, [allTasks]);
@@ -1355,48 +1496,95 @@ export default function MembersPage() {
           <span className="members-quarter">{quarterLabel(selectedWeek)}</span>
           <h2 className="members-week-title">{relativeWeekTitle(selectedWeek)}</h2>
         </div>
-        <select
-          className="week-select"
-          value={selectedWeek}
-          onChange={(e) => setSelectedWeek(e.target.value)}
-        >
-          {availableWeeks.map((wk) => {
-            const monday = new Date(wk + "T00:00:00");
-            return (
-              <option key={wk} value={wk}>
-                {weekLabel(monday)}
-              </option>
-            );
-          })}
-        </select>
+        <div className="members-week-bar-right">
+          <div className="projects-view-toggle">
+            <button
+              type="button"
+              className={"view-toggle-btn" + (memberViewMode === "member" ? " view-toggle-btn--active" : "")}
+              onClick={() => setMemberViewMode("member")}
+              title="Member view"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+            </button>
+            <button
+              type="button"
+              className={"view-toggle-btn" + (memberViewMode === "project" ? " view-toggle-btn--active" : "")}
+              onClick={() => setMemberViewMode("project")}
+              title="Project view"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 3.5h4l1.5 2h5.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/></svg>
+            </button>
+          </div>
+          <select
+            className="week-select"
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(e.target.value)}
+          >
+            {availableWeeks.map((wk) => {
+              const monday = new Date(wk + "T00:00:00");
+              return (
+                <option key={wk} value={wk}>
+                  {weekLabel(monday)}
+                </option>
+              );
+            })}
+          </select>
+        </div>
       </div>
 
       {members.length === 0 && <p className="empty-state">No members found in Firestore.</p>}
 
-      {MEMBER_TYPE_ORDER.filter((type) => membersByType[type]?.length > 0).map((type) => (
-        <div key={type} className="members-type-group">
-          <h3 className="members-type-heading">{MEMBER_TYPE_LABELS[type]}</h3>
-          <div className="members-grid">
-            {membersByType[type].map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                todos={tasksByMember[member.id] || []}
-                projects={projects}
-                onCreate={handleCreate}
-                onToggle={handleToggle}
-                onToggleSubtask={handleToggleSubtask}
-                onSaveEdit={handleSaveEdit}
-                onDelete={handleDelete}
-                onArchiveAll={handleArchiveAll}
-                onOvertimeSave={handleOvertimeSave}
-                onProjectRemaining={projectRemainingHint}
-                selectedWeek={selectedWeek}
-              />
-            ))}
-          </div>
+      {memberViewMode === "project" ? (
+        <div className="backlog-grid">
+          {sortedProjectsForView.map((project) => (
+            <ProjectGroupCard
+              key={project.id}
+              project={project}
+              tasks={tasksByProject[project.id] || []}
+              members={members}
+              onCreate={handleCreate}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          ))}
+          {(tasksByProject["__none__"] || []).length > 0 && (
+            <ProjectGroupCard
+              key="__none__"
+              project={null}
+              tasks={tasksByProject["__none__"] || []}
+              members={members}
+              onCreate={handleCreate}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          )}
         </div>
-      ))}
+      ) : (
+        MEMBER_TYPE_ORDER.filter((type) => membersByType[type]?.length > 0).map((type) => (
+          <div key={type} className="members-type-group">
+            <h3 className="members-type-heading">{MEMBER_TYPE_LABELS[type]}</h3>
+            <div className="members-grid">
+              {membersByType[type].map((member) => (
+                <MemberCard
+                  key={member.id}
+                  member={member}
+                  todos={tasksByMember[member.id] || []}
+                  projects={projects}
+                  onCreate={handleCreate}
+                  onToggle={handleToggle}
+                  onToggleSubtask={handleToggleSubtask}
+                  onSaveEdit={handleSaveEdit}
+                  onDelete={handleDelete}
+                  onArchiveAll={handleArchiveAll}
+                  onOvertimeSave={handleOvertimeSave}
+                  onProjectRemaining={projectRemainingHint}
+                  selectedWeek={selectedWeek}
+                />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
 
       <div className="toast-container" aria-live="polite">
         {toasts.map((t) => (

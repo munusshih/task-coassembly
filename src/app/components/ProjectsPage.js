@@ -758,110 +758,120 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       {/* Expanded detail panel */}
       {open && (
         <div className="project-detail">
-          <div className="detail-kpi-grid">
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Task assigned</span>
-              <span className="detail-kpi-value">{fmtH(hours)}</span>
-              {maxH != null && <span className="detail-kpi-sub">of {fmtH(maxH)}</span>}
-            </div>
-            {internalOrAdmin ? (
-              <div className="detail-kpi-card">
-                <span className="detail-kpi-label">Projected burn rate</span>
-                <span className="detail-kpi-value">{hourly != null ? `${fmtTWD(hourly)}/h` : "—"}</span>
-                <span className="detail-kpi-sub">Internal/Admin minimum NT${MIN_INTERNAL_ADMIN_HOURLY_TWD}/h</span>
-              </div>
-            ) : (
-              <div className="detail-kpi-card">
-                <span className="detail-kpi-label">Company donation</span>
-                <span className="detail-kpi-value">{donationPct}%</span>
-                <span className="detail-kpi-sub">{donationTWD != null ? fmtTWD(donationTWD) : "—"}</span>
-              </div>
-            )}
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Task hours left</span>
-              <span className="detail-kpi-value">{remainingHours != null ? fmtH(remainingHours) : "—"}</span>
-              <span className="detail-kpi-sub">max − assigned tasks</span>
-            </div>
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Stage planned</span>
-              <span className="detail-kpi-value">{fmtH(stagePlannedHours)}</span>
-              <span className="detail-kpi-sub">{stageAssignableLeft != null ? `${fmtH(Math.max(0, stageAssignableLeft))} left` : "set max hours"}</span>
-            </div>
-            <div className="detail-kpi-card">
-              <span className="detail-kpi-label">Team capacity</span>
-              <span className="detail-kpi-value">{fmtH(teamMaxHours)}</span>
-              <span className="detail-kpi-sub">{unassignedTeamHours != null ? `${fmtH(unassignedTeamHours)} unassigned` : ""}</span>
-            </div>
-            {internalOrAdmin ? (
-              <div className="detail-kpi-card">
-                <span className="detail-kpi-label">Burned so far</span>
-                <span className="detail-kpi-value">{burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"}</span>
-                <span className="detail-kpi-sub">
-                  {projectedBurnAtMaxTWD != null ? `Projected max ${fmtTWD(projectedBurnAtMaxTWD)}` : "Set max hours for full projection"}
+
+          {/* ── Primary zone: hero + ledger ── */}
+          <div className="detail-primary">
+
+            {/* Left: Hero stat (hourly rate) + hours progress */}
+            <div className="detail-hero">
+              <div className="detail-hero-stat">
+                <span className="detail-hero-label">{internalOrAdmin ? "Burn rate" : "Hourly wage"}</span>
+                <span className="detail-hero-value">
+                  {hourly != null ? fmtTWD(hourly) : "—"}
+                  {hourly != null && <span className="detail-hero-unit">/h</span>}
                 </span>
+                {!internalOrAdmin && maxH != null && hourly != null && (
+                  <span className="detail-hero-sub">{fmtTWD(teamDistributableTWD)} ÷ {fmtH(maxH)}</span>
+                )}
+                {internalOrAdmin && burnSoFarTWD != null && (
+                  <span className="detail-hero-sub">Burned {fmtTWD(burnSoFarTWD)}{projectedBurnAtMaxTWD != null ? ` · max ${fmtTWD(projectedBurnAtMaxTWD)}` : ""}</span>
+                )}
               </div>
-            ) : (
-              <div className="detail-kpi-card">
-                <span className="detail-kpi-label">Budget after donation</span>
-                <span className="detail-kpi-value">{effectiveBudgetTWD != null ? fmtTWD(effectiveBudgetTWD) : "—"}</span>
-                <span className="detail-kpi-sub">{fmtTWD(teamDistributableTWD)} for team · {fmtTWD(leadBonusTWD)} lead bonus</span>
+
+              {maxH != null && (
+                <div className="detail-progress">
+                  <div className="detail-progress-bars">
+                    <div className="detail-progress-track" title={`Tasks: ${fmtH(hours)}`}>
+                      <div className="detail-progress-fill detail-progress-fill--tasks"
+                        style={{ width: `${Math.max(0, Math.min(100, (hours / maxH) * 100))}%` }} />
+                    </div>
+                    {stagePlannedHours > 0 && (
+                      <div className="detail-progress-track" title={`Stage plan: ${fmtH(stagePlannedHours)}`}>
+                        <div className="detail-progress-fill detail-progress-fill--stage"
+                          style={{ width: `${Math.max(0, Math.min(100, (stagePlannedHours / maxH) * 100))}%` }} />
+                      </div>
+                    )}
+                    {teamMaxHours > 0 && (
+                      <div className="detail-progress-track" title={`Team capacity: ${fmtH(teamMaxHours)}`}>
+                        <div className="detail-progress-fill detail-progress-fill--team"
+                          style={{ width: `${Math.max(0, Math.min(100, (teamMaxHours / maxH) * 100))}%` }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="detail-progress-legend">
+                    <span className="detail-legend-item"><i className="detail-legend-dot detail-legend-dot--tasks" />Tasks {fmtH(hours)}</span>
+                    {stagePlannedHours > 0 && <span className="detail-legend-item"><i className="detail-legend-dot detail-legend-dot--stage" />Stage {fmtH(stagePlannedHours)}</span>}
+                    {teamMaxHours > 0 && <span className="detail-legend-item"><i className="detail-legend-dot detail-legend-dot--team" />Team {fmtH(teamMaxHours)}</span>}
+                    <span className="detail-legend-max">of {fmtH(maxH)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Budget ledger */}
+            {!internalOrAdmin && budgTWD != null && (
+              <div className="detail-ledger">
+                <div className="detail-ledger-row">
+                  <span className="detail-ledger-label">Budget</span>
+                  <span className="detail-ledger-val">{fmtTWD(budgTWD)}{d.budgetCurrency === "USD" && d.budget ? <span className="detail-ledger-orig"> {fmtUSD(d.budget)}</span> : null}</span>
+                </div>
+                <div className="detail-ledger-row detail-ledger-row--deduct">
+                  <span className="detail-ledger-label">Donation {donationPct}%</span>
+                  <span className="detail-ledger-val detail-ledger-val--deduct">−{fmtTWD(donationTWD)}</span>
+                </div>
+                <div className="detail-ledger-row detail-ledger-row--deduct">
+                  <span className="detail-ledger-label">Lead bonus 10%{leadStaff ? <span className="detail-ledger-who"> · {staffingResolved.find((s) => (s.roles || []).includes("lead"))?.member?.data?.name || "lead"}</span> : ""}</span>
+                  <span className="detail-ledger-val detail-ledger-val--deduct">−{fmtTWD(leadBonusTWD)}</span>
+                </div>
+                <div className="detail-ledger-divider" />
+                <div className="detail-ledger-row detail-ledger-row--total">
+                  <span className="detail-ledger-label">Team distributable</span>
+                  <span className="detail-ledger-val">{fmtTWD(teamDistributableTWD)}</span>
+                </div>
               </div>
             )}
-            {!internalOrAdmin && (
-              <div className="detail-kpi-card">
-                <span className="detail-kpi-label">Lead bonus</span>
-                <span className="detail-kpi-value">{leadBonusTWD != null ? fmtTWD(leadBonusTWD) : "—"}</span>
-                <span className="detail-kpi-sub">10% after donation{leadStaff ? ` · ${staffingResolved.find((s) => (s.roles || []).includes("lead"))?.member?.data?.name || "Lead"}` : " · no lead assigned"}</span>
+            {internalOrAdmin && (
+              <div className="detail-ledger">
+                <div className="detail-ledger-row">
+                  <span className="detail-ledger-label">Projected rate</span>
+                  <span className="detail-ledger-val">{hourly != null ? `${fmtTWD(hourly)}/h` : "—"}</span>
+                </div>
+                <div className="detail-ledger-row">
+                  <span className="detail-ledger-label">Min rate</span>
+                  <span className="detail-ledger-val">NT${MIN_INTERNAL_ADMIN_HOURLY_TWD}/h</span>
+                </div>
+                <div className="detail-ledger-divider" />
+                <div className="detail-ledger-row">
+                  <span className="detail-ledger-label">Burned so far</span>
+                  <span className="detail-ledger-val">{burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"}</span>
+                </div>
+                {projectedBurnAtMaxTWD != null && (
+                  <div className="detail-ledger-row">
+                    <span className="detail-ledger-label">Projected at max</span>
+                    <span className="detail-ledger-val">{fmtTWD(projectedBurnAtMaxTWD)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {maxH != null && (
-            <div className="detail-allocation-bars">
-              <div className="allocation-row">
-                <span className="allocation-label">Tasks</span>
-                <div className="allocation-track">
-                  <div className="allocation-fill allocation-fill--tasks" style={{ width: `${Math.max(0, Math.min(100, Math.round((hours / Math.max(1, maxH)) * 100)))}%` }} />
-                </div>
-                <span className="allocation-value">{fmtH(hours)}</span>
-              </div>
-              <div className="allocation-row">
-                <span className="allocation-label">Stage plan</span>
-                <div className="allocation-track">
-                  <div className="allocation-fill allocation-fill--stage" style={{ width: `${Math.max(0, Math.min(100, Math.round((stagePlannedHours / Math.max(1, maxH)) * 100)))}%` }} />
-                </div>
-                <span className="allocation-value">{fmtH(stagePlannedHours)}</span>
-              </div>
-              <div className="allocation-row">
-                <span className="allocation-label">Team cap</span>
-                <div className="allocation-track">
-                  <div className="allocation-fill allocation-fill--team" style={{ width: `${Math.max(0, Math.min(100, Math.round((teamMaxHours / Math.max(1, maxH)) * 100)))}%` }} />
-                </div>
-                <span className="allocation-value">{fmtH(teamMaxHours)}</span>
-              </div>
-            </div>
-          )}
-
           {/* ── Stage timeline ── */}
           {sortedStagePlans.length > 0 && (
             <div className="detail-timeline">
-              <span className="detail-section-label">Stage plan</span>
+              <div className="detail-section-head">
+                <span className="detail-section-label">Stage plan</span>
+                <span className="detail-section-meta">{phaseNow}</span>
+              </div>
               <div className="timeline-track">
                 {sortedStagePlans.map((sp, i) => {
                   const wks = Number(sp.weeks) || 1;
                   const totalW = totalWeeks(sortedStagePlans) || 1;
                   const flex = wks / totalW;
                   return (
-                    <div
-                      key={sp.id || i}
-                      className="timeline-stage"
-                      style={{ flex }}
-                    >
-                      <div className="timeline-bar" style={{ opacity: 0.15 + (i / sortedStagePlans.length) * 0.6 }} />
+                    <div key={sp.id || i} className="timeline-stage" style={{ flex }}>
+                      <div className="timeline-bar" style={{ opacity: 0.12 + (i / sortedStagePlans.length) * 0.55 }} />
                       <span className="timeline-stage-name">{sp.name}</span>
-                      <span className="timeline-stage-meta">
-                        {wks}w{sp.perspectiveHours > 0 ? ` · ${sp.perspectiveHours}h` : ""}
-                      </span>
+                      <span className="timeline-stage-meta">{wks}w{sp.perspectiveHours > 0 ? ` · ${sp.perspectiveHours}h` : ""}</span>
                     </div>
                   );
                 })}
@@ -871,59 +881,49 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
           {/* ── Team ── */}
           <div className="detail-team">
-            <div className="detail-team-header">
-              <span className="detail-section-label">Team staffing</span>
-              <span className="team-unassigned">
-                Assigned {fmtH(teamMaxHours)}{maxH != null ? ` / ${fmtH(maxH)}` : ""}
-                {unassignedTeamHours != null ? ` · Unassigned ${fmtH(unassignedTeamHours)}` : ""}
-                {teamWorkedHours > 0 ? ` · Worked ${fmtH(teamWorkedHours)}` : ""}
+            <div className="detail-section-head">
+              <span className="detail-section-label">Team</span>
+              <span className="detail-section-meta">
+                {fmtH(teamMaxHours)}{maxH != null ? ` / ${fmtH(maxH)}` : ""}
+                {unassignedTeamHours != null && unassignedTeamHours > 0 ? ` · ${fmtH(unassignedTeamHours)} unassigned` : ""}
+                {teamWorkedHours > 0 ? ` · ${fmtH(teamWorkedHours)} worked` : ""}
               </span>
             </div>
             {staffingResolved.length === 0 ? (
               <p className="snapshot-empty">No team assigned yet.</p>
             ) : (
-              <div className="detail-team-cards">
-                {staffingResolved.map((s, i) => (
-                  <div key={s.id || i} className="team-card">
-                    <div className="team-card-top">
-                      <span className="team-card-name">{s.member?.data?.name || s.memberId}</span>
-                      {s.maxHours > 0 && <span className="team-card-hours">{s.maxHours}h</span>}
+              <div className="detail-team-table">
+                <div className="detail-team-thead">
+                  <span>Name</span>
+                  <span>Role</span>
+                  <span>Max hrs</span>
+                  <span>Worked</span>
+                  <span>Pay est.</span>
+                </div>
+                {staffingResolved.map((s, i) => {
+                  const isLead = (s.roles || []).includes("lead");
+                  const workedHours = assignedHoursForMember(allTasks, project.id, s.memberId);
+                  const payEst = hourly != null ? Math.round((Number(s.maxHours) || 0) * hourly) : null;
+                  const totalPay = isLead && leadBonusTWD != null && payEst != null ? payEst + leadBonusTWD : payEst;
+                  const workedPay = hourly != null ? Math.round(workedHours * hourly) : null;
+                  return (
+                    <div key={s.id || i} className={"detail-team-row" + (isLead ? " detail-team-row--lead" : "")}>
+                      <span className="detail-team-name">{s.member?.data?.name || s.memberId}</span>
+                      <span className="detail-team-role">
+                        {STAFFING_ROLES.find((sr) => sr.value === (s.roles || [])[0])?.label || "—"}
+                      </span>
+                      <span className="detail-team-hours">{s.maxHours > 0 ? `${s.maxHours}h` : "—"}</span>
+                      <span className="detail-team-worked">
+                        {workedHours > 0 ? `${workedHours}h` : "—"}
+                        {workedPay != null && workedPay > 0 && <span className="detail-team-worked-pay"> · {fmtTWD(workedPay)}</span>}
+                      </span>
+                      <span className="detail-team-pay">
+                        {totalPay != null ? fmtTWD(totalPay) : "—"}
+                        {isLead && leadBonusTWD != null && <span className="detail-team-pay-note"> +bonus</span>}
+                      </span>
                     </div>
-                    <div className="team-card-roles">
-                      {(s.roles || []).map((r) => (
-                        <span key={r} className={"role-view-chip role-view-chip--" + r}>
-                          {STAFFING_ROLES.find((sr) => sr.value === r)?.label || r}
-                        </span>
-                      ))}
-                    </div>
-                    {hourly != null && (
-                      <div className="team-card-pay-row">
-                        <span className="team-card-pay-label">Pay est.</span>
-                        <span className="team-card-pay-value">{fmtTWD((Number(s.maxHours) || 0) * hourly)}</span>
-                      </div>
-                    )}
-                    {hourly != null && leadBonusTWD != null && (s.roles || []).includes("lead") && (
-                      <div className="team-card-pay-row">
-                        <span className="team-card-pay-label">Lead bonus</span>
-                        <span className="team-card-pay-value">{fmtTWD(leadBonusTWD)}</span>
-                      </div>
-                    )}
-                    {hourly != null && leadBonusTWD != null && (s.roles || []).includes("lead") && (
-                      <div className="team-card-pay-row">
-                        <span className="team-card-pay-label">Total pay</span>
-                        <span className="team-card-pay-value">{fmtTWD((Number(s.maxHours) || 0) * hourly + leadBonusTWD)}</span>
-                      </div>
-                    )}
-                    {hourly != null && (
-                      <div className="team-card-pay-row team-card-pay-row--muted">
-                        <span className="team-card-pay-label">Worked pay</span>
-                        <span className="team-card-pay-value">
-                          {fmtTWD(assignedHoursForMember(allTasks, project.id, s.memberId) * hourly)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -935,6 +935,82 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
 // ─ ProjectsPage ──────────────────────────────────────────────────────────────────────────────
 
+// ─ Kanban board ────────────────────────────────────────────────────────────────────────────────
+
+function ProjectKanbanCard({ project, allTasks }) {
+  const d = project.data;
+  const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
+  const internalOrAdmin = isInternalOrAdminKind(d.kind);
+  const donationPct = Number(d.donationPercent) || 0;
+  const donationTWD = donationAmount(budgTWD, donationPct);
+  const effectiveBudgetTWD = budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
+  const leadBonusTWD = (!internalOrAdmin && effectiveBudgetTWD != null)
+    ? Math.round(effectiveBudgetTWD * 0.10) : null;
+  const teamDistributableTWD = (effectiveBudgetTWD != null && leadBonusTWD != null)
+    ? Math.max(0, effectiveBudgetTWD - leadBonusTWD) : effectiveBudgetTWD;
+  const hourly = internalOrAdmin
+    ? (d.projectedHourlyWage != null ? Number(d.projectedHourlyWage) : null)
+    : (teamDistributableTWD != null && d.maxHours
+        ? Math.round(teamDistributableTWD / Number(d.maxHours)) : null);
+  const teamCount = Array.isArray(d.staffing) ? d.staffing.length : 0;
+  const projectTasks = allTasks.filter((t) => t.data.projectId === project.id && !t.data.archived);
+  const doneTasks = projectTasks.filter((t) => t.data.completed);
+
+  return (
+    <div className="kanban-card">
+      <div className="kanban-card-name">{d.name || "Unnamed"}</div>
+      {d.kind && (
+        <span
+          className="kanban-card-kind"
+          style={KIND_STYLE[d.kind] ? { background: KIND_STYLE[d.kind].bg, color: KIND_STYLE[d.kind].color } : {}}
+        >{d.kind}</span>
+      )}
+      <div className="kanban-card-meta">
+        {budgTWD != null && <span className="kanban-card-budget">{fmtTWD(budgTWD)}</span>}
+        {hourly != null && <span>NT${hourly}/h</span>}
+        {teamCount > 0 && <span>{teamCount} member{teamCount !== 1 ? "s" : ""}</span>}
+        {projectTasks.length > 0 && <span>{doneTasks.length}/{projectTasks.length} tasks</span>}
+      </div>
+    </div>
+  );
+}
+
+function ProjectKanbanBoard({ projects, allTasks }) {
+  const sorted = [...projects].sort((a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0));
+  const grouped = {};
+  PROJECT_STATUSES.forEach((s) => { grouped[s] = []; });
+  grouped[""] = [];
+  sorted.forEach((p) => {
+    const s = p.data.status || "";
+    if (grouped[s] !== undefined) grouped[s].push(p);
+    else grouped[""].push(p);
+  });
+  const cols = [
+    ...PROJECT_STATUSES.filter((s) => grouped[s].length > 0),
+    ...(grouped[""].length > 0 ? [""] : []),
+  ];
+  return (
+    <div className="kanban-board">
+      {cols.map((status) => (
+        <div key={status || "__none__"} className="kanban-col">
+          <div className="kanban-col-head">
+            <span
+              className="kanban-col-title"
+              style={STATUS_STYLE[status] ? { color: STATUS_STYLE[status].color } : {}}
+            >
+              {status || "No status"}
+            </span>
+            <span className="kanban-col-count">{grouped[status].length}</span>
+          </div>
+          {grouped[status].map((p) => (
+            <ProjectKanbanCard key={p.id} project={p} allTasks={allTasks} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
@@ -942,6 +1018,7 @@ export default function ProjectsPage() {
   const [form, setForm]         = useState(EMPTY_FORM);
   const [saving, setSaving]     = useState(false);
   const [toasts, setToasts]     = useState([]);
+  const [viewMode, setViewMode] = useState("list");
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -1047,17 +1124,37 @@ export default function ProjectsPage() {
   return (
     <div className="projects-page">
       <div className="members-header">
-        <h2 className="section-title">Projects</h2>
-        <p className="section-subtitle">
-          {projects.length} project{projects.length !== 1 ? "s" : ""}
-          {totalBudgetTWD > 0 && (
-            <>
-              {" "}&middot; NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalBudgetTWD)} total
-              {" "}&middot; Pool NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalCompanyPoolTWD)}
-              {" "}&middot; Member budget NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalMemberDistributableTWD)}
-            </>
-          )}
-        </p>
+        <div>
+          <h2 className="section-title">Projects</h2>
+          <p className="section-subtitle">
+            {projects.length} project{projects.length !== 1 ? "s" : ""}
+            {totalBudgetTWD > 0 && (
+              <>
+                {" "}&middot; NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalBudgetTWD)} total
+                {" "}&middot; Pool NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalCompanyPoolTWD)}
+                {" "}&middot; Member budget NT${new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(totalMemberDistributableTWD)}
+              </>
+            )}
+          </p>
+        </div>
+        <div className="projects-view-toggle">
+          <button
+            type="button"
+            className={"view-toggle-btn" + (viewMode === "list" ? " view-toggle-btn--active" : "")}
+            onClick={() => setViewMode("list")}
+            title="List view"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg>
+          </button>
+          <button
+            type="button"
+            className={"view-toggle-btn" + (viewMode === "kanban" ? " view-toggle-btn--active" : "")}
+            onClick={() => setViewMode("kanban")}
+            title="Kanban view"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1" y="2" width="3.5" height="10" rx="1"/><rect x="5.25" y="2" width="3.5" height="7" rx="1"/><rect x="9.5" y="2" width="3.5" height="5" rx="1"/></svg>
+          </button>
+        </div>
       </div>
 
       <form className="project-add-form" onSubmit={handleAdd}>
@@ -1119,33 +1216,34 @@ export default function ProjectsPage() {
         </button>
       </form>
 
-      {projects.length > 0 && (
-        <div className="project-col-headers">
-          <span>Name</span>
-          <span>Budget</span>
-          <span>Hours</span>
-          <span>Hourly Rate (TWD)</span>
-          <span />
-        </div>
-      )}
-
       {projects.length === 0 ? (
         <p className="empty-state">No projects yet.</p>
+      ) : viewMode === "kanban" ? (
+        <ProjectKanbanBoard projects={projects} allTasks={allTasks} />
       ) : (
-        <ul className="project-list">
-          {[...projects]
-            .sort((a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0))
-            .map((p) => (
-              <ProjectRow
-                key={p.id}
-                project={p}
-                allTasks={allTasks}
-                members={members}
-                onSave={handleSave}
-                onDelete={handleDelete}
-              />
-            ))}
-        </ul>
+        <>
+          <div className="project-col-headers">
+            <span>Name</span>
+            <span>Budget</span>
+            <span>Hours</span>
+            <span>Hourly Rate (TWD)</span>
+            <span />
+          </div>
+          <ul className="project-list">
+            {[...projects]
+              .sort((a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0))
+              .map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  allTasks={allTasks}
+                  members={members}
+                  onSave={handleSave}
+                  onDelete={handleDelete}
+                />
+              ))}
+          </ul>
+        </>
       )}
 
       <div className="toast-container" aria-live="polite">

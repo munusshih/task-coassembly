@@ -10,12 +10,15 @@ import ProjectsPage from "./components/ProjectsPage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
 import ResourcesPage from "./components/ResourcesPage";
+import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
 
 const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
 const TBD_TABS = ["finance"];
+
+const TAB_ORDER = ["members", "memberDirectory", "projects", "backlog", "finance", "meetingNotes", "resources"];
 
 const PRESENCE_COLORS = [
   "#D81B60", "#1E88E5", "#43A047", "#F4511E", "#5E35B1", "#00897B", "#6D4C41", "#8E24AA",
@@ -56,6 +59,7 @@ function lerp(from, to, factor) {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("members");
+  const [slideDir, setSlideDir] = useState("right");
   const [sessionUser, setSessionUser] = useState(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [identity, setIdentity] = useState(null);
@@ -479,6 +483,7 @@ export default function Home() {
     if (activeTab === "members") return <MembersPage />;
     if (activeTab === "memberDirectory") return <MemberDirectoryPage />;
     if (activeTab === "projects") return <ProjectsPage />;
+    if (activeTab === "backlog") return <BacklogPage />;
     if (activeTab === "meetingNotes") return <MeetingNotesPage />;
     if (activeTab === "resources") return <ResourcesPage />;
     if (DATA_TABS.includes(activeTab)) return <DataViewPage tabKey={activeTab} />;
@@ -486,10 +491,17 @@ export default function Home() {
     return null;
   }
 
+  function handleTabChange(newTab) {
+    const oldIdx = TAB_ORDER.indexOf(activeTab);
+    const newIdx = TAB_ORDER.indexOf(newTab);
+    setSlideDir(newIdx >= oldIdx ? "left" : "right");
+    setActiveTab(newTab);
+  }
+
   return (
     <>
       <main className="page-shell">
-        <section className="page-content">
+        <section className="page-content" key={activeTab} data-dir={slideDir}>
           {renderPage()}
         </section>
 
@@ -528,7 +540,7 @@ export default function Home() {
       </main>
       <Navigation
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         viewers={viewers}
         commentCounts={commentCounts}
       />

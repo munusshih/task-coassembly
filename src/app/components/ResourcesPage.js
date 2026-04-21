@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   subscribeCollection,
   createDocument,
@@ -14,6 +14,9 @@ import { DELETE_ICON, EDIT_ICON } from "./icons";
 
 const DEFAULT_CATEGORIES = ["general", "admin", "projects", "finance", "others"];
 
+const EMPTY_FORM = { name: "", url: "", description: "", category: "general", customCategory: "", subLinks: [] };
+const EMPTY_SUBLINK = { label: "", url: "" };
+
 function normalizeCategory(value) {
   const next = (value || "").trim().toLowerCase();
   return next || "general";
@@ -26,17 +29,110 @@ function toLinkHref(rawUrl) {
   return `https://${value}`;
 }
 
+function SubLinkEditor({ subLinks, onChange }) {
+  function update(i, key, val) {
+    const next = subLinks.map((s, idx) => idx === i ? { ...s, [key]: val } : s);
+    onChange(next);
+  }
+  function add() { onChange([...subLinks, { ...EMPTY_SUBLINK }]); }
+  function remove(i) { onChange(subLinks.filter((_, idx) => idx !== i)); }
+
+  return (
+    <div className="resource-sublinks-editor">
+      {subLinks.map((sl, i) => (
+        <div key={i} className="resource-sublink-row">
+          <input
+            className="resource-input resource-input--sm"
+            type="text"
+            placeholder="Label"
+            value={sl.label}
+            onChange={(e) => update(i, "label", e.target.value)}
+          />
+          <input
+            className="resource-input resource-input--sm"
+            type="url"
+            placeholder="https://…"
+            value={sl.url}
+            onChange={(e) => update(i, "url", e.target.value)}
+          />
+          <button type="button" className="resource-sublink-remove" onClick={() => remove(i)} aria-label="Remove">×</button>
+        </div>
+      ))}
+      <button type="button" className="resource-sublink-add" onClick={add}>+ sub-link</button>
+    </div>
+  );
+}
+
+function ResourceForm({ form, setForm, categoryOptions, onSave, onCancel, saveLabel = "Add" }) {
+  const effectiveCategory = form.category === "others"
+    ? normalizeCategory(form.customCategory || "others")
+    : normalizeCategory(form.category);
+
+  return (
+    <div className="resource-form">
+      <div className="resource-form-main">
+        <input
+          className="resource-input"
+          type="text"
+          placeholder="Name *"
+          value={form.name}
+          autoFocus
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+        <input
+          className="resource-input"
+          type="url"
+          placeholder="URL * (https://…)"
+          value={form.url}
+          onChange={(e) => setForm({ ...form, url: e.target.value })}
+        />
+        <select
+          className="resource-input"
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value, customCategory: "" })}
+        >
+          {categoryOptions.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+      {form.category === "others" && (
+        <input
+          className="resource-input"
+          type="text"
+          placeholder="New category name"
+          value={form.customCategory}
+          onChange={(e) => setForm({ ...form, customCategory: e.target.value })}
+        />
+      )}
+      <input
+        className="resource-input"
+        type="text"
+        placeholder="Description (optional)"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+      />
+      <div className="resource-form-sublinks-label">Sub-links</div>
+      <SubLinkEditor subLinks={form.subLinks} onChange={(sl) => setForm({ ...form, subLinks: sl })} />
+      <div className="resource-form-actions">
+        <Button onClick={() => onSave(form, effectiveCategory)} disabled={!form.name.trim() || !form.url.trim()}>
+          {saveLabel}
+        </Button>
+        {onCancel && <Button variant="ghost" onClick={onCancel}>Cancel</Button>}
+      </div>
+    </div>
+  );
+}
+
 export default function ResourcesPage() {
   const [links, setLinks] = useState([]);
-  const [newLink, setNewLink] = useState({ name: "", url: "", category: "general" });
-  const [newCustomCategory, setNewCustomCategory] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({ name: "", url: "", category: "general" });
-  const [editCustomCategory, setEditCustomCategory] = useState("");
+  const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Subscribe to links
   useEffect(() => {
     if (!firebaseReady) return;
     return subscribeCollection("resources", (items) => {
@@ -44,21 +140,18 @@ export default function ResourcesPage() {
     });
   }, []);
 
-  // Filter links based on search
   const filteredLinks = useMemo(() => {
     if (!searchQuery) return links;
-    return links.filter((link) => {
-      const name = link.data.name || "";
-      const url = link.data.url || "";
-      const category = link.data.category || "";
-      const query = searchQuery.toLowerCase();
-      return name.toLowerCase().includes(query) ||
-             url.toLowerCase().includes(query) ||
-             category.toLowerCase().includes(query);
+    const q = searchQuery.toLowerCase();
+    return links.filter((l) => {
+      const d = l.data;
+      return (d.name || "").toLowerCase().includes(q) ||
+             (d.url || "").toLowerCase().includes(q) ||
+             (d.description || "").toLowerCase().includes(q) ||
+             (d.category || "").toLowerCase().includes(q);
     });
   }, [links, searchQuery]);
 
-  // Group by category
   const groupedLinks = useMemo(() => {
     const grouped = {};
     filteredLinks.forEach((link) => {
@@ -70,67 +163,55 @@ export default function ResourcesPage() {
   }, [filteredLinks]);
 
   const categoryOptions = useMemo(() => {
-    const existing = links
-      .map((link) => normalizeCategory(link.data.category))
-      .filter(Boolean);
-
+    const existing = links.map((l) => normalizeCategory(l.data.category)).filter(Boolean);
     const seen = new Set();
     const ordered = [];
-
     [...DEFAULT_CATEGORIES, ...existing].forEach((cat) => {
       if (seen.has(cat)) return;
       seen.add(cat);
       ordered.push(cat);
     });
-
     return ordered;
   }, [links]);
 
-  async function handleCreateLink() {
-    if (!newLink.name.trim() || !newLink.url.trim()) return;
-    const categoryToSave =
-      newLink.category === "others"
-        ? normalizeCategory(newCustomCategory || "others")
-        : normalizeCategory(newLink.category);
+  async function handleCreate(form, category) {
     try {
       await createDocument("resources", {
-        name: newLink.name.trim(),
-        url: newLink.url.trim(),
-        category: categoryToSave,
+        name: form.name.trim(),
+        url: form.url.trim(),
+        description: form.description.trim(),
+        category,
+        subLinks: form.subLinks.filter((s) => s.url.trim()),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      setNewLink({ name: "", url: "", category: "general" });
-      setNewCustomCategory("");
+      setAddForm(EMPTY_FORM);
+      setAddOpen(false);
     } catch (e) {
       console.error("Could not create link:", e);
     }
   }
 
-  async function handleSaveEdit(id, data) {
-    const categoryToSave =
-      data.category === "others"
-        ? normalizeCategory(editCustomCategory || "others")
-        : normalizeCategory(data.category);
+  async function handleSaveEdit(form, category) {
+    const link = links.find((l) => l.id === editingId);
+    if (!link) return;
     try {
-      const link = links.find((l) => l.id === id);
-      if (link) {
-        await replaceDocument("resources", id, {
-          ...link.data,
-          name: data.name,
-          url: data.url,
-          category: categoryToSave,
-          updatedAt: Date.now(),
-        });
-        setEditingId(null);
-        setEditCustomCategory("");
-      }
+      await replaceDocument("resources", editingId, {
+        ...link.data,
+        name: form.name.trim(),
+        url: form.url.trim(),
+        description: form.description.trim(),
+        category,
+        subLinks: form.subLinks.filter((s) => s.url.trim()),
+        updatedAt: Date.now(),
+      });
+      setEditingId(null);
     } catch (e) {
       console.error("Could not save link:", e);
     }
   }
 
-  async function handleDeleteLink(id) {
+  async function handleDelete(id) {
     try {
       await deleteDocument("resources", id);
       setPendingDeleteId(null);
@@ -139,253 +220,127 @@ export default function ResourcesPage() {
     }
   }
 
-  function renderLinkSection(category, categoryLinks) {
-    if (!categoryLinks.length) return null;
-
-    return (
-      <div key={category} className="resources-section">
-        <h3 className="resources-section-title">{category}</h3>
-        <ul className="resources-list">
-          {categoryLinks.map((link) => (
-            <li key={link.id} className="resource-item">
-              <div className="resource-row">
-                <div className="resource-content-col">
-                  <a
-                    className="resource-name resource-link"
-                    href={toLinkHref(link.data.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={link.data.url}
-                  >
-                    {link.data.name}
-                  </a>
-                  <a
-                    className="resource-url"
-                    href={toLinkHref(link.data.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={link.data.url}
-                  >
-                    {link.data.url}
-                  </a>
-                </div>
-                <div className="resource-actions-row">
-                  <IconButton
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setPendingDeleteId(null);
-                      setEditingId(link.id);
-                      setEditData({
-                        name: link.data.name,
-                        url: link.data.url,
-                        category: normalizeCategory(link.data.category),
-                      });
-                      setEditCustomCategory("");
-                    }}
-                    title="Edit"
-                  >
-                    {EDIT_ICON}
-                  </IconButton>
-                  {pendingDeleteId === link.id ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDeleteLink(link.id);
-                        }}
-                      >
-                        Confirm
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setPendingDeleteId(null);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <IconButton
-                      variant="delete"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setPendingDeleteId(link.id);
-                      }}
-                      title="Delete link"
-                    >
-                      {DELETE_ICON}
-                    </IconButton>
-                  )}
-                </div>
-              </div>
-
-              {editingId === link.id && (
-                <div className="resource-editor-row">
-                  <div className="resource-editor-field">
-                    <label className="resource-field-label">Name</label>
-                    <input
-                      type="text"
-                      value={editData.name}
-                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                      className="resource-input"
-                    />
-                  </div>
-                  <div className="resource-editor-field">
-                    <label className="resource-field-label">URL</label>
-                    <input
-                      type="url"
-                      value={editData.url}
-                      onChange={(e) => setEditData({ ...editData, url: e.target.value })}
-                      className="resource-input"
-                    />
-                  </div>
-                  <div className="resource-editor-field">
-                    <label className="resource-field-label">Category</label>
-                    <select
-                      value={editData.category}
-                      onChange={(e) => {
-                        const nextCategory = e.target.value;
-                        setEditData({ ...editData, category: nextCategory });
-                        if (nextCategory !== "others") {
-                          setEditCustomCategory("");
-                        }
-                      }}
-                      className="resource-input"
-                    >
-                      {categoryOptions.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                    {editData.category === "others" && (
-                      <input
-                        type="text"
-                        value={editCustomCategory}
-                        onChange={(e) => setEditCustomCategory(e.target.value)}
-                        className="resource-input"
-                        placeholder="Type new category"
-                      />
-                    )}
-                  </div>
-                  <div className="resource-editor-actions">
-                    <Button
-                      onClick={() => handleSaveEdit(link.id, editData)}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditCustomCategory("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
+  function startEdit(link) {
+    const d = link.data;
+    setEditingId(link.id);
+    setEditForm({
+      name: d.name || "",
+      url: d.url || "",
+      description: d.description || "",
+      category: normalizeCategory(d.category),
+      customCategory: "",
+      subLinks: Array.isArray(d.subLinks) ? d.subLinks : [],
+    });
+    setPendingDeleteId(null);
   }
 
   return (
     <div className="resources-page">
-      <h2 className="section-title">Resources</h2>
-      <p className="section-subtitle">{links.length} link{links.length !== 1 ? "s" : ""}</p>
-
-      <div className="new-resource-row">
-        <input
-          type="text"
-          placeholder="Link name..."
-          value={newLink.name}
-          onChange={(e) => setNewLink({ ...newLink, name: e.target.value })}
-          className="resource-input"
-        />
-        <input
-          type="url"
-          placeholder="https://example.com"
-          value={newLink.url}
-          onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
-          className="resource-input"
-        />
-        <div className="resource-category-stack">
-          <select
-            value={newLink.category}
-            onChange={(e) => {
-              const nextCategory = e.target.value;
-              setNewLink({ ...newLink, category: nextCategory });
-              if (nextCategory !== "others") {
-                setNewCustomCategory("");
-              }
-            }}
-            className="resource-input"
-          >
-            {categoryOptions.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          {newLink.category === "others" && (
-            <input
-              type="text"
-              value={newCustomCategory}
-              onChange={(e) => setNewCustomCategory(e.target.value)}
-              className="resource-input"
-              placeholder="Type new category"
-            />
+      <div className="resources-topbar">
+        <div className="resources-topbar-left">
+          <h2 className="section-title">Resources</h2>
+          <span className="resources-count">{links.length} link{links.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="resources-topbar-right">
+          <input
+            type="text"
+            placeholder="Search…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="resource-input resource-search"
+          />
+          {searchQuery && (
+            <button type="button" className="resource-search-clear" onClick={() => setSearchQuery("")}>×</button>
           )}
         </div>
-        <Button
-          onClick={handleCreateLink}
-          disabled={!newLink.name.trim() || !newLink.url.trim()}
-        >
-          Add
-        </Button>
       </div>
 
-      <div className="search-row">
-        <input
-          type="text"
-          placeholder="Search resources..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="search-input"
-        />
-        {searchQuery && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => setSearchQuery("")}
-          >
-            Clear
-          </Button>
-        )}
-      </div>
+      {/* Add resource area */}
+      {addOpen ? (
+        <div className="resource-add-panel">
+          <span className="resources-section-label">New resource</span>
+          <ResourceForm
+            form={addForm}
+            setForm={setAddForm}
+            categoryOptions={categoryOptions}
+            onSave={handleCreate}
+            onCancel={() => { setAddForm(EMPTY_FORM); setAddOpen(false); }}
+            saveLabel="Add resource"
+          />
+        </div>
+      ) : (
+        <button type="button" className="resource-add-trigger" onClick={() => setAddOpen(true)}>
+          <span className="resource-add-plus">+</span>
+          <span className="resource-add-placeholder">Add a resource…</span>
+        </button>
+      )}
 
-      <div className="resources-sections">
-        {Object.keys(groupedLinks).map((category) =>
-          renderLinkSection(category, groupedLinks[category])
-        )}
-
-        {links.length === 0 && (
-          <p className="empty-state">No resources yet. Add one to get started!</p>
-        )}
-      </div>
+      {/* Sticky note grid */}
+      {filteredLinks.length > 0 ? (
+        <div className="resources-grid">
+          {filteredLinks.map((link) => (
+            <div key={link.id} className={`resource-sticky${editingId === link.id ? " resource-sticky--editing" : ""}`}>
+              {editingId === link.id ? (
+                <div className="resource-sticky-edit">
+                  <ResourceForm
+                    form={editForm}
+                    setForm={setEditForm}
+                    categoryOptions={categoryOptions}
+                    onSave={handleSaveEdit}
+                    onCancel={() => setEditingId(null)}
+                    saveLabel="Save"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="resource-sticky-actions">
+                    <IconButton onClick={() => startEdit(link)} title="Edit">{EDIT_ICON}</IconButton>
+                    {pendingDeleteId === link.id ? (
+                      <>
+                        <Button variant="ghost" size="small" onClick={() => handleDelete(link.id)}>Confirm</Button>
+                        <Button variant="ghost" size="small" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+                      </>
+                    ) : (
+                      <IconButton variant="delete" onClick={() => setPendingDeleteId(link.id)} title="Delete">{DELETE_ICON}</IconButton>
+                    )}
+                  </div>
+                  <div className="resource-sticky-body">
+                    <a
+                      className="resource-sticky-name"
+                      href={toLinkHref(link.data.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {link.data.name}
+                    </a>
+                    {link.data.description && (
+                      <span className="resource-sticky-desc">{link.data.description}</span>
+                    )}
+                    {Array.isArray(link.data.subLinks) && link.data.subLinks.filter((s) => s.url).length > 0 && (
+                      <div className="resource-sticky-sublinks">
+                        {link.data.subLinks.filter((s) => s.url).map((sl, i) => (
+                          <a
+                            key={i}
+                            className="resource-sticky-sublink"
+                            href={toLinkHref(sl.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {sl.label || sl.url}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="resource-sticky-cat">{normalizeCategory(link.data.category)}</span>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">{searchQuery ? "No results." : "No resources yet. Add one above!"}</p>
+      )}
     </div>
   );
 }

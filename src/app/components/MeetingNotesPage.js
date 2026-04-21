@@ -827,107 +827,123 @@ export default function MeetingNotesPage() {
 
   return (
     <div className="notes-page">
-      <h2 className="section-title">Notes / doc</h2>
-      <p className="section-subtitle">{notes.length} note{notes.length !== 1 ? "s" : ""}</p>
+      <div className="notes-topbar">
+        <div className="notes-topbar-left">
+          <h2 className="section-title">Notes / doc</h2>
+          <span className="resources-count">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="notes-topbar-right">
+          <input
+            type="text"
+            placeholder="Search…"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="resource-input resource-search"
+          />
+          {searchQuery && (
+            <button type="button" className="resource-search-clear" onClick={() => setSearchQuery("")}>×</button>
+          )}
+          <div className="projects-view-toggle">
+            <button
+              type="button"
+              className={"view-toggle-btn" + (groupMode === "date" ? " view-toggle-btn--active" : "")}
+              onClick={() => setGroupMode("date")}
+              title="Group by date"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1.5" y="1.5" width="11" height="11" rx="2"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="7.5" x2="10" y2="7.5"/><line x1="4" y1="10" x2="8" y2="10"/></svg>
+            </button>
+            <button
+              type="button"
+              className={"view-toggle-btn" + (groupMode === "project" ? " view-toggle-btn--active" : "")}
+              onClick={() => setGroupMode("project")}
+              title="Group by project"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1.5 3.5h4l1.5 2h5.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div className="new-note-row">
-        <input
-          type="text"
-          placeholder="New note title..."
-          value={newTitle}
-          onChange={(event) => setNewTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") handleCreateNote();
-          }}
-          className="new-note-input"
-        />
-
-        <select
-          className="note-meta-input"
-          value={newScopeType}
-          onChange={(event) => {
-            const nextScope = normalizeScopeType(event.target.value);
-            setNewScopeType(nextScope);
-            if (nextScope !== NOTE_SCOPE_PROJECT) setNewProjectId("");
-            setNewRoles((prev) => ({
-              ...prev,
-              meetingParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.meetingParticipantIds : [],
-              absentParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.absentParticipantIds : [],
-            }));
-          }}
-        >
-          <option value={NOTE_SCOPE_DATE}>Date-based</option>
-          <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-        </select>
-
-        {newScopeType === NOTE_SCOPE_PROJECT && (
+      <div className="note-create-area">
+        <div className="note-create-row">
+          <input
+            type="text"
+            placeholder="New note title…"
+            value={newTitle}
+            onChange={(event) => setNewTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") handleCreateNote();
+            }}
+            className="new-note-input"
+          />
           <select
             className="note-meta-input"
-            value={newProjectId}
+            value={newScopeType}
             onChange={(event) => {
-              const projectId = event.target.value;
-              setNewProjectId(projectId);
-              const projectTeamIds = getProjectTeamMemberIds(projectId, projects);
+              const nextScope = normalizeScopeType(event.target.value);
+              setNewScopeType(nextScope);
+              if (nextScope !== NOTE_SCOPE_PROJECT) setNewProjectId("");
               setNewRoles((prev) => ({
                 ...prev,
-                meetingParticipantIds: projectTeamIds,
-                absentParticipantIds: [],
+                meetingParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.meetingParticipantIds : [],
+                absentParticipantIds: nextScope === NOTE_SCOPE_PROJECT ? prev.absentParticipantIds : [],
               }));
             }}
           >
-            <option value="">No project selected</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project?.data?.name || project.id}
-              </option>
-            ))}
+            <option value={NOTE_SCOPE_DATE}>Date-based</option>
+            <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
           </select>
-        )}
-
-        <button
-          className="btn btn--primary"
-          onClick={handleCreateNote}
-          disabled={!newTitle.trim()}
-        >
-          Create
-        </button>
-      </div>
-
-      {renderRoleSelectors(newRoles, updateNewRole)}
-
-      <div className="notes-view-toggle">
-        <button
-          type="button"
-          className={groupMode === "date" ? "btn btn--primary btn--small" : "btn btn--ghost btn--small"}
-          onClick={() => setGroupMode("date")}
-        >
-          Date view
-        </button>
-        <button
-          type="button"
-          className={groupMode === "project" ? "btn btn--primary btn--small" : "btn btn--ghost btn--small"}
-          onClick={() => setGroupMode("project")}
-        >
-          Project view
-        </button>
-      </div>
-
-      <div className="search-row">
-        <input
-          type="text"
-          placeholder="Search notes..."
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          className="search-input"
-        />
-        {searchQuery && (
+          {newScopeType === NOTE_SCOPE_PROJECT && (
+            <select
+              className="note-meta-input"
+              value={newProjectId}
+              onChange={(event) => {
+                const projectId = event.target.value;
+                setNewProjectId(projectId);
+                const projectTeamIds = getProjectTeamMemberIds(projectId, projects);
+                setNewRoles((prev) => ({
+                  ...prev,
+                  meetingParticipantIds: projectTeamIds,
+                  absentParticipantIds: [],
+                }));
+              }}
+            >
+              <option value="">No project…</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project?.data?.name || project.id}
+                </option>
+              ))}
+            </select>
+          )}
           <button
-            className="btn btn--ghost btn--small"
-            onClick={() => setSearchQuery("")}
+            className="btn btn--primary"
+            onClick={handleCreateNote}
+            disabled={!newTitle.trim()}
           >
-            Clear
+            Create
           </button>
-        )}
+        </div>
+
+        <details className="note-roles-disclosure">
+          <summary className="note-roles-summary">
+            <span className="note-roles-summary-label">
+              Roles
+              {(newRoles.facilitatorId || newRoles.timekeeperId || newRoles.notetakerId) && (
+                <span className="note-roles-summary-chips">
+                  {ROLE_FIELDS.filter((f) => newRoles[f.key]).map((f) => (
+                    <span key={f.key} className="note-role-pill">
+                      {f.label.slice(0, 3)}: {memberNameById[newRoles[f.key]] || "…"}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+          </summary>
+          <div className="note-roles-body">
+            {renderRoleSelectors(newRoles, updateNewRole)}
+          </div>
+        </details>
       </div>
 
       <div className="notes-sections">
