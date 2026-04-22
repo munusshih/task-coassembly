@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import {
-  subscribeCollection,
+  subscribeCollectionQuery,
   createDocument,
-  replaceDocument,
+  updateDocument,
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
@@ -427,6 +427,7 @@ function FreeBoard({ links, positions, onPositionChange, onEdit, onDelete }) {
 
 export default function ResourcesPage() {
   const [links, setLinks] = useState([]);
+  const [resourcesLimit, setResourcesLimit] = useState(120);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -455,15 +456,23 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     if (!firebaseReady) return;
-    return subscribeCollection("resources", (items) => {
+    return subscribeCollectionQuery(
+      "resources",
+      {
+        orderByField: "createdAt",
+        orderDirection: "desc",
+        limitCount: resourcesLimit,
+      },
+      (items) => {
       setLinks(
         items.sort(
           (a, b) =>
             Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0),
         ),
       );
-    });
-  }, []);
+      },
+    );
+  }, [resourcesLimit]);
 
   const filteredLinks = useMemo(() => {
     if (!searchQuery) return links;
@@ -528,11 +537,9 @@ export default function ResourcesPage() {
   }
 
   async function handleSaveEdit(form, category) {
-    const link = links.find((l) => l.id === editingId);
-    if (!link) return;
+    if (!editingId) return;
     try {
-      await replaceDocument("resources", editingId, {
-        ...link.data,
+      await updateDocument("resources", editingId, {
         name: form.name.trim(),
         url: form.url.trim(),
         description: form.description.trim(),
@@ -650,6 +657,17 @@ export default function ResourcesPage() {
           onConfirm={() => handleDelete(pendingDelete.id)}
           onCancel={() => setPendingDelete(null)}
         />
+      )}
+
+      {links.length >= resourcesLimit && (
+        <div className="notes-load-more-row">
+          <Button
+            variant="ghost"
+            onClick={() => setResourcesLimit((prev) => prev + 120)}
+          >
+            Load more resources
+          </Button>
+        </div>
       )}
     </TabPage>
   );

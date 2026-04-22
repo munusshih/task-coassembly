@@ -5,8 +5,11 @@ import { firebaseReady } from "../firebase";
 import {
   createDocument,
   deleteDocument,
+  deleteDocumentsWhereBefore,
   replaceDocument,
   subscribeCollection,
+  subscribeCollectionQuery,
+  updateDocument,
 } from "../firestore";
 import Navigation from "./components/Navigation";
 import MembersPage from "./components/MembersPage";
@@ -278,15 +281,65 @@ export default function Home() {
       setPresenceRows([]);
       return;
     }
-    const unsub = subscribeCollection("presence", setPresenceRows);
+    const unsub = subscribeCollectionQuery(
+      "presence",
+      {
+        orderByField: "lastSeen",
+        orderDirection: "desc",
+        limitCount: 120,
+      },
+      setPresenceRows,
+    );
     return () => unsub();
   }, [isPageVisible]);
 
   useEffect(() => {
-    if (!firebaseReady) return;
-    const unsub = subscribeCollection("tabComments", setCommentRows);
+    if (!firebaseReady || !isPageVisible) return;
+    const unsub = subscribeCollectionQuery(
+      "tabComments",
+      {
+        orderByField: "createdAt",
+        orderDirection: "desc",
+        limitCount: 300,
+      },
+      setCommentRows,
+    );
     return () => unsub();
-  }, []);
+  }, [isPageVisible]);
+
+  useEffect(() => {
+    if (!firebaseReady || !identity) return;
+    let stopped = false;
+
+    async function runCleanup() {
+      if (stopped) return;
+      const now = Date.now();
+      try {
+        await deleteDocumentsWhereBefore("presence", "lastSeen", now - 60 * 1000, 120);
+        await deleteDocumentsWhereBefore(
+          "meetingNotePresence",
+          "lastSeen",
+          now - 60 * 1000,
+          120,
+        );
+        await deleteDocumentsWhereBefore(
+          "tabComments",
+          "createdAt",
+          now - 14 * 24 * 60 * 60 * 1000,
+          120,
+        );
+      } catch {
+        // Ignore cleanup failures.
+      }
+    }
+
+    runCleanup();
+    const timer = window.setInterval(runCleanup, 30 * 60 * 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [identity]);
 
   const viewers = useMemo(() => {
     const now = Date.now();
@@ -310,6 +363,7 @@ export default function Home() {
     let heartbeatTimer = null;
     let pending = false;
     let pendingForce = false;
+    let hasUpserted = false;
     let lastSent = { x: null, y: null, tab: null };
 
     function markActivity() {
@@ -352,14 +406,24 @@ export default function Home() {
       lastWriteAt = now;
 
       try {
-        await replaceDocument("presence", identity.id, {
-          name: identity.name,
-          color: identity.color,
-          tab: activeTab,
-          cursorX: x,
-          cursorY: y,
-          lastSeen: Date.now(),
-        });
+        if (!hasUpserted) {
+          await replaceDocument("presence", identity.id, {
+            name: identity.name,
+            color: identity.color,
+            tab: activeTab,
+            cursorX: x,
+            cursorY: y,
+            lastSeen: Date.now(),
+          });
+          hasUpserted = true;
+        } else {
+          await updateDocument("presence", identity.id, {
+            tab: activeTab,
+            cursorX: x,
+            cursorY: y,
+            lastSeen: Date.now(),
+          });
+        }
         lastSent = { x, y, tab: activeTab };
       } catch {
         // Ignore transient network issues; next write retries.

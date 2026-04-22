@@ -507,6 +507,7 @@ function WishItem({
 function ProjectSection({
   project,
   items,
+  archivedItems = [],
   members,
   currentUsername,
   sessionChecked,
@@ -520,6 +521,7 @@ function ProjectSection({
   const [addText, setAddText] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const sortedItems = useMemo(
     () =>
@@ -596,6 +598,38 @@ function ProjectSection({
           </button>
         )}
 
+        {archivedItems.length > 0 && (
+          <div className="wish-archive-block">
+            <button
+              type="button"
+              className="wish-show-more"
+              onClick={() => setShowArchived((value) => !value)}
+            >
+              {showArchived
+                ? `Hide archived (${archivedItems.length})`
+                : `Show archived (${archivedItems.length})`}
+            </button>
+            {showArchived && (
+              <ul className="wish-list wish-list--archived">
+                {archivedItems.map((item) => (
+                  <WishItem
+                    key={item.id}
+                    item={item}
+                    members={members}
+                    currentUsername={currentUsername}
+                    sessionChecked={sessionChecked}
+                    onSessionExpired={onSessionExpired}
+                    onDelete={onDelete}
+                    onPush={onPush}
+                    onReact={onReact}
+                    onComment={onComment}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <CreateBar
           open={addOpen}
           onOpen={() => setAddOpen(true)}
@@ -641,6 +675,7 @@ export default function BacklogPage() {
   const [wishItems, setWishItems] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
@@ -666,10 +701,14 @@ export default function BacklogPage() {
     const u1 = subscribeCollection("backlogItems", setWishItems);
     const u2 = subscribeCollection("projects", setProjects);
     const u3 = subscribeCollection("members", setMembers);
+    const u4 = subscribeCollection("tasks", (items) =>
+      setTasks(items.filter((item) => item?.data?.type === TODO_TYPE)),
+    );
     return () => {
       u1();
       u2();
       u3();
+      u4();
     };
   }, []);
 
@@ -722,15 +761,71 @@ export default function BacklogPage() {
     );
   }, [wishItems, searchQuery]);
 
-  const groupedItems = useMemo(() => {
+  const groupedActiveItems = useMemo(() => {
     const map = {};
-    filteredItems.forEach((item) => {
+    filteredItems
+      .filter((item) => !item?.data?.archived)
+      .forEach((item) => {
+        const pid = item.data.projectId || "__none__";
+        if (!map[pid]) map[pid] = [];
+        map[pid].push(item);
+      });
+    return map;
+  }, [filteredItems]);
+
+  const groupedArchivedItems = useMemo(() => {
+    const map = {};
+    filteredItems
+      .filter((item) => Boolean(item?.data?.archived))
+      .forEach((item) => {
       const pid = item.data.projectId || "__none__";
       if (!map[pid]) map[pid] = [];
       map[pid].push(item);
     });
     return map;
   }, [filteredItems]);
+
+  useEffect(() => {
+    if (!wishItems.length || !tasks.length) return;
+
+    const taskById = new Map(tasks.map((task) => [task.id, task]));
+    const updates = [];
+
+    for (const wish of wishItems) {
+      const linkedTaskIds = Array.isArray(wish?.data?.linkedTaskIds)
+        ? wish.data.linkedTaskIds
+        : [];
+      if (linkedTaskIds.length === 0) continue;
+
+      const linkedTasks = linkedTaskIds
+        .map((taskId) => taskById.get(taskId))
+        .filter(Boolean);
+      if (!linkedTasks.length) continue;
+
+      const allFinished = linkedTasks.every(
+        (task) => Boolean(task?.data?.completed) || Boolean(task?.data?.archived),
+      );
+      const currentlyArchived = Boolean(wish?.data?.archived);
+      if (allFinished === currentlyArchived) continue;
+
+      updates.push(
+        replaceDocument("backlogItems", wish.id, {
+          ...wish.data,
+          archived: allFinished,
+          archivedAt: allFinished
+            ? Number(wish?.data?.archivedAt) || Date.now()
+            : null,
+          updatedAt: Date.now(),
+        }),
+      );
+    }
+
+    if (!updates.length) return;
+
+    Promise.all(updates).catch((error) => {
+      console.error("Could not sync wish archive state:", error);
+    });
+  }, [wishItems, tasks]);
 
   async function handleAdd(text, projectId) {
     try {
@@ -739,7 +834,11 @@ export default function BacklogPage() {
         projectId: projectId || null,
         reactions: {},
         comments: [],
+        linkedTaskIds: [],
+        archived: false,
+        archivedAt: null,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
     } catch (e) {
       console.error("Could not add wish:", e);
@@ -764,11 +863,14 @@ export default function BacklogPage() {
   async function handlePush(item, memberId) {
     const now = Date.now();
     try {
-      await createDocument("tasks", {
+      const taskId = await createDocument("tasks", {
         type: TODO_TYPE,
         memberId,
         title: item.data.text,
         projectId: item.data.projectId || null,
+        sourceWishId: item.id,
+        sourceWishText: item.data.text || "",
+        sourceWishSnapshotAt: now,
         timeUnits: null,
         deadline: null,
         subtasks: [],
@@ -777,6 +879,22 @@ export default function BacklogPage() {
         archived: false,
         orderIndex: now,
         createdAt: now,
+        updatedAt: now,
+      });
+
+      const existingLinkedTaskIds = Array.isArray(item?.data?.linkedTaskIds)
+        ? item.data.linkedTaskIds
+        : [];
+      const linkedTaskIds = [...existingLinkedTaskIds, taskId].filter(
+        (id, index, all) => all.indexOf(id) === index,
+      );
+
+      await replaceDocument("backlogItems", item.id, {
+        ...item.data,
+        linkedTaskIds,
+        archived: false,
+        archivedAt: null,
+        lastAssignedAt: now,
         updatedAt: now,
       });
     } catch (e) {
@@ -828,7 +946,8 @@ export default function BacklogPage() {
           <ProjectSection
             key={project.id}
             project={project}
-            items={groupedItems[project.id] || []}
+            items={groupedActiveItems[project.id] || []}
+            archivedItems={groupedArchivedItems[project.id] || []}
             members={members}
             currentUsername={currentUsername}
             sessionChecked={sessionChecked}
@@ -843,7 +962,8 @@ export default function BacklogPage() {
         <ProjectSection
           key="__none__"
           project={null}
-          items={groupedItems["__none__"] || []}
+          items={groupedActiveItems["__none__"] || []}
+          archivedItems={groupedArchivedItems["__none__"] || []}
           members={members}
           currentUsername={currentUsername}
           sessionChecked={sessionChecked}

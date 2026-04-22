@@ -16,7 +16,7 @@ const sponact = localFont({
 });
 
 export const metadata = {
-  title: "Co-Assembly",
+  title: "CoAssembly Task",
   description: "Team management dashboard.",
 };
 

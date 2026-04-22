@@ -20,7 +20,6 @@ import SelectField from "./ui/SelectField";
 import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
-import { memberDirectoryTexture } from "./ui/paperTextures";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
 
@@ -279,23 +278,46 @@ function colorForProjectKind(kind) {
 
 function toProjectKindSegments(countMap) {
   const pairs = Object.entries(countMap || {}).filter(
-    ([, count]) => Number(count) > 0,
+    ([, value]) => Number(value) > 0,
   );
-  const total = pairs.reduce((sum, [, count]) => sum + Number(count), 0);
+  const total = pairs.reduce((sum, [, value]) => sum + Number(value), 0);
   if (!total) return [];
 
-  return pairs
-    .sort((a, b) => {
-      const countDiff = Number(b[1]) - Number(a[1]);
-      if (countDiff !== 0) return countDiff;
-      return String(a[0]).localeCompare(String(b[0]));
-    })
-    .map(([kind, count]) => ({
-      kind,
-      count: Number(count),
-      color: colorForProjectKind(kind),
-      ratio: Number(count) / total,
-    }));
+  const sortedPairs = pairs.sort((a, b) => {
+    const valueDiff = Number(b[1]) - Number(a[1]);
+    if (valueDiff !== 0) return valueDiff;
+    return String(a[0]).localeCompare(String(b[0]));
+  });
+
+  return sortedPairs.map(([kind, value], index) => ({
+    label: kind,
+    value: Number(value),
+    color:
+      PROJECT_KIND_COLOR_BY_KEY[normalizeProjectKindKey(kind)] ||
+      PROJECT_KIND_COLORS[index % PROJECT_KIND_COLORS.length],
+    ratio: Number(value) / total,
+  }));
+}
+
+function toProjectSegments(timeMap) {
+  const pairs = Object.entries(timeMap || {}).filter(
+    ([, value]) => Number(value) > 0,
+  );
+  const total = pairs.reduce((sum, [, value]) => sum + Number(value), 0);
+  if (!total) return [];
+
+  const sortedPairs = pairs.sort((a, b) => {
+    const valueDiff = Number(b[1]) - Number(a[1]);
+    if (valueDiff !== 0) return valueDiff;
+    return String(a[0]).localeCompare(String(b[0]));
+  });
+
+  return sortedPairs.map(([projectName, value], index) => ({
+    label: projectName,
+    value: Number(value),
+    color: PROJECT_KIND_COLORS[index % PROJECT_KIND_COLORS.length],
+    ratio: Number(value) / total,
+  }));
 }
 
 function donutBackground(segments) {
@@ -318,8 +340,76 @@ function donutBackground(segments) {
 
 function segmentTotal(segments) {
   return (segments || []).reduce(
-    (sum, segment) => sum + (Number(segment.count) || 0),
+    (sum, segment) => sum + (Number(segment.value) || 0),
     0,
+  );
+}
+
+function taskFinishedAtTs(taskData) {
+  if (!taskData || typeof taskData !== "object") return 0;
+  if (!taskData.archived && !taskData.completed) return 0;
+  return (
+    Number(taskData.archivedAt) ||
+    Number(taskData.updatedAt) ||
+    Number(taskData.createdAt) ||
+    0
+  );
+}
+
+function taskFinishedUnits(taskData) {
+  if (!taskData || typeof taskData !== "object") return 0;
+  return (Number(taskData.timeUnits) || 0) + (Number(taskData.overtimeUnits) || 0);
+}
+
+function formatUnitsAsHours(units) {
+  const value = Number(units) || 0;
+  const totalMinutes = Math.max(0, Math.round(value * 15));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function TimeDonutChart({ label, segments, emptyText, ariaLabel }) {
+  return (
+    <div className="member-kind-chart">
+      <span className="member-directory-meta-label">{label}</span>
+      <div className="member-kind-chart-body">
+        <div
+          className="member-kind-donut"
+          style={{
+            backgroundImage: donutBackground(segments),
+          }}
+          aria-label={ariaLabel}
+        >
+          <span className="member-kind-donut-value">
+            {formatUnitsAsHours(segmentTotal(segments))}
+          </span>
+        </div>
+        {segments.length === 0 ? (
+          <p className="member-kind-empty">{emptyText}</p>
+        ) : (
+          <ul className="member-kind-legend">
+            {segments.map((segment) => (
+              <li
+                key={`${ariaLabel}-${segment.label}`}
+                className="member-kind-legend-item"
+              >
+                <span
+                  className="member-kind-swatch"
+                  style={{ backgroundColor: segment.color }}
+                />
+                <span className="member-kind-label">{segment.label}</span>
+                <span className="member-kind-count">
+                  {formatUnitsAsHours(segment.value)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -373,6 +463,7 @@ export default function MemberDirectoryPage() {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [rotationOpen, setRotationOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [memberTimeTabById, setMemberTimeTabById] = useState({});
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -429,19 +520,25 @@ export default function MemberDirectoryPage() {
     for (const member of membersSorted) {
       metricsByMember[member.id] = {
         totalTaskCount: 0,
-        activeTaskCount: 0,
+        plannedUnits: 0,
+        assignedTotalCount: 0,
+        completedTotalCount: 0,
+        finishedUnitsTotal: 0,
         assignedThisWeekCount: 0,
         completedThisWeekCount: 0,
-        plannedUnits: 0,
+        finishedUnitsThisWeek: 0,
         weekly: recentWeekKeys.map((weekKey) => ({
           weekKey,
           assigned: 0,
           completed: 0,
+          finishedUnits: 0,
         })),
         currentProjectIds: new Set(),
         historicalProjectIds: new Set(),
-        projectKindCountMap: {},
-        thisWeekProjectKindCountMap: {},
+        projectTimeMap: {},
+        thisWeekProjectTimeMap: {},
+        projectKindTimeMap: {},
+        thisWeekProjectKindTimeMap: {},
       };
     }
 
@@ -457,22 +554,7 @@ export default function MemberDirectoryPage() {
 
       metric.totalTaskCount += 1;
       if (!archived) {
-        metric.activeTaskCount += 1;
         metric.plannedUnits += Number(data.timeUnits) || 0;
-        const kind = normalizeProjectKind(
-          projectKindById[data.projectId],
-          Boolean(data.projectId),
-        );
-        metric.projectKindCountMap[kind] =
-          (metric.projectKindCountMap[kind] || 0) + 1;
-        const taskTs = Math.max(
-          Number(data.createdAt) || 0,
-          Number(data.updatedAt) || 0,
-        );
-        if (taskTs >= currentWeekStartTs) {
-          metric.thisWeekProjectKindCountMap[kind] =
-            (metric.thisWeekProjectKindCountMap[kind] || 0) + 1;
-        }
       }
 
       const assignedWeek = weekKeyFromTs(
@@ -481,21 +563,43 @@ export default function MemberDirectoryPage() {
       if (assignedWeek) {
         const assignedIndex = weekToIndex.get(assignedWeek);
         if (assignedIndex != null) metric.weekly[assignedIndex].assigned += 1;
+        metric.assignedTotalCount += 1;
         if (assignedWeek === currentWeekKey) metric.assignedThisWeekCount += 1;
       }
 
-      if (archived) {
-        const completedWeek = weekKeyFromTs(
-          Number(data.archivedAt) ||
-            Number(data.updatedAt) ||
-            Number(data.createdAt),
+      const finishedAt = taskFinishedAtTs(data);
+      const finishedUnits = taskFinishedUnits(data);
+      if (finishedAt && finishedUnits > 0) {
+        const completedWeek = weekKeyFromTs(finishedAt);
+        const projectName = data.projectId
+          ? projectNameById[data.projectId] || data.projectId
+          : "No project";
+        const kind = normalizeProjectKind(
+          projectKindById[data.projectId],
+          Boolean(data.projectId),
         );
+
+        metric.finishedUnitsTotal += finishedUnits;
+        metric.completedTotalCount += 1;
+        metric.projectTimeMap[projectName] =
+          (metric.projectTimeMap[projectName] || 0) + finishedUnits;
+        metric.projectKindTimeMap[kind] =
+          (metric.projectKindTimeMap[kind] || 0) + finishedUnits;
+
         if (completedWeek) {
           const completedIndex = weekToIndex.get(completedWeek);
-          if (completedIndex != null)
+          if (completedIndex != null) {
             metric.weekly[completedIndex].completed += 1;
-          if (completedWeek === currentWeekKey)
+            metric.weekly[completedIndex].finishedUnits += finishedUnits;
+          }
+          if (completedWeek === currentWeekKey) {
             metric.completedThisWeekCount += 1;
+            metric.finishedUnitsThisWeek += finishedUnits;
+            metric.thisWeekProjectTimeMap[projectName] =
+              (metric.thisWeekProjectTimeMap[projectName] || 0) + finishedUnits;
+            metric.thisWeekProjectKindTimeMap[kind] =
+              (metric.thisWeekProjectKindTimeMap[kind] || 0) + finishedUnits;
+          }
         }
       }
 
@@ -513,17 +617,22 @@ export default function MemberDirectoryPage() {
 
       normalized[memberId] = {
         totalTaskCount: metric.totalTaskCount,
-        activeTaskCount: metric.activeTaskCount,
+        assignedTotalCount: metric.assignedTotalCount,
+        completedTotalCount: metric.completedTotalCount,
+        finishedUnitsTotal: metric.finishedUnitsTotal,
         assignedThisWeekCount: metric.assignedThisWeekCount,
         completedThisWeekCount: metric.completedThisWeekCount,
+        finishedUnitsThisWeek: metric.finishedUnitsThisWeek,
         plannedUnits: metric.plannedUnits,
         weekly: metric.weekly,
         currentProjectCount: metric.currentProjectIds.size,
         historicalProjectCount: metric.historicalProjectIds.size,
         currentProjects,
-        projectKindSegments: toProjectKindSegments(metric.projectKindCountMap),
+        projectSegments: toProjectSegments(metric.projectTimeMap),
+        thisWeekProjectSegments: toProjectSegments(metric.thisWeekProjectTimeMap),
+        projectKindSegments: toProjectKindSegments(metric.projectKindTimeMap),
         thisWeekProjectKindSegments: toProjectKindSegments(
-          metric.thisWeekProjectKindCountMap,
+          metric.thisWeekProjectKindTimeMap,
         ),
       };
     }
@@ -615,6 +724,10 @@ export default function MemberDirectoryPage() {
 
   function toggleMemberExpanded(memberId) {
     setExpandedMembers((prev) => ({ ...prev, [memberId]: !prev[memberId] }));
+  }
+
+  function setMemberTimeTab(memberId, tab) {
+    setMemberTimeTabById((prev) => ({ ...prev, [memberId]: tab }));
   }
 
   async function saveEdit(member) {
@@ -1019,18 +1132,24 @@ export default function MemberDirectoryPage() {
         {membersSorted.map((member) => {
           const metric = memberMetrics[member.id] || {
             totalTaskCount: 0,
-            activeTaskCount: 0,
+            assignedTotalCount: 0,
+            completedTotalCount: 0,
+            finishedUnitsTotal: 0,
             assignedThisWeekCount: 0,
             completedThisWeekCount: 0,
+            finishedUnitsThisWeek: 0,
             plannedUnits: 0,
             weekly: recentWeekKeys.map((weekKey) => ({
               weekKey,
               assigned: 0,
               completed: 0,
+              finishedUnits: 0,
             })),
             currentProjectCount: 0,
             historicalProjectCount: 0,
             currentProjects: [],
+            projectSegments: [],
+            thisWeekProjectSegments: [],
             projectKindSegments: [],
             thisWeekProjectKindSegments: [],
           };
@@ -1041,12 +1160,9 @@ export default function MemberDirectoryPage() {
             assigned: metric.assignedThisWeekCount,
             completed: metric.completedThisWeekCount,
           };
+          const timeTab = memberTimeTabById[member.id] || "weekly";
           const role = normalizeMemberRole(member?.data?.role);
           const meetingRequired = isWorkerOwner(role);
-          const cardTexture = memberDirectoryTexture(
-            role,
-            member?.data?.active,
-          );
 
           return (
             <EntityCard
@@ -1057,7 +1173,6 @@ export default function MemberDirectoryPage() {
                   ? "member-directory-card member-directory-card--open"
                   : "member-directory-card"
               }
-              texture={cardTexture}
             >
               <div className="member-directory-card-head">
                 <div className="member-directory-card-titles">
@@ -1130,6 +1245,12 @@ export default function MemberDirectoryPage() {
                     <span className="member-stat-chip">
                       {formatPlannedHoursFromUnits(metric.plannedUnits)} planned
                     </span>
+                      <span className="member-stat-chip">
+                        {formatUnitsAsHours(metric.finishedUnitsThisWeek)} done this week
+                      </span>
+                      <span className="member-stat-chip">
+                        {formatUnitsAsHours(metric.finishedUnitsTotal)} done overall
+                      </span>
                     <span className="member-stat-chip">
                       {metric.currentProjectCount} current projects
                     </span>
@@ -1170,128 +1291,98 @@ export default function MemberDirectoryPage() {
                       </div>
                     </div>
 
-                    <div className="member-directory-stats">
-                      <span className="member-stat-chip">
-                        {metric.activeTaskCount} active tasks
-                      </span>
-                      <span className="member-stat-chip">
-                        {metric.assignedThisWeekCount} assigned this week
-                      </span>
-                      <span className="member-stat-chip">
-                        {metric.completedThisWeekCount} completed this week
-                      </span>
-                    </div>
-
-                    <div className="member-kind-charts">
-                      <div className="member-kind-chart">
-                        <span className="member-directory-meta-label">
-                          Project types (active now)
-                        </span>
-                        <div className="member-kind-chart-body">
-                          <div
-                            className="member-kind-donut"
-                            style={{
-                              backgroundImage: donutBackground(
-                                metric.projectKindSegments,
-                              ),
-                            }}
-                            aria-label="Project types active now"
-                          >
-                            <span className="member-kind-donut-value">
-                              {segmentTotal(metric.projectKindSegments)}
-                            </span>
-                          </div>
-                          {metric.projectKindSegments.length === 0 ? (
-                            <p className="member-kind-empty">
-                              No active project-linked tasks.
-                            </p>
-                          ) : (
-                            <ul className="member-kind-legend">
-                              {metric.projectKindSegments.map((segment) => (
-                                <li
-                                  key={`kind-all-${member.id}-${segment.kind}`}
-                                  className="member-kind-legend-item"
-                                >
-                                  <span
-                                    className="member-kind-swatch"
-                                    style={{ backgroundColor: segment.color }}
-                                  />
-                                  <span className="member-kind-label">
-                                    {segment.kind}
-                                  </span>
-                                  <span className="member-kind-count">
-                                    {segment.count}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="member-kind-chart">
-                        <span className="member-directory-meta-label">
-                          Project types (this week)
-                        </span>
-                        <div className="member-kind-chart-body">
-                          <div
-                            className="member-kind-donut"
-                            style={{
-                              backgroundImage: donutBackground(
-                                metric.thisWeekProjectKindSegments,
-                              ),
-                            }}
-                            aria-label="Project types this week"
-                          >
-                            <span className="member-kind-donut-value">
-                              {segmentTotal(metric.thisWeekProjectKindSegments)}
-                            </span>
-                          </div>
-                          {metric.thisWeekProjectKindSegments.length === 0 ? (
-                            <p className="member-kind-empty">
-                              No active tasks created this week.
-                            </p>
-                          ) : (
-                            <ul className="member-kind-legend">
-                              {metric.thisWeekProjectKindSegments.map(
-                                (segment) => (
-                                  <li
-                                    key={`kind-week-${member.id}-${segment.kind}`}
-                                    className="member-kind-legend-item"
-                                  >
-                                    <span
-                                      className="member-kind-swatch"
-                                      style={{ backgroundColor: segment.color }}
-                                    />
-                                    <span className="member-kind-label">
-                                      {segment.kind}
-                                    </span>
-                                    <span className="member-kind-count">
-                                      {segment.count}
-                                    </span>
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="member-weekly-board">
-                      {metric.weekly.map((weekly) => (
-                        <div
-                          key={`${member.id}-${weekly.weekKey}`}
-                          className="member-weekly-item"
+                    <div className="member-chart-section">
+                      <div className="member-time-tabs" role="tablist" aria-label="Time analytics view">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={timeTab === "weekly"}
+                          className={
+                            timeTab === "weekly"
+                              ? "member-time-tab member-time-tab--active"
+                              : "member-time-tab"
+                          }
+                          onClick={() => setMemberTimeTab(member.id, "weekly")}
                         >
-                          <span className="member-weekly-week">
-                            {formatWeekKeyLabel(weekly.weekKey)}
-                          </span>
-                          <span className="member-weekly-values">
-                            {weekly.assigned} assigned · {weekly.completed} done
-                          </span>
-                        </div>
-                      ))}
+                          Weekly
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={timeTab === "overall"}
+                          className={
+                            timeTab === "overall"
+                              ? "member-time-tab member-time-tab--active"
+                              : "member-time-tab"
+                          }
+                          onClick={() => setMemberTimeTab(member.id, "overall")}
+                        >
+                          Overall
+                        </button>
+                      </div>
+
+                      {timeTab === "weekly" ? (
+                        <>
+                          <span className="member-directory-meta-label">This week</span>
+                          <div className="member-kind-charts">
+                            <TimeDonutChart
+                              label="Time by project"
+                              segments={metric.thisWeekProjectSegments}
+                              emptyText="No finished project time this week."
+                              ariaLabel={`project-time-week-${member.id}`}
+                            />
+                            <TimeDonutChart
+                              label="Time by project type"
+                              segments={metric.thisWeekProjectKindSegments}
+                              emptyText="No finished project-type time this week."
+                              ariaLabel={`project-kind-time-week-${member.id}`}
+                            />
+                          </div>
+
+                          <div className="member-weekly-board">
+                            {metric.weekly.map((weekly) => (
+                              <div
+                                key={`${member.id}-${weekly.weekKey}`}
+                                className="member-weekly-item"
+                              >
+                                <span className="member-weekly-week">
+                                  {formatWeekKeyLabel(weekly.weekKey)}
+                                </span>
+                                <span className="member-weekly-values">
+                                  {weekly.assigned} assigned · {weekly.completed} done · {formatUnitsAsHours(weekly.finishedUnits)} finished
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span className="member-directory-meta-label">Overall</span>
+                          <div className="member-kind-charts">
+                            <TimeDonutChart
+                              label="Time by project"
+                              segments={metric.projectSegments}
+                              emptyText="No finished project time yet."
+                              ariaLabel={`project-time-all-${member.id}`}
+                            />
+                            <TimeDonutChart
+                              label="Time by project type"
+                              segments={metric.projectKindSegments}
+                              emptyText="No finished project-type time yet."
+                              ariaLabel={`project-kind-time-all-${member.id}`}
+                            />
+                          </div>
+
+                          <div className="member-overall-board">
+                            <div className="member-weekly-item">
+                              <span className="member-weekly-week">Overall</span>
+                              <span className="member-weekly-values">
+                                {metric.assignedTotalCount} assigned · {metric.completedTotalCount} done · {formatUnitsAsHours(metric.finishedUnitsTotal)} finished
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {metric.currentProjects.length > 0 && (

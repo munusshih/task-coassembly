@@ -156,6 +156,44 @@ function assignedHoursForMember(tasks, projectId, memberId) {
     .reduce((s, t) => s + (Number(t.data.timeUnits) || 0) * 0.25, 0);
 }
 
+function getWeekStartTs(ts) {
+  const value = Number(ts);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const d = new Date(value);
+  const day = d.getUTCDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diffToMonday);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function finishedAtTs(taskData) {
+  if (!taskData || typeof taskData !== "object") return 0;
+  if (!taskData.completed && !taskData.archived) return 0;
+  return (
+    Number(taskData.archivedAt) ||
+    Number(taskData.updatedAt) ||
+    Number(taskData.createdAt) ||
+    0
+  );
+}
+
+function finishedHoursForMember(tasks, projectId, memberId, sinceTs = 0) {
+  return tasks
+    .filter((t) => t.data.projectId === projectId && t.data.memberId === memberId)
+    .filter((t) => {
+      const ts = finishedAtTs(t.data);
+      return ts > 0 && (sinceTs <= 0 || ts >= sinceTs);
+    })
+    .reduce(
+      (s, t) =>
+        s +
+        ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) *
+          0.25,
+      0,
+    );
+}
+
 function totalWeeks(stagePlans) {
   if (!Array.isArray(stagePlans)) return 0;
   return stagePlans.reduce((s, sp) => s + (Number(sp.weeks) || 0), 0);
@@ -630,6 +668,22 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       0,
     );
   }, [d.staffing, allTasks, project.id]);
+
+  const weekStartTs = useMemo(() => getWeekStartTs(Date.now()), []);
+
+  const finishedByMember = useMemo(() => {
+    if (!Array.isArray(d.staffing)) return {};
+    const map = {};
+    for (const entry of d.staffing) {
+      const memberId = entry?.memberId;
+      if (!memberId) continue;
+      map[memberId] = {
+        week: finishedHoursForMember(allTasks, project.id, memberId, weekStartTs),
+        total: finishedHoursForMember(allTasks, project.id, memberId, 0),
+      };
+    }
+    return map;
+  }, [d.staffing, allTasks, project.id, weekStartTs]);
 
   if (editing) {
     const formInternalOrAdmin = isInternalOrAdminKind(form.kind);
@@ -1277,7 +1331,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                 <div className="detail-team-thead">
                   <span>Name</span>
                   <span>Role</span>
-                  <span>Max hrs</span>
+                  <span>Allocated</span>
                   <span>Worked</span>
                   <span>Pay est.</span>
                 </div>
@@ -1298,6 +1352,10 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       : payEst;
                   const workedPay =
                     hourly != null ? Math.round(workedHours * hourly) : null;
+                  const finished = finishedByMember[s.memberId] || {
+                    week: 0,
+                    total: 0,
+                  };
                   return (
                     <div
                       key={s.id || i}
@@ -1316,6 +1374,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       </span>
                       <span className="detail-team-hours">
                         {s.maxHours > 0 ? `${s.maxHours}h` : "—"}
+                        <span className="detail-team-hours-meta">
+                          done {fmtH(finished.week)} this week · {fmtH(finished.total)} total
+                        </span>
                       </span>
                       <span className="detail-team-worked">
                         {workedHours > 0 ? `${workedHours}h` : "—"}

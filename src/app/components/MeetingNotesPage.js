@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   subscribeCollection,
+  subscribeCollectionQuery,
   createDocument,
   replaceDocument,
+  updateDocument,
   deleteDocument,
+  deleteDocumentsWhereBefore,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import EmojiPicker from "emoji-picker-react";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
@@ -126,6 +131,13 @@ function isLinkOnlyNote(noteData) {
   return hasLink && !hasContent;
 }
 
+function normalizeNoteEmoji(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return "";
+  const token = text.split(/\s+/)[0] || "";
+  return Array.from(token).slice(0, 2).join("");
+}
+
 function emptyRoleAssignments() {
   return {
     facilitatorId: "",
@@ -152,6 +164,7 @@ function normalizeRoleAssignments(data) {
 
 function emptyEditMeta() {
   return {
+    emoji: "",
     title: "",
     noteDate: "",
     linkUrl: "",
@@ -225,6 +238,9 @@ function getProjectTeamMemberIds(projectId, projects) {
 
 export default function MeetingNotesPage() {
   const [notes, setNotes] = useState([]);
+  const [notesLimit, setNotesLimit] = useState(80);
+  const [newEmoji, setNewEmoji] = useState("");
+  const [createEmojiPickerOpen, setCreateEmojiPickerOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newScopeType, setNewScopeType] = useState(NOTE_SCOPE_DATE);
@@ -235,12 +251,22 @@ export default function MeetingNotesPage() {
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
   const [editMeta, setEditMeta] = useState(() => emptyEditMeta());
+  const [editEmojiPickerOpen, setEditEmojiPickerOpen] = useState(false);
+  const [editEmojiPickerPosition, setEditEmojiPickerPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+  const editEmojiTriggerRef = useRef(null);
+  const editEmojiPopoverRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [groupMode, setGroupMode] = useState("date");
   const [notesLayout, setNotesLayout] = useState("grid");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
+  const [notePresenceRows, setNotePresenceRows] = useState([]);
+  const [autoSaveState, setAutoSaveState] = useState("idle");
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState(null);
 
   const [members, setMembers] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -249,27 +275,109 @@ export default function MeetingNotesPage() {
 
   useEffect(() => {
     if (!firebaseReady) return;
-    return subscribeCollection("meetingNotes", (items) => {
+    return subscribeCollectionQuery(
+      "meetingNotes",
+      {
+        orderByField: "createdAt",
+        orderDirection: "desc",
+        limitCount: notesLimit,
+      },
+      (items) => {
       setNotes(
         items.sort(
           (a, b) =>
             Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0),
         ),
       );
-    });
-  }, []);
+      },
+    );
+  }, [notesLimit]);
 
   useEffect(() => {
     if (!firebaseReady) return;
     const u1 = subscribeCollection("members", setMembers);
     const u2 = subscribeCollection("projects", setProjects);
-    const u3 = subscribeCollection("tasks", setTasks);
-    const u4 = subscribeCollection("resources", setResources);
+    const u5 = subscribeCollectionQuery(
+      "meetingNotePresence",
+      {
+        orderByField: "lastSeen",
+        orderDirection: "desc",
+        limitCount: 120,
+      },
+      setNotePresenceRows,
+    );
     return () => {
       u1();
       u2();
-      u3();
-      u4();
+      u5();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseReady || !editingId) {
+      setTasks([]);
+      setResources([]);
+      return;
+    }
+    const u1 = subscribeCollection("tasks", setTasks);
+    const u2 = subscribeCollection("resources", setResources);
+    return () => {
+      u1();
+      u2();
+    };
+  }, [editingId]);
+
+  useEffect(() => {
+    if (!editEmojiPickerOpen) return;
+
+    const handleViewportChange = () => {
+      measureEditEmojiPickerPosition();
+    };
+
+    const handleOutsideClick = (event) => {
+      const trigger = editEmojiTriggerRef.current;
+      const popover = editEmojiPopoverRef.current;
+      const target = event.target;
+
+      if (trigger?.contains(target) || popover?.contains(target)) return;
+      setEditEmojiPickerOpen(false);
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [editEmojiPickerOpen]);
+
+  useEffect(() => {
+    if (!firebaseReady) return;
+    let stopped = false;
+
+    async function runCleanup() {
+      if (stopped) return;
+      const stalePresenceCutoff = Date.now() - 60 * 1000;
+      try {
+        await deleteDocumentsWhereBefore(
+          "meetingNotePresence",
+          "lastSeen",
+          stalePresenceCutoff,
+          120,
+        );
+      } catch {
+        // Ignore cleanup failures.
+      }
+    }
+
+    runCleanup();
+    const timer = window.setInterval(runCleanup, 30 * 60 * 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -521,6 +629,17 @@ export default function MeetingNotesPage() {
   function formatAuditTimestamp(ts) {
     const date = new Date(Number(ts || 0));
     if (Number.isNaN(date.getTime())) return "Unknown time";
+    const isDateOnlyMidnight =
+      date.getHours() === 0 &&
+      date.getMinutes() === 0 &&
+      date.getSeconds() === 0;
+    if (isDateOnlyMidnight) {
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
     return date.toLocaleString("en-US", {
       year: "numeric",
       month: "short",
@@ -530,9 +649,11 @@ export default function MeetingNotesPage() {
     });
   }
 
-  function formatAuditUser(username) {
+  function formatAuditUser(username, fallbackUsername = "") {
     const value = String(username || "").trim();
-    return value || "Unknown";
+    if (value) return value;
+    const fallback = String(fallbackUsername || "").trim();
+    return fallback || "Unknown";
   }
 
   function formatUpdatedTime(ts) {
@@ -568,9 +689,51 @@ export default function MeetingNotesPage() {
     setEditMeta((prev) => ({ ...prev, [field]: value }));
   }
 
+  function measureEditEmojiPickerPosition() {
+    const trigger = editEmojiTriggerRef.current;
+    if (!trigger || typeof window === "undefined") return;
+
+    const rect = trigger.getBoundingClientRect();
+    const pickerWidth = 300;
+    const pickerHeight = 360;
+    const gutter = 8;
+
+    let left = rect.left;
+    let top = rect.bottom + 6;
+
+    if (left + pickerWidth > window.innerWidth - gutter) {
+      left = Math.max(gutter, window.innerWidth - pickerWidth - gutter);
+    }
+
+    if (top + pickerHeight > window.innerHeight - gutter) {
+      top = Math.max(gutter, rect.top - pickerHeight - 6);
+    }
+
+    setEditEmojiPickerPosition({ top, left });
+  }
+
+  function toggleEditEmojiPicker() {
+    setEditEmojiPickerOpen((open) => {
+      const next = !open;
+      if (next) measureEditEmojiPickerPosition();
+      return next;
+    });
+  }
+
   function openNote(noteId) {
     setViewingId(noteId);
     setEditingId(null);
+    setCreateEmojiPickerOpen(false);
+    setEditEmojiPickerOpen(false);
+    setAutoSaveState("idle");
+    setLastAutoSavedAt(null);
+  }
+
+  function presenceDocId(noteId, username) {
+    const safeUser = encodeURIComponent(
+      String(username || "viewer").trim().toLowerCase() || "viewer",
+    );
+    return `${noteId}__${safeUser}`;
   }
 
   function updateMetaParticipantSelection(setter, field, memberId, checked) {
@@ -646,8 +809,10 @@ export default function MeetingNotesPage() {
         : fallbackProjectTeamIds;
     setEditingId(note.id);
     setViewingId(note.id);
+    setEditEmojiPickerOpen(false);
     setEditContent(note?.data?.content || "");
     setEditMeta({
+      emoji: normalizeNoteEmoji(note?.data?.emoji),
       title: note?.data?.title || "",
       noteDate: formatDateInputValue(note?.data?.createdAt || Date.now()),
       linkUrl: note?.data?.linkUrl || "",
@@ -669,6 +834,7 @@ export default function MeetingNotesPage() {
 
   async function handleCreateNote() {
     if (!newTitle.trim()) return;
+    const emoji = normalizeNoteEmoji(newEmoji);
     const scopeType = normalizeScopeType(newScopeType);
     const normalizedLinkUrl = normalizeExternalUrl(newLinkUrl);
     const isLinkOnly = Boolean(normalizedLinkUrl);
@@ -680,6 +846,7 @@ export default function MeetingNotesPage() {
     const now = Date.now();
     try {
       await createDocument("meetingNotes", {
+        emoji: emoji || null,
         title: newTitle.trim(),
         linkUrl: normalizedLinkUrl || null,
         content: normalizedLinkUrl
@@ -707,6 +874,8 @@ export default function MeetingNotesPage() {
         updatedByUsername: authorUsername || null,
       });
       setNewTitle("");
+      setNewEmoji("");
+      setCreateEmojiPickerOpen(false);
       setNewLinkUrl("");
       setNewScopeType(NOTE_SCOPE_DATE);
       setNewProjectId("");
@@ -723,11 +892,16 @@ export default function MeetingNotesPage() {
   }
 
   async function handleSaveEdit(noteId) {
+    const saved = await saveNoteEdits(noteId, { closeEditor: true, source: "manual" });
+    if (saved) setAutoSaveState("saved");
+  }
+
+  function buildEditedPayload(noteId) {
     const note = notes.find((n) => n.id === noteId);
-    if (!note) return;
+    if (!note) return null;
 
     const title = editMeta.title.trim();
-    if (!title) return;
+    if (!title) return { invalid: true };
 
     const scopeType = normalizeScopeType(editMeta.scopeType);
     const normalizedLinkUrl = normalizeExternalUrl(editMeta.linkUrl);
@@ -740,9 +914,12 @@ export default function MeetingNotesPage() {
       .toLowerCase();
     const isLinkOnly =
       Boolean(normalizedLinkUrl) && !Boolean(String(editContent || "").trim());
-    try {
-      await replaceDocument("meetingNotes", noteId, {
+    return {
+      invalid: false,
+      isLinkOnly,
+      payload: {
         ...note.data,
+        emoji: normalizeNoteEmoji(editMeta.emoji) || null,
         title,
         createdAt: nextCreatedAt,
         linkUrl: normalizedLinkUrl || null,
@@ -766,13 +943,104 @@ export default function MeetingNotesPage() {
         updatedAt: Date.now(),
         updatedByUsername:
           editorUsername || note.data.updatedByUsername || null,
-      });
-      setEditingId(null);
-      if (isLinkOnly) setViewingId(null);
+      },
+    };
+  }
+
+  async function saveNoteEdits(
+    noteId,
+    { closeEditor = false, source = "manual" } = {},
+  ) {
+    const note = notes.find((n) => n.id === noteId);
+    if (!note) return false;
+
+    const built = buildEditedPayload(noteId);
+    if (!built || built.invalid) return false;
+
+    const hasChanged =
+      JSON.stringify({ ...note.data, updatedAt: undefined }) !==
+      JSON.stringify({ ...built.payload, updatedAt: undefined });
+    if (!hasChanged) {
+      if (source === "auto") setAutoSaveState("saved");
+      if (closeEditor) {
+        setEditingId(null);
+        if (built.isLinkOnly) setViewingId(null);
+      }
+      return true;
+    }
+
+    if (source === "auto") setAutoSaveState("saving");
+
+    try {
+      await updateDocument("meetingNotes", noteId, built.payload);
+      if (source === "auto") {
+        setAutoSaveState("saved");
+        setLastAutoSavedAt(Date.now());
+      }
+      if (closeEditor) {
+        setEditingId(null);
+        if (built.isLinkOnly) setViewingId(null);
+      }
+      return true;
     } catch (error) {
+      if (source === "auto") setAutoSaveState("error");
       console.error("Could not save note:", error);
+      return false;
     }
   }
+
+  useEffect(() => {
+    if (!editingId) return;
+    if (!editMeta.title.trim()) return;
+
+    const timer = window.setTimeout(() => {
+      saveNoteEdits(editingId, { closeEditor: false, source: "auto" });
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [editingId, editContent, editMeta, notes, currentUsername]);
+
+  useEffect(() => {
+    if (!firebaseReady || !editingId) return;
+
+    const username = String(currentUsername || "viewer")
+      .trim()
+      .toLowerCase() || "viewer";
+    const docId = presenceDocId(editingId, username);
+    let stopped = false;
+    let hasUpserted = false;
+
+    async function heartbeat() {
+      if (stopped) return;
+      try {
+        if (!hasUpserted) {
+          await replaceDocument("meetingNotePresence", docId, {
+            noteId: editingId,
+            username,
+            lastSeen: Date.now(),
+          });
+          hasUpserted = true;
+        } else {
+          await updateDocument("meetingNotePresence", docId, {
+            lastSeen: Date.now(),
+          });
+        }
+      } catch {
+        // Ignore transient presence update failures.
+      }
+    }
+
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 3000);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      deleteDocument("meetingNotePresence", docId).catch(() => {});
+    };
+  }, [editingId, currentUsername]);
 
   async function handleDeleteNote(noteId, noteTitle) {
     setDeleteTarget({
@@ -1003,6 +1271,7 @@ export default function MeetingNotesPage() {
             const isLinkShortcut = isLinkOnlyNote(note?.data);
             const shortcutHref = normalizeExternalUrl(note?.data?.linkUrl);
             const shortcutLabel = formatLinkLabel(note?.data?.linkUrl);
+            const noteEmoji = normalizeNoteEmoji(note?.data?.emoji);
 
             return (
               <li
@@ -1043,6 +1312,11 @@ export default function MeetingNotesPage() {
                     : note.data.title || "Untitled"
                 }
               >
+                {noteEmoji && !isLinkShortcut && (
+                  <div className="note-item-emoji" aria-hidden="true">
+                    {noteEmoji}
+                  </div>
+                )}
                 <div className="note-row">
                   <div className="note-content-col">
                     {!isLinkShortcut ? (
@@ -1150,6 +1424,37 @@ export default function MeetingNotesPage() {
     () => notes.find((note) => note.id === viewingId) || null,
     [notes, viewingId],
   );
+  const activeEditors = useMemo(() => {
+    if (!activeNote?.id) return [];
+    const now = Date.now();
+    const self = String(currentUsername || "")
+      .trim()
+      .toLowerCase();
+    return notePresenceRows
+      .map((row) => ({ id: row.id, ...row.data }))
+      .filter((row) => row.noteId === activeNote.id)
+      .filter((row) => now - Number(row.lastSeen || 0) < 12000)
+      .filter((row) => {
+        const username = String(row.username || "")
+          .trim()
+          .toLowerCase();
+        return username && username !== self;
+      });
+  }, [activeNote, notePresenceRows, currentUsername]);
+
+  const autoSaveLabel = useMemo(() => {
+    if (autoSaveState === "saving") return "Saving...";
+    if (autoSaveState === "error") return "Autosave failed";
+    if (autoSaveState === "saved" && lastAutoSavedAt) {
+      return `Saved ${new Date(lastAutoSavedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}`;
+    }
+    return "Autosave on";
+  }, [autoSaveState, lastAutoSavedAt]);
+
+  const filteredTasks = useMemo(
+    () => tasks.filter((task) => task?.data?.type === "memberTodo"),
+    [tasks],
+  );
   const activeNoteIsLinkOnly = isLinkOnlyNote(activeNote?.data);
   const editIsLinkOnly =
     Boolean(normalizeExternalUrl(editMeta.linkUrl)) &&
@@ -1209,6 +1514,33 @@ export default function MeetingNotesPage() {
         bodyClassName="note-create-area"
       >
         <div className="note-create-row">
+          <div className="note-emoji-picker" title="Note emoji">
+            <span className="note-emoji-picker-label">Emoji</span>
+            <button
+              type="button"
+              className="note-emoji-picker-trigger"
+              onClick={() => setCreateEmojiPickerOpen((open) => !open)}
+              aria-label="Pick note emoji"
+            >
+              {normalizeNoteEmoji(newEmoji) || "📝"}
+            </button>
+            {createEmojiPickerOpen && (
+              <div className="note-emoji-picker-popover">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => {
+                    setNewEmoji(normalizeNoteEmoji(emojiData.emoji));
+                    setCreateEmojiPickerOpen(false);
+                  }}
+                  lazyLoadEmojis
+                  previewConfig={{ showPreview: false }}
+                  searchDisabled={false}
+                  skinTonesDisabled
+                  width={300}
+                  height={360}
+                />
+              </div>
+            )}
+          </div>
           <InputField
             type="text"
             placeholder="New note title…"
@@ -1331,15 +1663,28 @@ export default function MeetingNotesPage() {
         <ModalShell
           title={editingId === activeNote.id ? "Edit note" : "Note details"}
           size="lg"
-          className={editingId === activeNote.id ? "" : "note-detail-modal"}
+          className="note-detail-modal"
           onClose={() => {
             setViewingId(null);
             setEditingId(null);
+            setEditEmojiPickerOpen(false);
           }}
         >
           {editingId === activeNote.id || activeNoteIsLinkOnly ? (
             <div className="note-editor-row">
               <div className="note-editor-meta">
+                {activeEditors.length > 0 && (
+                  <div className="note-live-editing">
+                    {activeEditors.map((editor) => (
+                      <span
+                        key={`editor-${editor.id}`}
+                        className="note-live-editing-chip"
+                      >
+                        {String(editor.username || "Someone")} is editing
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <label className="note-meta-field note-meta-field--wide">
                   <span>Title</span>
                   <InputField
@@ -1350,6 +1695,19 @@ export default function MeetingNotesPage() {
                       updateEditMeta("title", event.target.value)
                     }
                   />
+                </label>
+
+                <label className="note-meta-field">
+                  <span>Emoji</span>
+                  <button
+                    ref={editEmojiTriggerRef}
+                    type="button"
+                    className="note-emoji-picker-trigger note-emoji-picker-trigger--edit"
+                    onClick={toggleEditEmojiPicker}
+                    aria-label="Pick note emoji"
+                  >
+                    {normalizeNoteEmoji(editMeta.emoji) || "📝"}
+                  </button>
                 </label>
 
                 <label className="note-meta-field">
@@ -1439,7 +1797,7 @@ export default function MeetingNotesPage() {
                 onChange={setEditContent}
                 members={members}
                 projects={projects}
-                tasks={tasks}
+                tasks={filteredTasks}
                 resources={resources}
                 notes={notes}
                 currentNoteId={activeNote.id}
@@ -1448,6 +1806,7 @@ export default function MeetingNotesPage() {
                 }
               />
               <div className="note-editor-actions">
+                <span className="note-autosave-status">{autoSaveLabel}</span>
                 <Button
                   onClick={() => handleSaveEdit(activeNote.id)}
                   disabled={!editMeta.title.trim()}
@@ -1458,6 +1817,7 @@ export default function MeetingNotesPage() {
                   variant="ghost"
                   onClick={() => {
                     setEditingId(null);
+                    setEditEmojiPickerOpen(false);
                     if (activeNoteIsLinkOnly) setViewingId(null);
                   }}
                 >
@@ -1470,21 +1830,23 @@ export default function MeetingNotesPage() {
               <div className="note-preview-header">
                 <div className="note-preview-title-block">
                   <h3 className="note-preview-title">
+                    {normalizeNoteEmoji(activeNote?.data?.emoji) && (
+                      <span className="note-title-emoji" aria-hidden="true">
+                        {normalizeNoteEmoji(activeNote?.data?.emoji)}
+                      </span>
+                    )}
                     {formatDateInTitle(activeNote?.data?.createdAt)} ·{" "}
                     {activeNote?.data?.title || "Untitled"}
                   </h3>
                   <p className="note-preview-updated">
-                    {`Created by ${formatAuditUser(activeNote?.data?.createdByUsername)} · ${formatAuditTimestamp(activeNote?.data?.createdAt)}`}
+                    {`Created by ${formatAuditUser(activeNote?.data?.createdByUsername, activeNote?.data?.updatedByUsername || currentUsername)} · ${formatAuditTimestamp(activeNote?.data?.createdAt)}`}
                   </p>
                   <p className="note-preview-updated">
-                    {`Last edited by ${formatAuditUser(activeNote?.data?.updatedByUsername || activeNote?.data?.createdByUsername)} · ${formatAuditTimestamp(activeNote?.data?.updatedAt || activeNote?.data?.createdAt)}`}
+                    {`Last edited by ${formatAuditUser(activeNote?.data?.updatedByUsername || activeNote?.data?.createdByUsername, currentUsername)} · ${formatAuditTimestamp(activeNote?.data?.updatedAt || activeNote?.data?.createdAt)}`}
                   </p>
                 </div>
                 <div className="note-editor-actions note-editor-actions--preview">
                   <Button onClick={() => startEditing(activeNote)}>Edit</Button>
-                  <Button variant="ghost" onClick={() => setViewingId(null)}>
-                    Close
-                  </Button>
                 </div>
               </div>
 
@@ -1541,12 +1903,52 @@ export default function MeetingNotesPage() {
         </ModalShell>
       )}
 
+      {editEmojiPickerOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={editEmojiPopoverRef}
+            className="note-emoji-picker-popover note-emoji-picker-popover--portal"
+            style={{
+              top: `${editEmojiPickerPosition.top}px`,
+              left: `${editEmojiPickerPosition.left}px`,
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <EmojiPicker
+              onEmojiClick={(emojiData) => {
+                updateEditMeta("emoji", normalizeNoteEmoji(emojiData.emoji));
+                setEditEmojiPickerOpen(false);
+              }}
+              lazyLoadEmojis
+              previewConfig={{ showPreview: false }}
+              searchDisabled={false}
+              skinTonesDisabled
+              width={300}
+              height={360}
+            />
+          </div>,
+          document.body,
+        )}
+
       {deleteTarget && (
         <DeleteConfirmDialog
           label={deleteTarget.label}
           onConfirm={deleteTarget.onConfirm}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+
+      {notes.length >= notesLimit && (
+        <div className="notes-load-more-row">
+          <Button
+            variant="ghost"
+            onClick={() => setNotesLimit((prev) => prev + 80)}
+          >
+            Load more notes
+          </Button>
+        </div>
       )}
     </TabPage>
   );

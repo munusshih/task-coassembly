@@ -831,7 +831,7 @@ function ArchiveSection({ archivedTodos, projects, onUnarchiveAll }) {
                   {monday ? weekLabel(monday) : "Unknown week"}
                 </span>
                 <span className="archive-week-total">
-                  {count} task{count !== 1 ? "s" : ""} ·{" "}
+                  {count} task{count !== 1 ? "s" : ""} ·{" total "}
                   {formatWeeklyTime(totalMin) || "0m"}
                 </span>
               </div>
