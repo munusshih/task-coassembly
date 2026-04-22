@@ -9,6 +9,7 @@
     "auth:hash": "node scripts/generate-auth-accounts.mjs"
   },
   "dependencies": {
+    "@tiptap/extension-code-block": "^3.22.4",
     "@tiptap/extension-mention": "^3.22.4",
     "@tiptap/extension-underline": "^3.22.4",
     "@tiptap/react": "^3.22.4",

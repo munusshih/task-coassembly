@@ -743,8 +743,9 @@ function TaskItem({
 
 // ─── Archive section ──────────────────────────────────────────────────────────────────
 
-function ArchiveSection({ archivedTodos, projects }) {
+function ArchiveSection({ archivedTodos, projects, onUnarchiveAll }) {
   const [open, setOpen] = useState(false);
+  const [confirmUnflush, setConfirmUnflush] = useState(false);
 
   // Group by week key (descending), then by projectId within each week
   const weekGroups = useMemo(() => {
@@ -783,13 +784,44 @@ function ArchiveSection({ archivedTodos, projects }) {
 
   return (
     <div className="archive-section">
-      <button
-        type="button"
-        className="archive-toggle"
-        onClick={() => setOpen((s) => !s)}
-      >
-        Archive ({archivedTodos.length}){open ? " ▲" : " ▼"}
-      </button>
+      <div className="archive-header-row">
+        <button
+          type="button"
+          className="archive-toggle"
+          onClick={() => setOpen((s) => !s)}
+        >
+          Archive ({archivedTodos.length}){open ? " ▲" : " ▼"}
+        </button>
+        {!confirmUnflush ? (
+          <button
+            type="button"
+            className="flush-btn flush-btn--danger"
+            onClick={() => setConfirmUnflush(true)}
+          >
+            Restore all
+          </button>
+        ) : (
+          <span className="archive-unflush-confirm">
+            <button
+              type="button"
+              className="flush-btn flush-btn--danger-confirm"
+              onClick={() => {
+                setConfirmUnflush(false);
+                onUnarchiveAll();
+              }}
+            >
+              Confirm restore
+            </button>
+            <button
+              type="button"
+              className="flush-btn"
+              onClick={() => setConfirmUnflush(false)}
+            >
+              Cancel
+            </button>
+          </span>
+        )}
+      </div>
       {open && (
         <div className="archive-body">
           {weekGroups.map(({ key, monday, byProject, totalMin, count }) => (
@@ -985,7 +1017,6 @@ function ProjectGroupCard({
             autoFocus
             onChange={(e) => setAddTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
               if (e.key === "Escape") {
                 setAddOpen(false);
                 setAddTitle("");
@@ -1043,6 +1074,7 @@ function MemberCard({
   onSaveEdit,
   onDelete,
   onArchiveAll,
+  onUnarchiveAll,
   onOvertimeSave,
   onProjectRemaining,
   selectedWeek,
@@ -1573,7 +1605,11 @@ function MemberCard({
               </div>
             )}
             <div className="member-archive-controls-row">
-              <ArchiveSection archivedTodos={archivedTodos} projects={projects} />
+              <ArchiveSection
+                archivedTodos={archivedTodos}
+                projects={projects}
+                onUnarchiveAll={() => onUnarchiveAll(member.id)}
+              />
             </div>
           </div>
         </div>
@@ -1825,7 +1861,7 @@ export default function MembersPage() {
 
   async function handleArchiveAll(memberId) {
     const tasks = (tasksByMember[memberId] || []).filter(
-      (t) => !t.data.archived,
+      (t) => !t.data.archived && t.data.completed,
     );
     if (!tasks.length) return;
     const now = Date.now();
@@ -1839,9 +1875,30 @@ export default function MembersPage() {
           }),
         ),
       );
-      addToast("Flushed to archive");
+      addToast("Flushed completed tasks to archive");
     } catch (e) {
       addToast(e.message || "Could not archive", true);
+    }
+  }
+
+  async function handleUnarchiveAll(memberId) {
+    const tasks = (tasksByMember[memberId] || []).filter(
+      (t) => t.data.archived,
+    );
+    if (!tasks.length) return;
+    try {
+      await Promise.all(
+        tasks.map((t) =>
+          replaceDocument("tasks", t.id, {
+            ...t.data,
+            archived: false,
+            archivedAt: null,
+          }),
+        ),
+      );
+      addToast("Restored all archived tasks");
+    } catch (e) {
+      addToast(e.message || "Could not restore", true);
     }
   }
 
@@ -2001,6 +2058,7 @@ export default function MembersPage() {
                     onSaveEdit={handleSaveEdit}
                     onDelete={handleDelete}
                     onArchiveAll={handleArchiveAll}
+                    onUnarchiveAll={handleUnarchiveAll}
                     onOvertimeSave={handleOvertimeSave}
                     onProjectRemaining={projectRemainingHint}
                     selectedWeek={selectedWeek}

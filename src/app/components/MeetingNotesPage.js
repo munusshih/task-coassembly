@@ -43,11 +43,13 @@ const ROLE_FIELDS = [
 ];
 
 const BOOK_PALETTE = [
-  { spine: "#b98f6f", cover: "#f3e6d8" },
-  { spine: "#b08f82", cover: "#f2e3dc" },
-  { spine: "#9f9b7d", cover: "#ece9d7" },
-  { spine: "#a9968a", cover: "#efe4d9" },
-  { spine: "#b7a27a", cover: "#f3ead8" },
+  { spine: "#b98f6f", cover: "#f3e6d8", ink: "#5f4330" },
+  { spine: "#b08f82", cover: "#f2e3dc", ink: "#5a3d3d" },
+  { spine: "#9f9b7d", cover: "#ece9d7", ink: "#48553c" },
+  { spine: "#a9968a", cover: "#efe4d9", ink: "#4f465d" },
+  { spine: "#b7a27a", cover: "#f3ead8", ink: "#5f4f2a" },
+  { spine: "#8e9eb2", cover: "#e7edf5", ink: "#2d486a" },
+  { spine: "#8da88a", cover: "#e8f0e6", ink: "#2f5a35" },
 ];
 
 function hashText(value) {
@@ -61,10 +63,21 @@ function hashText(value) {
 }
 
 function getNoteBookStyle(noteId) {
-  const palette = BOOK_PALETTE[hashText(noteId) % BOOK_PALETTE.length];
+  const hash = hashText(noteId);
+  const palette = BOOK_PALETTE[hash % BOOK_PALETTE.length];
+  const patternIndex = hash % 6;
   return {
-    "--book-spine": palette.spine,
-    "--book-cover": palette.cover,
+    style: {
+      "--book-spine": palette.spine,
+      "--book-cover": palette.cover,
+      "--book-ink": palette.ink,
+      "--book-height": `${156 + (hash % 34)}px`,
+      "--book-tilt": `${(hash % 7) - 3}deg`,
+      "--book-band-top": `${12 + (hash % 48)}%`,
+      "--book-band-opacity": `${0.13 + ((hash >> 3) % 6) * 0.03}`,
+      "--book-grain-opacity": `${0.06 + ((hash >> 5) % 4) * 0.03}`,
+    },
+    patternClass: `note-item--pattern-${patternIndex}`,
   };
 }
 
@@ -87,6 +100,30 @@ function buildStarterNoteContent(title, scopeType, projectName) {
 
 function normalizeScopeType(raw) {
   return raw === NOTE_SCOPE_PROJECT ? NOTE_SCOPE_PROJECT : NOTE_SCOPE_DATE;
+}
+
+function normalizeExternalUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function formatLinkLabel(rawUrl) {
+  const normalized = normalizeExternalUrl(rawUrl);
+  if (!normalized) return "";
+  try {
+    const parsed = new URL(normalized);
+    return parsed.hostname.replace(/^www\./i, "") || normalized;
+  } catch {
+    return normalized;
+  }
+}
+
+function isLinkOnlyNote(noteData) {
+  const hasLink = Boolean(normalizeExternalUrl(noteData?.linkUrl));
+  const hasContent = Boolean(String(noteData?.content || "").trim());
+  return hasLink && !hasContent;
 }
 
 function emptyRoleAssignments() {
@@ -116,6 +153,8 @@ function normalizeRoleAssignments(data) {
 function emptyEditMeta() {
   return {
     title: "",
+    noteDate: "",
+    linkUrl: "",
     scopeType: NOTE_SCOPE_DATE,
     projectId: "",
     ...emptyRoleAssignments(),
@@ -187,6 +226,7 @@ function getProjectTeamMemberIds(projectId, projects) {
 export default function MeetingNotesPage() {
   const [notes, setNotes] = useState([]);
   const [newTitle, setNewTitle] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newScopeType, setNewScopeType] = useState(NOTE_SCOPE_DATE);
   const [newProjectId, setNewProjectId] = useState("");
   const [newRoles, setNewRoles] = useState(() => emptyRoleAssignments());
@@ -200,6 +240,7 @@ export default function MeetingNotesPage() {
   const [groupMode, setGroupMode] = useState("date");
   const [notesLayout, setNotesLayout] = useState("grid");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [currentUsername, setCurrentUsername] = useState("");
 
   const [members, setMembers] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -229,6 +270,30 @@ export default function MeetingNotesPage() {
       u2();
       u3();
       u4();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (cancelled) return;
+        const username = String(payload?.username || "")
+          .trim()
+          .toLowerCase();
+        if (username) setCurrentUsername(username);
+      } catch {
+        // Metadata should still render even when session lookup fails.
+      }
+    }
+
+    loadSession();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -304,6 +369,9 @@ export default function MeetingNotesPage() {
       .filter((note) => {
         const title = (note?.data?.title || "").toLowerCase();
         const content = (note?.data?.content || "").toLowerCase();
+        const linkUrl = normalizeExternalUrl(
+          note?.data?.linkUrl || "",
+        ).toLowerCase();
         const scopeType = normalizeScopeType(note?.data?.scopeType);
         const scopeLabel =
           scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based";
@@ -314,17 +382,21 @@ export default function MeetingNotesPage() {
           (memberNameById[note?.data?.[field.key]] || "").toLowerCase(),
         ).join(" ");
 
-        const haystack = `${title} ${content} ${scopeLabel} ${projectName} ${roleNames}`;
+        const haystack = `${title} ${content} ${linkUrl} ${scopeLabel} ${projectName} ${roleNames}`;
         return haystack.includes(query);
       })
       .map((note) => {
         const title = (note?.data?.title || "").toLowerCase();
         const content = (note?.data?.content || "").toLowerCase();
+        const linkUrl = normalizeExternalUrl(
+          note?.data?.linkUrl || "",
+        ).toLowerCase();
         const projectName = note?.data?.projectId
           ? (projectNameById[note.data.projectId] || "").toLowerCase()
           : "";
         let matchType = "content";
         if (title.includes(query)) matchType = "title";
+        else if (linkUrl.includes(query)) matchType = "link";
         else if (projectName.includes(query)) matchType = "project";
         return { ...note, matchType };
       });
@@ -423,6 +495,44 @@ export default function MeetingNotesPage() {
     const day = String(date.getDate()).padStart(2, "0");
     const year = String(date.getFullYear()).slice(-2);
     return `${month}${day}${year}`;
+  }
+
+  function formatDateInputValue(ts) {
+    const date = new Date(Number(ts || 0));
+    if (Number.isNaN(date.getTime())) return "";
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function parseDateInputToTimestamp(inputValue, fallbackTs) {
+    const raw = String(inputValue || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return Number(fallbackTs || Date.now());
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const next = new Date(year, month - 1, day);
+    if (Number.isNaN(next.getTime())) return Number(fallbackTs || Date.now());
+    return next.getTime();
+  }
+
+  function formatAuditTimestamp(ts) {
+    const date = new Date(Number(ts || 0));
+    if (Number.isNaN(date.getTime())) return "Unknown time";
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  function formatAuditUser(username) {
+    const value = String(username || "").trim();
+    return value || "Unknown";
   }
 
   function formatUpdatedTime(ts) {
@@ -539,6 +649,8 @@ export default function MeetingNotesPage() {
     setEditContent(note?.data?.content || "");
     setEditMeta({
       title: note?.data?.title || "",
+      noteDate: formatDateInputValue(note?.data?.createdAt || Date.now()),
+      linkUrl: note?.data?.linkUrl || "",
       scopeType: normalizeScopeType(note?.data?.scopeType),
       projectId: note?.data?.projectId || "",
       facilitatorId:
@@ -558,36 +670,44 @@ export default function MeetingNotesPage() {
   async function handleCreateNote() {
     if (!newTitle.trim()) return;
     const scopeType = normalizeScopeType(newScopeType);
+    const normalizedLinkUrl = normalizeExternalUrl(newLinkUrl);
+    const isLinkOnly = Boolean(normalizedLinkUrl);
     const projectName =
       scopeType === NOTE_SCOPE_PROJECT ? projectLabel(newProjectId || "") : "";
+    const authorUsername = String(currentUsername || "")
+      .trim()
+      .toLowerCase();
+    const now = Date.now();
     try {
       await createDocument("meetingNotes", {
         title: newTitle.trim(),
-        content: buildStarterNoteContent(
-          newTitle.trim(),
-          scopeType,
-          projectName,
-        ),
+        linkUrl: normalizedLinkUrl || null,
+        content: normalizedLinkUrl
+          ? ""
+          : buildStarterNoteContent(newTitle.trim(), scopeType, projectName),
         scopeType,
         projectId:
           scopeType === NOTE_SCOPE_PROJECT ? newProjectId || null : null,
-        facilitatorId: newRoles.facilitatorId || null,
-        timekeeperId: newRoles.timekeeperId || null,
-        notetakerId: newRoles.notetakerId || null,
+        facilitatorId: isLinkOnly ? null : newRoles.facilitatorId || null,
+        timekeeperId: isLinkOnly ? null : newRoles.timekeeperId || null,
+        notetakerId: isLinkOnly ? null : newRoles.notetakerId || null,
         meetingParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT
+          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
             ? normalizeIdList(newRoles.meetingParticipantIds)
             : [],
         absentParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT
+          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
             ? normalizeIdList(newRoles.absentParticipantIds).filter((id) =>
                 normalizeIdList(newRoles.meetingParticipantIds).includes(id),
               )
             : [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+        createdByUsername: authorUsername || null,
+        updatedByUsername: authorUsername || null,
       });
       setNewTitle("");
+      setNewLinkUrl("");
       setNewScopeType(NOTE_SCOPE_DATE);
       setNewProjectId("");
       setNewRoles({
@@ -610,30 +730,45 @@ export default function MeetingNotesPage() {
     if (!title) return;
 
     const scopeType = normalizeScopeType(editMeta.scopeType);
+    const normalizedLinkUrl = normalizeExternalUrl(editMeta.linkUrl);
+    const nextCreatedAt = parseDateInputToTimestamp(
+      editMeta.noteDate,
+      note.data.createdAt,
+    );
+    const editorUsername = String(currentUsername || "")
+      .trim()
+      .toLowerCase();
+    const isLinkOnly =
+      Boolean(normalizedLinkUrl) && !Boolean(String(editContent || "").trim());
     try {
       await replaceDocument("meetingNotes", noteId, {
         ...note.data,
         title,
+        createdAt: nextCreatedAt,
+        linkUrl: normalizedLinkUrl || null,
         content: editContent,
         scopeType,
         projectId:
           scopeType === NOTE_SCOPE_PROJECT ? editMeta.projectId || null : null,
-        facilitatorId: editMeta.facilitatorId || null,
-        timekeeperId: editMeta.timekeeperId || null,
-        notetakerId: editMeta.notetakerId || null,
+        facilitatorId: isLinkOnly ? null : editMeta.facilitatorId || null,
+        timekeeperId: isLinkOnly ? null : editMeta.timekeeperId || null,
+        notetakerId: isLinkOnly ? null : editMeta.notetakerId || null,
         meetingParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT
+          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
             ? normalizeIdList(editMeta.meetingParticipantIds)
             : [],
         absentParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT
+          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
             ? normalizeIdList(editMeta.absentParticipantIds).filter((id) =>
                 normalizeIdList(editMeta.meetingParticipantIds).includes(id),
               )
             : [],
         updatedAt: Date.now(),
+        updatedByUsername:
+          editorUsername || note.data.updatedByUsername || null,
       });
       setEditingId(null);
+      if (isLinkOnly) setViewingId(null);
     } catch (error) {
       console.error("Could not save note:", error);
     }
@@ -864,59 +999,104 @@ export default function MeetingNotesPage() {
           {notesList.map((note) => {
             const scopeType = normalizeScopeType(note?.data?.scopeType);
             const projectId = note?.data?.projectId || "";
-            const isOpen = viewingId === note.id;
+            const bookStyle = getNoteBookStyle(note.id);
+            const isLinkShortcut = isLinkOnlyNote(note?.data);
+            const shortcutHref = normalizeExternalUrl(note?.data?.linkUrl);
+            const shortcutLabel = formatLinkLabel(note?.data?.linkUrl);
 
             return (
               <li
                 key={note.id}
-                className="note-item"
-                style={getNoteBookStyle(note.id)}
-                onClick={() => openNote(note.id)}
+                className={`note-item ${bookStyle.patternClass}${isLinkShortcut ? " note-item--link-shortcut" : ""}`}
+                style={bookStyle.style}
+                onClick={() => {
+                  if (isLinkShortcut && shortcutHref) {
+                    window.open(shortcutHref, "_blank", "noopener,noreferrer");
+                    return;
+                  }
+                  openNote(note.id);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
+                    if (isLinkShortcut && shortcutHref) {
+                      window.open(
+                        shortcutHref,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                      return;
+                    }
                     openNote(note.id);
                   }
                 }}
                 tabIndex={0}
                 role="button"
-                aria-label={`Open note ${note.data.title || "Untitled"}`}
+                aria-label={
+                  isLinkShortcut
+                    ? `Open linked page ${note.data.title || shortcutLabel || "Untitled"}`
+                    : `Open note ${note.data.title || "Untitled"}`
+                }
+                title={
+                  isLinkShortcut
+                    ? `Open ${shortcutLabel || note.data.title || "linked page"}`
+                    : note.data.title || "Untitled"
+                }
               >
                 <div className="note-row">
                   <div className="note-content-col">
-                    <span className="note-title">
-                      {formatDateInTitle(note.data.createdAt)} ·{" "}
-                      {note.data.title || "Untitled"}
-                      {searchQuery && note.matchType && (
-                        <span className="match-indicator">
-                          (matched in {note.matchType})
+                    {!isLinkShortcut ? (
+                      <>
+                        <span className="note-title">
+                          {formatDateInTitle(note.data.createdAt)} ·{" "}
+                          {note.data.title || "Untitled"}
+                          {searchQuery && note.matchType && (
+                            <span className="match-indicator">
+                              (matched in {note.matchType})
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
 
-                    <div className="note-meta-line">
-                      <span className="note-scope-chip">
-                        {scopeType === NOTE_SCOPE_PROJECT
-                          ? "project-based"
-                          : "date-based"}
-                      </span>
-                      {scopeType === NOTE_SCOPE_PROJECT && (
-                        <span className="note-project-chip">
-                          {projectLabel(projectId)}
-                        </span>
-                      )}
-                    </div>
+                        {!!note?.data?.linkUrl && (
+                          <div className="note-meta-line">
+                            <span className="note-link-chip">
+                              Linked doc: {formatLinkLabel(note.data.linkUrl)}
+                            </span>
+                          </div>
+                        )}
 
-                    <div className="note-role-line">
-                      {renderRoleSummary(note?.data)}
-                    </div>
-
-                    {note.data.updatedAt &&
-                      note.data.updatedAt !== note.data.createdAt && (
-                        <span className="note-updated">
-                          Updated {formatUpdatedTime(note.data.updatedAt)}
-                        </span>
-                      )}
+                        {note.data.updatedAt &&
+                          note.data.updatedAt !== note.data.createdAt && (
+                            <span className="note-updated">
+                              Updated {formatUpdatedTime(note.data.updatedAt)}
+                            </span>
+                          )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="note-link-shortcut-head">
+                          <span
+                            className="note-link-shortcut-icon"
+                            aria-hidden="true"
+                          >
+                            ↗
+                          </span>
+                          <span className="note-title note-title--shortcut">
+                            {note.data.title || "Untitled"}
+                          </span>
+                        </div>
+                        <div className="note-meta-line">
+                          <span className="note-link-chip">
+                            Linked doc: {shortcutLabel || "external link"}
+                          </span>
+                          {scopeType === NOTE_SCOPE_PROJECT && (
+                            <span className="note-project-chip">
+                              {projectLabel(projectId)}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="note-actions-row">
@@ -970,6 +1150,10 @@ export default function MeetingNotesPage() {
     () => notes.find((note) => note.id === viewingId) || null,
     [notes, viewingId],
   );
+  const activeNoteIsLinkOnly = isLinkOnlyNote(activeNote?.data);
+  const editIsLinkOnly =
+    Boolean(normalizeExternalUrl(editMeta.linkUrl)) &&
+    !Boolean(String(editContent || "").trim());
 
   const groupingOptions = [
     {
@@ -1030,10 +1214,14 @@ export default function MeetingNotesPage() {
             placeholder="New note title…"
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") handleCreateNote();
-            }}
             className="new-note-input"
+          />
+          <InputField
+            type="url"
+            placeholder="Link URL (optional)"
+            value={newLinkUrl}
+            onChange={(event) => setNewLinkUrl(event.target.value)}
+            className="note-meta-input"
           />
           <SelectField
             className="note-meta-input"
@@ -1089,28 +1277,30 @@ export default function MeetingNotesPage() {
           </Button>
         </div>
 
-        <details className="note-roles-disclosure">
-          <summary className="note-roles-summary">
-            <span className="note-roles-summary-label">
-              Roles
-              {(newRoles.facilitatorId ||
-                newRoles.timekeeperId ||
-                newRoles.notetakerId) && (
-                <span className="note-roles-summary-chips">
-                  {ROLE_FIELDS.filter((f) => newRoles[f.key]).map((f) => (
-                    <span key={f.key} className="note-role-pill">
-                      {f.label.slice(0, 3)}:{" "}
-                      {memberNameById[newRoles[f.key]] || "…"}
-                    </span>
-                  ))}
-                </span>
-              )}
-            </span>
-          </summary>
-          <div className="note-roles-body">
-            {renderRoleSelectors(newRoles, updateNewRole)}
-          </div>
-        </details>
+        {!newLinkUrl.trim() && (
+          <details className="note-roles-disclosure">
+            <summary className="note-roles-summary">
+              <span className="note-roles-summary-label">
+                Roles
+                {(newRoles.facilitatorId ||
+                  newRoles.timekeeperId ||
+                  newRoles.notetakerId) && (
+                  <span className="note-roles-summary-chips">
+                    {ROLE_FIELDS.filter((f) => newRoles[f.key]).map((f) => (
+                      <span key={f.key} className="note-role-pill">
+                        {f.label.slice(0, 3)}:{" "}
+                        {memberNameById[newRoles[f.key]] || "…"}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </span>
+            </summary>
+            <div className="note-roles-body">
+              {renderRoleSelectors(newRoles, updateNewRole)}
+            </div>
+          </details>
+        )}
       </SectionBlock>
 
       <CollectionLayout variant="list" className="notes-sections">
@@ -1147,7 +1337,7 @@ export default function MeetingNotesPage() {
             setEditingId(null);
           }}
         >
-          {editingId === activeNote.id ? (
+          {editingId === activeNote.id || activeNoteIsLinkOnly ? (
             <div className="note-editor-row">
               <div className="note-editor-meta">
                 <label className="note-meta-field note-meta-field--wide">
@@ -1158,6 +1348,31 @@ export default function MeetingNotesPage() {
                     value={editMeta.title}
                     onChange={(event) =>
                       updateEditMeta("title", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="note-meta-field">
+                  <span>Date</span>
+                  <InputField
+                    type="date"
+                    className="note-meta-input"
+                    value={editMeta.noteDate}
+                    onChange={(event) =>
+                      updateEditMeta("noteDate", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="note-meta-field note-meta-field--wide">
+                  <span>Link URL (optional)</span>
+                  <InputField
+                    type="url"
+                    className="note-meta-input"
+                    placeholder="https://..."
+                    value={editMeta.linkUrl}
+                    onChange={(event) =>
+                      updateEditMeta("linkUrl", event.target.value)
                     }
                   />
                 </label>
@@ -1215,7 +1430,8 @@ export default function MeetingNotesPage() {
                   </label>
                 )}
 
-                {renderRoleSelectors(editMeta, updateEditMeta)}
+                {!editIsLinkOnly &&
+                  renderRoleSelectors(editMeta, updateEditMeta)}
               </div>
 
               <RichEditor
@@ -1238,7 +1454,13 @@ export default function MeetingNotesPage() {
                 >
                   Save
                 </Button>
-                <Button variant="ghost" onClick={() => setEditingId(null)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingId(null);
+                    if (activeNoteIsLinkOnly) setViewingId(null);
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
@@ -1252,16 +1474,10 @@ export default function MeetingNotesPage() {
                     {activeNote?.data?.title || "Untitled"}
                   </h3>
                   <p className="note-preview-updated">
-                    {activeNote?.data?.updatedAt
-                      ? `Updated ${new Date(
-                          Number(activeNote.data.updatedAt),
-                        ).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}`
-                      : ""}
+                    {`Created by ${formatAuditUser(activeNote?.data?.createdByUsername)} · ${formatAuditTimestamp(activeNote?.data?.createdAt)}`}
+                  </p>
+                  <p className="note-preview-updated">
+                    {`Last edited by ${formatAuditUser(activeNote?.data?.updatedByUsername || activeNote?.data?.createdByUsername)} · ${formatAuditTimestamp(activeNote?.data?.updatedAt || activeNote?.data?.createdAt)}`}
                   </p>
                 </div>
                 <div className="note-editor-actions note-editor-actions--preview">
@@ -1280,6 +1496,18 @@ export default function MeetingNotesPage() {
                       ? "project-based"
                       : "date-based"}
                   </span>
+                  {!!activeNote?.data?.linkUrl && (
+                    <a
+                      className="note-linked-doc"
+                      href={normalizeExternalUrl(activeNote.data.linkUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Open linked doc (
+                      {formatLinkLabel(activeNote.data.linkUrl)})
+                    </a>
+                  )}
                   {normalizeScopeType(activeNote?.data?.scopeType) ===
                     NOTE_SCOPE_PROJECT && (
                     <span className="note-project-chip">
@@ -1289,10 +1517,11 @@ export default function MeetingNotesPage() {
                 </div>
 
                 <div className="note-role-line">
-                  {renderRoleSummary(activeNote?.data)}
+                  {!activeNoteIsLinkOnly && renderRoleSummary(activeNote?.data)}
                 </div>
 
-                {renderMeetingAttendanceDetail(activeNote?.data)}
+                {!activeNoteIsLinkOnly &&
+                  renderMeetingAttendanceDetail(activeNote?.data)}
               </div>
 
               {activeNote?.data?.content ? (
@@ -1302,7 +1531,9 @@ export default function MeetingNotesPage() {
                 />
               ) : (
                 <p className="note-empty">
-                  No content yet. Click Edit to add content.
+                  {activeNote?.data?.linkUrl
+                    ? "This note links to an external document."
+                    : "No content yet. Click Edit to add content."}
                 </p>
               )}
             </div>

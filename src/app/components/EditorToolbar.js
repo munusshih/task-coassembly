@@ -1,6 +1,12 @@
 "use client";
 
-export default function EditorToolbar({ editor, showDateObjectButton = false, onInsertDateObject }) {
+export default function EditorToolbar({
+  editor,
+  showDateObjectButton = false,
+  onInsertDateObject,
+  onInsertCodeBlock,
+  onInsertIframe,
+}) {
   if (!editor) return null;
 
   const ButtonGroup = ({ children }) => (
@@ -46,34 +52,51 @@ export default function EditorToolbar({ editor, showDateObjectButton = false, on
           icon="H1"
           label="Heading 1"
           active={editor.isActive("heading", { level: 1 })}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
         />
         <ToolBtn
           icon="H2"
           label="Heading 2"
           active={editor.isActive("heading", { level: 2 })}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
         />
         <ToolBtn
           icon="H3"
           label="Heading 3"
           active={editor.isActive("heading", { level: 3 })}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
         />
       </ButtonGroup>
 
       <ButtonGroup>
         <ToolBtn
           icon="•"
-          title="Bullet List"
+          label="Bullet List"
           active={editor.isActive("bulletList")}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         />
         <ToolBtn
           icon="1."
-          title="Ordered List"
+          label="Ordered List"
           active={editor.isActive("orderedList")}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        />
+        <ToolBtn
+          icon="Code"
+          label="Insert code block"
+          active={editor.isActive("codeBlock")}
+          onClick={() => onInsertCodeBlock?.()}
+        />
+        <ToolBtn
+          icon="Frame"
+          label="Insert iframe"
+          onClick={() => onInsertIframe?.()}
         />
       </ButtonGroup>
 
@@ -87,12 +110,12 @@ export default function EditorToolbar({ editor, showDateObjectButton = false, on
         )}
         <ToolBtn
           icon="↶"
-          title="Undo"
+          label="Undo"
           onClick={() => editor.chain().focus().undo().run()}
         />
         <ToolBtn
           icon="↷"
-          title="Redo"
+          label="Redo"
           onClick={() => editor.chain().focus().redo().run()}
         />
       </ButtonGroup>

@@ -612,7 +612,6 @@ function ProjectSection({
             autoFocus
             onChange={(e) => setAddText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
               if (e.key === "Escape") {
                 setAddOpen(false);
                 setAddText("");
