@@ -22,6 +22,7 @@ import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
+import { normalizeEmailValue } from "../../authAccess";
 
 const TODO_TYPE = "memberTodo";
 const METRICS_CUTOFF_ISO = "2026-04-20";
@@ -31,7 +32,6 @@ const MEETING_ROTATION = ["facilitator", "notetaker", "time keeper"];
 const MEMBER_TYPE_OPTIONS = [
   { value: "worker-owner", label: "Worker-owner" },
   { value: "associate", label: "Associate" },
-  { value: "contractor", label: "Contractor" },
   { value: "flying-member", label: "Flying member" },
   { value: "external-collaborator", label: "External collaborator" },
 ];
@@ -68,7 +68,6 @@ function normalizeMemberRole(rawRole) {
   if (value === "worker-owner" || value === "workerowner")
     return "worker-owner";
   if (value === "associate") return "associate";
-  if (value === "contractor") return "contractor";
   if (value === "flying-member" || value === "flying") return "flying-member";
   if (value === "external-collaborator" || value === "external")
     return "external-collaborator";
@@ -690,12 +689,14 @@ export default function MemberDirectoryPage() {
     const name = newMember.name.trim();
     if (!name) return;
     const now = Date.now();
+    const email = normalizeEmailValue(newMember.email);
 
     try {
       await createDocument("members", {
         name,
         role: normalizeMemberRole(newMember.role),
-        email: newMember.email.trim(),
+        email,
+        emailLower: email,
         timezone: newMember.timezone.trim(),
         joinedOn: newMember.joinedOn || monthKeyFromTs(now) + "-01",
         notes: newMember.notes.trim(),
@@ -734,12 +735,14 @@ export default function MemberDirectoryPage() {
     const name = editDraft.name.trim();
     if (!name) return;
     const now = Date.now();
+    const email = normalizeEmailValue(editDraft.email);
     try {
       await replaceDocument("members", member.id, {
         ...member.data,
         name,
         role: normalizeMemberRole(editDraft.role),
-        email: editDraft.email.trim(),
+        email,
+        emailLower: email,
         timezone: editDraft.timezone.trim(),
         joinedOn: editDraft.joinedOn || null,
         notes: editDraft.notes.trim(),

@@ -1,5 +1,11 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,4 +33,25 @@ const app = firebaseReady
     : initializeApp(firebaseConfig)
   : null;
 
-export const db = app ? getFirestore(app) : null;
+export const auth = app ? getAuth(app) : null;
+export const googleProvider = app ? new GoogleAuthProvider() : null;
+
+function createFirestore(appInstance) {
+  if (!appInstance) return null;
+
+  try {
+    if (typeof window !== "undefined") {
+      return initializeFirestore(appInstance, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    }
+  } catch {
+    // Firestore may already be initialized by HMR; fallback to existing instance.
+  }
+
+  return getFirestore(appInstance);
+}
+
+export const db = createFirestore(app);

@@ -1,5 +1,7 @@
 "use client";
 
+import { signOut } from "firebase/auth";
+import { auth } from "../../firebase";
 import {
   IconBacklog,
   IconChartLine,
@@ -25,7 +27,25 @@ export default function Navigation({
   onTabChange,
   viewers = [],
   commentCounts = {},
+  isAdmin = false,
+  allowedTabs = [],
 }) {
+  async function handleSignOut() {
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } finally {
+      if (typeof window !== "undefined") {
+        window.location.assign("/login");
+      }
+    }
+  }
+
+  const allowed = Array.isArray(allowedTabs) && allowedTabs.length
+    ? new Set(allowedTabs)
+    : null;
+
   return (
     <aside className="nav-wrap">
       <nav className="nav-bar" aria-label="Primary navigation">
@@ -33,7 +53,11 @@ export default function Navigation({
           <div className="nav-brand" aria-hidden="true">
             <span className="nav-brand-text">CoA</span>
           </div>
-          {TABS.map((tab) => (
+          {TABS.filter((tab) => {
+            if (!isAdmin && tab.key === "memberDirectory") return false;
+            if (allowed && !allowed.has(tab.key)) return false;
+            return true;
+          }).map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -71,19 +95,16 @@ export default function Navigation({
             <span className="nav-live-count">{viewers.length} online</span>
           </div>
 
-          <form
-            action="/api/auth/logout"
-            method="post"
-            className="nav-signout-form"
-          >
+          <div className="nav-signout-form">
             <button
-              type="submit"
+              type="button"
+              onClick={handleSignOut}
               className="nav-signout-btn"
               title="Sign out and return to login"
             >
               Sign out
             </button>
-          </form>
+          </div>
         </div>
       </nav>
     </aside>

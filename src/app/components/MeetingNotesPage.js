@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { createPortal } from "react-dom";
 import {
   subscribeCollection,
@@ -11,7 +12,7 @@ import {
   deleteDocument,
   deleteDocumentsWhereBefore,
 } from "../../firestore";
-import { firebaseReady } from "../../firebase";
+import { auth, firebaseReady } from "../../firebase";
 import EmojiPicker from "emoji-picker-react";
 import Button from "./Button";
 import IconButton from "./IconButton";
@@ -236,7 +237,7 @@ function getProjectTeamMemberIds(projectId, projects) {
     .filter((id, index, all) => all.indexOf(id) === index);
 }
 
-export default function MeetingNotesPage() {
+export default function MeetingNotesPage({ viewerName = "" }) {
   const [notes, setNotes] = useState([]);
   const [notesLimit, setNotesLimit] = useState(80);
   const [newEmoji, setNewEmoji] = useState("");
@@ -382,28 +383,26 @@ export default function MeetingNotesPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const next = String(viewerName || "").trim();
+    if (!next) return;
+    setCurrentUsername(next);
+  }, [viewerName]);
 
-    async function loadSession() {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = await res.json();
-        if (cancelled) return;
-        const username = String(payload?.username || "")
-          .trim()
-          .toLowerCase();
-        if (username) setCurrentUsername(username);
-      } catch {
-        // Metadata should still render even when session lookup fails.
-      }
+  useEffect(() => {
+    if (viewerName) {
+      return undefined;
     }
+    if (!auth) return undefined;
 
-    loadSession();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      const username = String(user?.email || user?.displayName || "")
+        .trim()
+        .toLowerCase();
+      if (username) setCurrentUsername(username);
+    });
+
+    return () => unsub();
+  }, [viewerName]);
 
   const memberNameById = useMemo(() => {
     const map = {};
@@ -1012,18 +1011,20 @@ export default function MeetingNotesPage() {
     let stopped = false;
     let hasUpserted = false;
 
-    async function heartbeat() {
+    async function writePresence(active = true) {
       if (stopped) return;
       try {
         if (!hasUpserted) {
           await replaceDocument("meetingNotePresence", docId, {
             noteId: editingId,
             username,
+            active: Boolean(active),
             lastSeen: Date.now(),
           });
           hasUpserted = true;
         } else {
           await updateDocument("meetingNotePresence", docId, {
+            active: Boolean(active),
             lastSeen: Date.now(),
           });
         }
@@ -1032,12 +1033,17 @@ export default function MeetingNotesPage() {
       }
     }
 
-    heartbeat();
-    const timer = window.setInterval(heartbeat, 3000);
+    function onVisibilityChange() {
+      if (typeof document === "undefined") return;
+      writePresence(document.visibilityState === "visible");
+    }
+
+    writePresence(true);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       deleteDocument("meetingNotePresence", docId).catch(() => {});
     };
   }, [editingId, currentUsername]);

@@ -258,6 +258,14 @@ function newUUID() {
   });
 }
 
+function isAssignedToProject(project, memberId) {
+  if (!project || !memberId) return false;
+  const staffing = Array.isArray(project?.data?.staffing)
+    ? project.data.staffing
+    : [];
+  return staffing.some((entry) => entry?.memberId === memberId);
+}
+
 // ─ StagePlanEdit ────────────────────────────────────────────────────────────────────────────
 
 // Inline editor for the stagePlans list
@@ -1520,7 +1528,10 @@ function ProjectKanbanBoard({ projects, allTasks }) {
   );
 }
 
-export default function ProjectsPage() {
+export default function ProjectsPage({
+  viewerMemberId = null,
+  viewerRole = "associate",
+}) {
   const [projects, setProjects] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1529,6 +1540,8 @@ export default function ProjectsPage() {
   const [toasts, setToasts] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const isLimitedViewer =
+    viewerRole === "flying-member" || viewerRole === "external-collaborator";
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -1566,6 +1579,10 @@ export default function ProjectsPage() {
   }
 
   async function handleAdd(e) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to create projects", true);
+      return;
+    }
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
@@ -1611,6 +1628,10 @@ export default function ProjectsPage() {
   }
 
   async function handleSave(project, data) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to edit projects", true);
+      return;
+    }
     try {
       await replaceDocument("projects", project.id, {
         ...project.data,
@@ -1624,6 +1645,10 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(project) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to delete projects", true);
+      return;
+    }
     setDeleteTarget({
       label: project.data?.name || "this project",
       onConfirm: async () => {
@@ -1639,33 +1664,45 @@ export default function ProjectsPage() {
     });
   }
 
+  const visibleProjects = useMemo(() => {
+    if (!isLimitedViewer) return projects;
+    if (!viewerMemberId) return [];
+    return projects.filter((project) => isAssignedToProject(project, viewerMemberId));
+  }, [isLimitedViewer, projects, viewerMemberId]);
+
+  const visibleTasks = useMemo(() => {
+    if (!isLimitedViewer) return allTasks;
+    const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
+    return allTasks.filter((task) => visibleProjectIds.has(task?.data?.projectId));
+  }, [allTasks, isLimitedViewer, visibleProjects]);
+
   const totalBudgetTWD = useMemo(
     () =>
-      projects.reduce(
+      visibleProjects.reduce(
         (s, p) => s + (budgetToTWD(p.data.budget, p.data.budgetCurrency) || 0),
         0,
       ),
-    [projects],
+    [visibleProjects],
   );
 
   const totalCompanyPoolTWD = useMemo(
     () =>
-      projects.reduce((s, p) => {
+      visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
         return s + (donationAmount(budget, p.data.donationPercent) || 0);
       }, 0),
-    [projects],
+    [visibleProjects],
   );
 
   const totalMemberDistributableTWD = useMemo(
     () =>
-      projects.reduce((s, p) => {
+      visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
         const donation = donationAmount(budget, p.data.donationPercent) || 0;
         if (budget == null) return s;
         return s + Math.max(0, budget - donation);
       }, 0),
-    [projects],
+    [visibleProjects],
   );
 
   const projectViewOptions = [
@@ -1693,7 +1730,7 @@ export default function ProjectsPage() {
     <TabPage
       className="projects-page"
       title="Projects"
-      badge={`${projects.length} project${projects.length !== 1 ? "s" : ""}`}
+      badge={`${visibleProjects.length} project${visibleProjects.length !== 1 ? "s" : ""}`}
       subtitle={projectSubtitle}
       right={
         <PageControls compact>
@@ -1707,13 +1744,14 @@ export default function ProjectsPage() {
         </PageControls>
       }
     >
-      <SectionBlock
-        className="project-create-section"
-        title="Create project"
-        titleTag="h3"
-        texture={SURFACE_TEXTURES.projectCreate}
-      >
-        <form className="project-add-form" onSubmit={handleAdd}>
+      {!isLimitedViewer ? (
+        <SectionBlock
+          className="project-create-section"
+          title="Create project"
+          titleTag="h3"
+          texture={SURFACE_TEXTURES.projectCreate}
+        >
+          <form className="project-add-form" onSubmit={handleAdd}>
           <InputField
             className="project-field project-field--name"
             type="text"
@@ -1789,13 +1827,23 @@ export default function ProjectsPage() {
               title="Projected hourly wage for Internal/Admin projects (TWD)"
             />
           )}
-          <Button type="submit" disabled={saving || !form.name.trim()}>
-            Add project
-          </Button>
-        </form>
-      </SectionBlock>
+            <Button type="submit" disabled={saving || !form.name.trim()}>
+              Add project
+            </Button>
+          </form>
+        </SectionBlock>
+      ) : (
+        <SectionBlock
+          className="project-create-section"
+          title="Project access"
+          titleTag="h3"
+          texture={SURFACE_TEXTURES.projectCreate}
+        >
+          <p>You can view projects where you are assigned in staffing.</p>
+        </SectionBlock>
+      )}
 
-      {projects.length === 0 ? (
+      {visibleProjects.length === 0 ? (
         <EmptyState>No projects yet.</EmptyState>
       ) : viewMode === "kanban" ? (
         <SectionBlock
@@ -1804,7 +1852,7 @@ export default function ProjectsPage() {
           titleTag="h3"
           texture={SURFACE_TEXTURES.projectKanban}
         >
-          <ProjectKanbanBoard projects={projects} allTasks={allTasks} />
+          <ProjectKanbanBoard projects={visibleProjects} allTasks={visibleTasks} />
         </SectionBlock>
       ) : (
         <SectionBlock
@@ -1821,7 +1869,7 @@ export default function ProjectsPage() {
             <span />
           </div>
           <CollectionLayout as="ul" variant="list" className="project-list">
-            {[...projects]
+            {[...visibleProjects]
               .sort(
                 (a, b) =>
                   (Number(b.data.createdAt) || 0) -
@@ -1831,7 +1879,7 @@ export default function ProjectsPage() {
                 <ProjectRow
                   key={p.id}
                   project={p}
-                  allTasks={allTasks}
+                  allTasks={visibleTasks}
                   members={members}
                   onSave={handleSave}
                   onDelete={handleDelete}
