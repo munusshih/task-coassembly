@@ -1624,6 +1624,9 @@ function MemberCard({
 export default function MembersPage({
   viewerMemberId = null,
   viewerRole = "associate",
+  sharedMembers = null,
+  sharedProjects = null,
+  sharedTasks = null,
 }) {
   const [members, setMembers] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
@@ -1634,8 +1637,13 @@ export default function MembersPage({
   const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
   const isLimitedViewer =
     viewerRole === "flying-member" || viewerRole === "external-collaborator";
+  const hasSharedData =
+    Array.isArray(sharedMembers) &&
+    Array.isArray(sharedProjects) &&
+    Array.isArray(sharedTasks);
 
   useEffect(() => {
+    if (hasSharedData) return;
     const cached = readTaskBoardCache();
     if (cached.members.length) setMembers(cached.members);
     if (cached.tasks.length)
@@ -1646,9 +1654,17 @@ export default function MembersPage({
     if (typeof storedWeek === "string") {
       setSelectedWeek(storedWeek);
     }
-  }, []);
+  }, [hasSharedData]);
 
   useEffect(() => {
+    if (!hasSharedData) return;
+    setMembers(sharedMembers);
+    setProjects(sharedProjects);
+    setAllTasks(sharedTasks.filter((i) => i?.data?.type === TODO_TYPE));
+  }, [hasSharedData, sharedMembers, sharedProjects, sharedTasks]);
+
+  useEffect(() => {
+    if (hasSharedData) return;
     if (!firebaseReady) return;
     const u1 = subscribeCollection("members", setMembers);
     const u2 = subscribeCollection("tasks", (items) =>
@@ -1660,7 +1676,7 @@ export default function MembersPage({
       u2();
       u3();
     };
-  }, []);
+  }, [hasSharedData]);
 
   useEffect(() => {
     writeLocalJSON(TASK_BOARD_CACHE_KEY, {
@@ -1776,7 +1792,7 @@ export default function MembersPage({
     }
 
     try {
-      await createDocument("tasks", {
+      const created = {
         type: TODO_TYPE,
         memberId,
         title: taskData.title,
@@ -1790,7 +1806,9 @@ export default function MembersPage({
         orderIndex: now,
         createdAt: now,
         updatedAt: now,
-      });
+      };
+      const id = await createDocument("tasks", created);
+      setAllTasks((prev) => [{ id, data: created }, ...prev]);
       addToast("Task added");
       return true;
     } catch (e) {
@@ -1801,11 +1819,17 @@ export default function MembersPage({
 
   async function handleToggle(task, checked) {
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         completed: checked,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not update", true);
     }
@@ -1821,11 +1845,17 @@ export default function MembersPage({
     };
 
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         subtasks,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not update subtask", true);
     }
@@ -1854,7 +1884,7 @@ export default function MembersPage({
       Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
 
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         title,
         timeUnits: nextTimeUnits,
@@ -1863,7 +1893,13 @@ export default function MembersPage({
         subtasks: normalizeTaskSubtaskList(draft.subtasks),
         links: normalizeTaskLinkList(draft.links),
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
       addToast("Task updated");
       return true;
     } catch (e) {
@@ -1878,6 +1914,7 @@ export default function MembersPage({
       onConfirm: async () => {
         try {
           await deleteDocument("tasks", task.id);
+          setAllTasks((prev) => prev.filter((item) => item.id !== task.id));
           addToast("Deleted");
         } catch (e) {
           addToast(e.message || "Could not delete", true);
@@ -1890,11 +1927,17 @@ export default function MembersPage({
 
   async function handleOvertimeSave(task, otUnits) {
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         overtimeUnits: otUnits || null,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not save overtime", true);
     }
@@ -1920,6 +1963,20 @@ export default function MembersPage({
           }),
         ),
       );
+      const taskIdSet = new Set(tasks.map((task) => task.id));
+      setAllTasks((prev) =>
+        prev.map((item) => {
+          if (!taskIdSet.has(item.id)) return item;
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              archived: true,
+              archivedAt: now,
+            },
+          };
+        }),
+      );
       addToast("Flushed completed tasks to archive");
     } catch (e) {
       addToast(e.message || "Could not archive", true);
@@ -1944,6 +2001,20 @@ export default function MembersPage({
             archivedAt: null,
           }),
         ),
+      );
+      const taskIdSet = new Set(tasks.map((task) => task.id));
+      setAllTasks((prev) =>
+        prev.map((item) => {
+          if (!taskIdSet.has(item.id)) return item;
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              archived: false,
+              archivedAt: null,
+            },
+          };
+        }),
       );
       addToast("Restored all archived tasks");
     } catch (e) {

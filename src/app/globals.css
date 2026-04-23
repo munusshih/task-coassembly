@@ -917,6 +917,16 @@ input[type="radio"] {
     font-size: 10px;
   }
 
+
+  .nav-rollup {
+    margin-top: 6px;
+    font-size: 10px;
+    color: #7f7a70;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
   .nav-signout-btn {
     width: auto;
     padding: 6px 10px;
@@ -5608,6 +5618,47 @@ input[type="radio"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.slash-dropdown {
+  position: absolute;
+  z-index: 2200;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  max-height: 320px;
+  min-width: 260px;
+  overflow-y: auto;
+}
+
+.collab-cursor-marker {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  pointer-events: none;
+  width: 0;
+}
+
+.collab-cursor-caret {
+  width: 2px;
+  height: 1.15em;
+  border-radius: 1px;
+  margin-top: 0.05em;
+}
+
+.collab-cursor-label {
+  position: absolute;
+  top: -1.35em;
+  left: 2px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
 /* .btn variants & .btn:disabled are all defined in the main Buttons section above */

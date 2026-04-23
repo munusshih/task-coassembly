@@ -2,15 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { firebaseReady } from "../firebase";
-import { auth } from "../firebase";
 import {
-  createDocument,
-  deleteDocument,
-  deleteDocumentsWhereBefore,
-  replaceDocument,
+  onDisconnect,
+  limitToLast,
+  onValue,
+  orderByChild,
+  push,
+  query,
+  ref as rtdbRef,
+  remove,
+  serverTimestamp,
+  set,
+  update,
+} from "firebase/database";
+import { auth, firebaseReady, realtimeDb } from "../firebase";
+import {
   subscribeCollection,
-  subscribeCollectionQuery,
   updateDocument,
 } from "../firestore";
 import {
@@ -126,8 +133,20 @@ function toCursorCoord(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function lerp(from, to, factor) {
-  return from + (to - from) * factor;
+function normalizePresenceRows(snapshotValue) {
+  if (!snapshotValue || typeof snapshotValue !== "object") return [];
+  return Object.entries(snapshotValue).map(([id, row]) => ({
+    id,
+    data: row || {},
+  }));
+}
+
+function normalizeRealtimeRows(snapshotValue) {
+  if (!snapshotValue || typeof snapshotValue !== "object") return [];
+  return Object.entries(snapshotValue).map(([id, row]) => ({
+    id,
+    data: row || {},
+  }));
 }
 
 function loadStylePrefsFromStorage() {
@@ -172,6 +191,9 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [currentMember, setCurrentMember] = useState(null);
   const [identity, setIdentity] = useState(null);
+  const [sharedMembers, setSharedMembers] = useState([]);
+  const [sharedProjects, setSharedProjects] = useState([]);
+  const [sharedTasks, setSharedTasks] = useState([]);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [presenceRows, setPresenceRows] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
@@ -179,6 +201,8 @@ export default function Home() {
   const [stylePrefsLoaded, setStylePrefsLoaded] = useState(false);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const cursorRef = useRef({ x: 120, y: 120 });
+  const lastCursorWriteAtRef = useRef(0);
+  const lastCursorPointRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -263,6 +287,25 @@ export default function Home() {
     }
     return TAB_ORDER;
   }, [hasLimitedAccess]);
+
+  useEffect(() => {
+    if (!firebaseReady || !authReady || !currentMember) {
+      setSharedMembers([]);
+      setSharedProjects([]);
+      setSharedTasks([]);
+      return;
+    }
+
+    const unsubMembers = subscribeCollection("members", setSharedMembers);
+    const unsubProjects = subscribeCollection("projects", setSharedProjects);
+    const unsubTasks = subscribeCollection("tasks", setSharedTasks);
+
+    return () => {
+      unsubMembers();
+      unsubProjects();
+      unsubTasks();
+    };
+  }, [authReady, currentMember]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -350,88 +393,48 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!firebaseReady || !isPageVisible) {
+    if (!firebaseReady || !realtimeDb || !authReady || !currentMember) {
       setPresenceRows([]);
       return;
     }
-    const unsub = subscribeCollectionQuery(
-      "presence",
-      {
-        orderByField: "lastSeen",
-        orderDirection: "desc",
-        limitCount: 120,
-      },
-      setPresenceRows,
-    );
+
+    const presenceRef = rtdbRef(realtimeDb, "presence");
+    const unsub = onValue(presenceRef, (snapshot) => {
+      setPresenceRows(normalizePresenceRows(snapshot.val()));
+    });
+
     return () => unsub();
-  }, [isPageVisible]);
+  }, [authReady, currentMember]);
 
   useEffect(() => {
-    if (!firebaseReady || !isPageVisible) return;
-    const unsub = subscribeCollectionQuery(
-      "tabComments",
-      {
-        orderByField: "createdAt",
-        orderDirection: "desc",
-        limitCount: 300,
-      },
-      setCommentRows,
-    );
-    return () => unsub();
-  }, [isPageVisible]);
-
-  useEffect(() => {
-    if (!firebaseReady || !identity) return;
-    let stopped = false;
-
-    async function runCleanup() {
-      if (stopped) return;
-      const now = Date.now();
-      try {
-        await deleteDocumentsWhereBefore(
-          "presence",
-          "lastSeen",
-          now - 24 * 60 * 60 * 1000,
-          120,
-        );
-        await deleteDocumentsWhereBefore(
-          "meetingNotePresence",
-          "lastSeen",
-          now - 6 * 60 * 60 * 1000,
-          120,
-        );
-        await deleteDocumentsWhereBefore(
-          "tabComments",
-          "createdAt",
-          now - 14 * 24 * 60 * 60 * 1000,
-          120,
-        );
-      } catch {
-        // Ignore cleanup failures.
-      }
+    if (!firebaseReady || !realtimeDb || !isPageVisible) {
+      setCommentRows([]);
+      return;
     }
 
-    runCleanup();
-    const timer = window.setInterval(runCleanup, 30 * 60 * 1000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [identity]);
+    const commentsRef = query(
+      rtdbRef(realtimeDb, "tabComments"),
+      orderByChild("createdAt"),
+      limitToLast(300),
+    );
+    const unsub = onValue(commentsRef, (snapshot) => {
+      setCommentRows(normalizeRealtimeRows(snapshot.val()));
+    });
+
+    return () => unsub();
+  }, [isPageVisible]);
 
   const viewers = useMemo(() => {
-    const now = Date.now();
     return presenceRows
       .map((row) => ({ id: row.id, ...row.data }))
-      .filter((v) => Boolean(v.active))
-      .filter((v) => now - Number(v.lastSeen || 0) < 10 * 60 * 1000)
       .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0));
   }, [presenceRows]);
 
   useEffect(() => {
-    if (!firebaseReady || !identity) return;
+    if (!firebaseReady || !realtimeDb || !identity) return;
     let stopped = false;
-    let hasUpserted = false;
+
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${identity.id}`);
 
     async function writePresence(activeFlag) {
       if (stopped) return;
@@ -440,16 +443,13 @@ export default function Home() {
         color: identity.color,
         tab: activeTab,
         active: Boolean(activeFlag),
-        lastSeen: Date.now(),
+        x: Math.round(cursorRef.current.x),
+        y: Math.round(cursorRef.current.y),
+        lastSeen: serverTimestamp(),
       };
 
       try {
-        if (!hasUpserted) {
-          await replaceDocument("presence", identity.id, payload);
-          hasUpserted = true;
-        } else {
-          await updateDocument("presence", identity.id, payload);
-        }
+        await set(selfPresenceRef, payload);
       } catch {
         // Ignore transient network issues; next visibility/tab change retries.
       }
@@ -460,33 +460,71 @@ export default function Home() {
       writePresence(document.visibilityState === "visible");
     }
 
+    onDisconnect(selfPresenceRef)
+      .remove()
+      .catch(() => {});
+
     writePresence(true);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       stopped = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      remove(selfPresenceRef).catch(() => {});
     };
   }, [activeTab, identity]);
 
   useEffect(() => {
-    if (!identity) return;
+    if (!firebaseReady || !realtimeDb || !identity) return;
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${identity.id}`);
 
-    return () => {
-      deleteDocument("presence", identity.id).catch(() => {});
-    };
-  }, [identity]);
+    async function pushCursorUpdate(nextX, nextY) {
+      const now = Date.now();
+      const previous = lastCursorPointRef.current;
+      const movedEnough =
+        Math.abs(nextX - previous.x) >= 6 || Math.abs(nextY - previous.y) >= 6;
+      if (!movedEnough) return;
+      if (now - lastCursorWriteAtRef.current < 160) return;
 
-  useEffect(() => {
+      lastCursorWriteAtRef.current = now;
+      lastCursorPointRef.current = { x: nextX, y: nextY };
+
+      try {
+        await update(selfPresenceRef, {
+          x: Math.round(nextX),
+          y: Math.round(nextY),
+          tab: activeTab,
+          active: typeof document === "undefined" ? true : document.visibilityState === "visible",
+          lastSeen: serverTimestamp(),
+        });
+      } catch {
+        // Ignore transient cursor update failures.
+      }
+    }
+
     function onMouseMove(e) {
       cursorRef.current = { x: e.clientX, y: e.clientY };
+      pushCursorUpdate(e.clientX, e.clientY);
     }
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
     };
-  }, []);
+  }, [activeTab, identity]);
+
+  const peerCursors = useMemo(() => {
+    return presenceRows
+      .map((row) => ({ id: row.id, ...row.data }))
+      .filter((peer) => Boolean(peer.active))
+      .filter((peer) => peer.id !== identity?.id)
+      .filter((peer) => (peer.tab || "members") === activeTab)
+      .map((peer) => ({
+        ...peer,
+        x: toCursorCoord(peer.x),
+        y: toCursorCoord(peer.y),
+      }));
+  }, [activeTab, identity, presenceRows]);
 
   const tabComments = useMemo(
     () => commentRows.map((row) => ({ id: row.id, ...row.data })),
@@ -514,7 +552,7 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!firebaseReady || !identity) return;
+    if (!firebaseReady || !realtimeDb || !identity) return;
 
     function onKeyDown(e) {
       const t = e.target;
@@ -528,7 +566,8 @@ export default function Home() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const text = window.prompt("Add comment");
       if (!text || !text.trim()) return;
-      createDocument("tabComments", {
+      const rowRef = push(rtdbRef(realtimeDb, "tabComments"));
+      set(rowRef, {
         tab: activeTab,
         text: text.trim(),
         authorId: identity.id,
@@ -589,6 +628,9 @@ export default function Home() {
         <MembersPage
           viewerMemberId={currentMember.id}
           viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          sharedMembers={sharedMembers}
+          sharedProjects={sharedProjects}
+          sharedTasks={sharedTasks}
         />
       );
     }
@@ -608,6 +650,9 @@ export default function Home() {
         <ProjectsPage
           viewerMemberId={currentMember.id}
           viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          sharedMembers={sharedMembers}
+          sharedProjects={sharedProjects}
+          sharedTasks={sharedTasks}
         />
       );
     }
@@ -652,6 +697,24 @@ export default function Home() {
         <section className="page-content" key={activeTab} data-dir={slideDir}>
           {renderPage()}
         </section>
+
+        <div className="cursor-layer" aria-hidden="true">
+          {peerCursors.map((peer) => (
+            <div
+              key={peer.id}
+              className="peer-cursor"
+              style={{ left: `${peer.x}px`, top: `${peer.y}px` }}
+            >
+              <span className="peer-cursor-arrow" />
+              <span
+                className="peer-cursor-label"
+                style={{ background: peer.color || "#666" }}
+              >
+                {peer.name || "Viewer"}
+              </span>
+            </div>
+          ))}
+        </div>
 
         <div className="comment-layer" aria-hidden="true">
           {activeTabComments.map((comment) => (

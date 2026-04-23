@@ -52,6 +52,16 @@ export function subscribeCollection(collectionName, onData) {
   });
 }
 
+export async function fetchCollection(collectionName) {
+  const collectionRef = collection(getDb(), collectionName);
+  const snapshot = await getDocs(collectionRef);
+  const documents = snapshot.docs.map((snapshotDocument) => ({
+    id: snapshotDocument.id,
+    data: snapshotDocument.data(),
+  }));
+  return sortDocuments(documents);
+}
+
 export function subscribeCollectionQuery(
   collectionName,
   options,

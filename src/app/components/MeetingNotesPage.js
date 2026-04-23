@@ -2,17 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import {
+  onDisconnect,
+  onValue,
+  ref as rtdbRef,
+  remove,
+  serverTimestamp,
+  set,
+  update,
+} from "firebase/database";
 import { createPortal } from "react-dom";
 import {
   subscribeCollection,
   subscribeCollectionQuery,
   createDocument,
-  replaceDocument,
   updateDocument,
   deleteDocument,
-  deleteDocumentsWhereBefore,
 } from "../../firestore";
-import { auth, firebaseReady } from "../../firebase";
+import { auth, firebaseReady, realtimeDb } from "../../firebase";
 import EmojiPicker from "emoji-picker-react";
 import Button from "./Button";
 import IconButton from "./IconButton";
@@ -237,6 +244,25 @@ function getProjectTeamMemberIds(projectId, projects) {
     .filter((id, index, all) => all.indexOf(id) === index);
 }
 
+function normalizePresenceRows(snapshotValue) {
+  if (!snapshotValue || typeof snapshotValue !== "object") return [];
+  return Object.entries(snapshotValue).map(([id, row]) => ({
+    id,
+    data: row || {},
+  }));
+}
+
+function colorFromTextSeed(value) {
+  const text = String(value || "viewer");
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(index);
+    hash |= 0;
+  }
+  const palette = ["#2f5a9c", "#7a3e9d", "#2d7a58", "#b86a2f", "#8c2f56"];
+  return palette[Math.abs(hash) % palette.length];
+}
+
 export default function MeetingNotesPage({ viewerName = "" }) {
   const [notes, setNotes] = useState([]);
   const [notesLimit, setNotesLimit] = useState(80);
@@ -266,6 +292,8 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [notePresenceRows, setNotePresenceRows] = useState([]);
+  const [editSelection, setEditSelection] = useState({ anchor: 1, head: 1 });
+  const editSelectionRef = useRef({ anchor: 1, head: 1 });
   const [autoSaveState, setAutoSaveState] = useState("idle");
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState(null);
 
@@ -273,6 +301,13 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [resources, setResources] = useState([]);
+
+  useEffect(() => {
+    editSelectionRef.current = {
+      anchor: Number(editSelection.anchor) || 1,
+      head: Number(editSelection.head) || Number(editSelection.anchor) || 1,
+    };
+  }, [editSelection]);
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -284,33 +319,33 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         limitCount: notesLimit,
       },
       (items) => {
-      setNotes(
-        items.sort(
-          (a, b) =>
-            Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0),
-        ),
-      );
+        setNotes(
+          items.sort(
+            (a, b) =>
+              Number(b.data.createdAt || 0) - Number(a.data.createdAt || 0),
+          ),
+        );
       },
     );
   }, [notesLimit]);
 
   useEffect(() => {
-    if (!firebaseReady) return;
+    if (!firebaseReady || !realtimeDb) {
+      setNotePresenceRows([]);
+      return;
+    }
+
     const u1 = subscribeCollection("members", setMembers);
     const u2 = subscribeCollection("projects", setProjects);
-    const u5 = subscribeCollectionQuery(
-      "meetingNotePresence",
-      {
-        orderByField: "lastSeen",
-        orderDirection: "desc",
-        limitCount: 120,
-      },
-      setNotePresenceRows,
-    );
+    const presenceRef = rtdbRef(realtimeDb, "meetingNotePresence");
+    const u3 = onValue(presenceRef, (snapshot) => {
+      setNotePresenceRows(normalizePresenceRows(snapshot.val()));
+    });
+
     return () => {
       u1();
       u2();
-      u5();
+      u3();
     };
   }, []);
 
@@ -354,33 +389,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, [editEmojiPickerOpen]);
-
-  useEffect(() => {
-    if (!firebaseReady) return;
-    let stopped = false;
-
-    async function runCleanup() {
-      if (stopped) return;
-      const stalePresenceCutoff = Date.now() - 60 * 1000;
-      try {
-        await deleteDocumentsWhereBefore(
-          "meetingNotePresence",
-          "lastSeen",
-          stalePresenceCutoff,
-          120,
-        );
-      } catch {
-        // Ignore cleanup failures.
-      }
-    }
-
-    runCleanup();
-    const timer = window.setInterval(runCleanup, 30 * 60 * 1000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, []);
 
   useEffect(() => {
     const next = String(viewerName || "").trim();
@@ -1002,32 +1010,27 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   }, [editingId, editContent, editMeta, notes, currentUsername]);
 
   useEffect(() => {
-    if (!firebaseReady || !editingId) return;
+    if (!firebaseReady || !realtimeDb || !editingId) return;
 
     const username = String(currentUsername || "viewer")
       .trim()
       .toLowerCase() || "viewer";
     const docId = presenceDocId(editingId, username);
     let stopped = false;
-    let hasUpserted = false;
+    const rowRef = rtdbRef(realtimeDb, `meetingNotePresence/${docId}`);
 
     async function writePresence(active = true) {
       if (stopped) return;
       try {
-        if (!hasUpserted) {
-          await replaceDocument("meetingNotePresence", docId, {
-            noteId: editingId,
-            username,
-            active: Boolean(active),
-            lastSeen: Date.now(),
-          });
-          hasUpserted = true;
-        } else {
-          await updateDocument("meetingNotePresence", docId, {
-            active: Boolean(active),
-            lastSeen: Date.now(),
-          });
-        }
+        await update(rowRef, {
+          noteId: editingId,
+          username,
+          color: colorFromTextSeed(username),
+          active: Boolean(active),
+          cursorAnchor: editSelectionRef.current.anchor,
+          cursorHead: editSelectionRef.current.head,
+          lastSeen: serverTimestamp(),
+        });
       } catch {
         // Ignore transient presence update failures.
       }
@@ -1038,15 +1041,53 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       writePresence(document.visibilityState === "visible");
     }
 
+    onDisconnect(rowRef)
+      .remove()
+      .catch(() => {});
+
+    set(rowRef, {
+      noteId: editingId,
+      username,
+      color: colorFromTextSeed(username),
+      active: true,
+      cursorAnchor: editSelectionRef.current.anchor,
+      cursorHead: editSelectionRef.current.head,
+      lastSeen: serverTimestamp(),
+    }).catch(() => {});
+
     writePresence(true);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    const keepAlive = window.setInterval(() => {
+      writePresence(typeof document === "undefined" ? true : document.visibilityState === "visible");
+    }, 10 * 1000);
 
     return () => {
       stopped = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      deleteDocument("meetingNotePresence", docId).catch(() => {});
+      window.clearInterval(keepAlive);
+      remove(rowRef).catch(() => {});
     };
   }, [editingId, currentUsername]);
+
+  useEffect(() => {
+    if (!firebaseReady || !realtimeDb || !editingId) return;
+
+    const username = String(currentUsername || "viewer")
+      .trim()
+      .toLowerCase() || "viewer";
+    const docId = presenceDocId(editingId, username);
+    const rowRef = rtdbRef(realtimeDb, `meetingNotePresence/${docId}`);
+
+    const timer = window.setTimeout(() => {
+      update(rowRef, {
+        cursorAnchor: editSelectionRef.current.anchor,
+        cursorHead: editSelectionRef.current.head,
+        lastSeen: serverTimestamp(),
+      }).catch(() => {});
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [editingId, currentUsername, editSelection]);
 
   async function handleDeleteNote(noteId, noteTitle) {
     setDeleteTarget({
@@ -1445,7 +1486,12 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           .trim()
           .toLowerCase();
         return username && username !== self;
-      });
+      })
+      .map((row) => ({
+        ...row,
+        color: row.color || colorFromTextSeed(row.username),
+        cursorAnchor: Number(row.cursorAnchor) || 1,
+      }));
   }, [activeNote, notePresenceRows, currentUsername]);
 
   const autoSaveLabel = useMemo(() => {
@@ -1801,11 +1847,13 @@ export default function MeetingNotesPage({ viewerName = "" }) {
               <RichEditor
                 value={editContent}
                 onChange={setEditContent}
+                onSelectionChange={setEditSelection}
                 members={members}
                 projects={projects}
                 tasks={filteredTasks}
                 resources={resources}
                 notes={notes}
+                collaborators={activeEditors}
                 currentNoteId={activeNote.id}
                 showDateObjectButton={
                   normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT

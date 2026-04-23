@@ -1531,6 +1531,9 @@ function ProjectKanbanBoard({ projects, allTasks }) {
 export default function ProjectsPage({
   viewerMemberId = null,
   viewerRole = "associate",
+  sharedMembers = null,
+  sharedProjects = null,
+  sharedTasks = null,
 }) {
   const [projects, setProjects] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
@@ -1542,8 +1545,13 @@ export default function ProjectsPage({
   const [deleteTarget, setDeleteTarget] = useState(null);
   const isLimitedViewer =
     viewerRole === "flying-member" || viewerRole === "external-collaborator";
+  const hasSharedData =
+    Array.isArray(sharedMembers) &&
+    Array.isArray(sharedProjects) &&
+    Array.isArray(sharedTasks);
 
   useEffect(() => {
+    if (hasSharedData) return;
     if (!firebaseReady) return;
     const u1 = subscribeCollection("projects", setProjects);
     const u2 = subscribeCollection("tasks", setAllTasks);
@@ -1553,7 +1561,14 @@ export default function ProjectsPage({
       u2();
       u3();
     };
-  }, []);
+  }, [hasSharedData]);
+
+  useEffect(() => {
+    if (!hasSharedData) return;
+    setMembers(sharedMembers);
+    setProjects(sharedProjects);
+    setAllTasks(sharedTasks);
+  }, [hasSharedData, sharedMembers, sharedProjects, sharedTasks]);
 
   function addToast(message, isError = false) {
     const id = Date.now() + Math.random();
@@ -1603,7 +1618,7 @@ export default function ProjectsPage({
     }
     setSaving(true);
     try {
-      await createDocument("projects", {
+      const created = {
         name,
         kind: form.kind || null,
         status: form.status || null,
@@ -1617,7 +1632,9 @@ export default function ProjectsPage({
         stages: [],
         staffing: [],
         createdAt: Date.now(),
-      });
+      };
+      const id = await createDocument("projects", created);
+      setProjects((prev) => [{ id, data: created }, ...prev]);
       setForm(EMPTY_FORM);
       addToast("Project added");
     } catch (err) {
@@ -1633,11 +1650,17 @@ export default function ProjectsPage({
       return;
     }
     try {
-      await replaceDocument("projects", project.id, {
+      const nextData = {
         ...project.data,
         ...data,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("projects", project.id, nextData);
+      setProjects((prev) =>
+        prev.map((item) =>
+          item.id === project.id ? { ...item, data: nextData } : item,
+        ),
+      );
       addToast("Saved");
     } catch (err) {
       addToast(err.message || "Could not save", true);
@@ -1654,6 +1677,7 @@ export default function ProjectsPage({
       onConfirm: async () => {
         try {
           await deleteDocument("projects", project.id);
+          setProjects((prev) => prev.filter((item) => item.id !== project.id));
           addToast("Deleted");
         } catch (err) {
           addToast(err.message || "Could not delete", true);
