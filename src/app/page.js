@@ -32,6 +32,7 @@ import Navigation from "./components/Navigation";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
 import ProjectsPage from "./components/ProjectsPage";
+import FinancePage from "./components/FinancePage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
 import ResourcesPage from "./components/ResourcesPage";
@@ -42,7 +43,7 @@ const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
 const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
-const TBD_TABS = ["finance"];
+const TBD_TABS = [];
 
 const TAB_ORDER = [
   "members",
@@ -149,6 +150,11 @@ function normalizeRealtimeRows(snapshotValue) {
   }));
 }
 
+function isPermissionDeniedError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("permission_denied") || message.includes("permission denied");
+}
+
 function loadStylePrefsFromStorage() {
   if (typeof window === "undefined") return DEFAULT_STYLE_PREFS;
 
@@ -203,6 +209,7 @@ export default function Home() {
   const cursorRef = useRef({ x: 120, y: 120 });
   const lastCursorWriteAtRef = useRef(0);
   const lastCursorPointRef = useRef({ x: 0, y: 0 });
+  const presenceWriteAllowedRef = useRef(true);
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -432,13 +439,18 @@ export default function Home() {
 
   useEffect(() => {
     if (!firebaseReady || !realtimeDb || !identity) return;
+    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    if (!authUid) return;
+    presenceWriteAllowedRef.current = true;
     let stopped = false;
 
-    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${identity.id}`);
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${authUid}`);
 
     async function writePresence(activeFlag) {
       if (stopped) return;
+      if (!presenceWriteAllowedRef.current) return;
       const payload = {
+        viewerId: identity.id,
         name: identity.name,
         color: identity.color,
         tab: activeTab,
@@ -450,7 +462,11 @@ export default function Home() {
 
       try {
         await set(selfPresenceRef, payload);
-      } catch {
+      } catch (error) {
+        if (isPermissionDeniedError(error)) {
+          presenceWriteAllowedRef.current = false;
+          return;
+        }
         // Ignore transient network issues; next visibility/tab change retries.
       }
     }
@@ -472,13 +488,16 @@ export default function Home() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       remove(selfPresenceRef).catch(() => {});
     };
-  }, [activeTab, identity]);
+  }, [activeTab, currentMember?.authUid, identity]);
 
   useEffect(() => {
     if (!firebaseReady || !realtimeDb || !identity) return;
-    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${identity.id}`);
+    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    if (!authUid) return;
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${authUid}`);
 
     async function pushCursorUpdate(nextX, nextY) {
+      if (!presenceWriteAllowedRef.current) return;
       const now = Date.now();
       const previous = lastCursorPointRef.current;
       const movedEnough =
@@ -497,7 +516,11 @@ export default function Home() {
           active: typeof document === "undefined" ? true : document.visibilityState === "visible",
           lastSeen: serverTimestamp(),
         });
-      } catch {
+      } catch (error) {
+        if (isPermissionDeniedError(error)) {
+          presenceWriteAllowedRef.current = false;
+          return;
+        }
         // Ignore transient cursor update failures.
       }
     }
@@ -511,20 +534,24 @@ export default function Home() {
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
     };
-  }, [activeTab, identity]);
+  }, [activeTab, currentMember?.authUid, identity]);
 
   const peerCursors = useMemo(() => {
     return presenceRows
       .map((row) => ({ id: row.id, ...row.data }))
       .filter((peer) => Boolean(peer.active))
-      .filter((peer) => peer.id !== identity?.id)
+      .filter(
+        (peer) =>
+          peer.id !== (auth?.currentUser?.uid || currentMember?.authUid) &&
+          peer.viewerId !== identity?.id,
+      )
       .filter((peer) => (peer.tab || "members") === activeTab)
       .map((peer) => ({
         ...peer,
         x: toCursorCoord(peer.x),
         y: toCursorCoord(peer.y),
       }));
-  }, [activeTab, identity, presenceRows]);
+  }, [activeTab, currentMember?.authUid, identity, presenceRows]);
 
   const tabComments = useMemo(
     () => commentRows.map((row) => ({ id: row.id, ...row.data })),
@@ -658,6 +685,9 @@ export default function Home() {
     }
     if (activeTab === "backlog") {
       return <BacklogPage viewerName={currentMember.name || ""} />;
+    }
+    if (activeTab === "finance") {
+      return <FinancePage />;
     }
     if (activeTab === "meetingNotes") {
       return <MeetingNotesPage viewerName={currentMember.name || ""} />;

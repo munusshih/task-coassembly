@@ -415,6 +415,7 @@ function TimeDonutChart({ label, segments, emptyText, ariaLabel }) {
 function emptyMemberForm() {
   return {
     name: "",
+    aliases: "",
     role: "associate",
     email: "",
     timezone: "",
@@ -424,11 +425,31 @@ function emptyMemberForm() {
   };
 }
 
+function normalizeAlsoKnownAs(rawValue) {
+  const source = Array.isArray(rawValue)
+    ? rawValue
+    : String(rawValue || "")
+        .split(/[\n,]/)
+        .map((item) => item.trim());
+
+  return source
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item, index, all) => all.indexOf(item) === index);
+}
+
+function aliasesToInputValue(rawValue) {
+  return normalizeAlsoKnownAs(rawValue).join(", ");
+}
+
 function buildFormFromMember(memberData) {
   const form = emptyMemberForm();
   if (!memberData || typeof memberData !== "object") return form;
   return {
     name: typeof memberData.name === "string" ? memberData.name : "",
+    aliases: aliasesToInputValue(
+      memberData.alsoKnownAs || memberData.aliases || "",
+    ),
     role: normalizeMemberRole(memberData.role),
     email: typeof memberData.email === "string" ? memberData.email : "",
     timezone:
@@ -690,10 +711,12 @@ export default function MemberDirectoryPage() {
     if (!name) return;
     const now = Date.now();
     const email = normalizeEmailValue(newMember.email);
+    const alsoKnownAs = normalizeAlsoKnownAs(newMember.aliases);
 
     try {
       await createDocument("members", {
         name,
+        alsoKnownAs,
         role: normalizeMemberRole(newMember.role),
         email,
         emailLower: email,
@@ -736,10 +759,12 @@ export default function MemberDirectoryPage() {
     if (!name) return;
     const now = Date.now();
     const email = normalizeEmailValue(editDraft.email);
+    const alsoKnownAs = normalizeAlsoKnownAs(editDraft.aliases);
     try {
       await replaceDocument("members", member.id, {
         ...member.data,
         name,
+        alsoKnownAs,
         role: normalizeMemberRole(editDraft.role),
         email,
         emailLower: email,
@@ -943,6 +968,17 @@ export default function MemberDirectoryPage() {
                       updateNewMemberField("name", e.target.value)
                     }
                     placeholder="Member name"
+                  />
+                </label>
+                <label className="member-form-field member-form-field--full">
+                  <span>Also known as</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.aliases}
+                    onChange={(e) =>
+                      updateNewMemberField("aliases", e.target.value)
+                    }
+                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
                   />
                 </label>
                 <label className="member-form-field">
@@ -1455,6 +1491,15 @@ export default function MemberDirectoryPage() {
                 value={editDraft.name}
                 onChange={(e) => updateEditField("name", e.target.value)}
                 autoFocus
+              />
+            </label>
+            <label className="member-form-field member-form-field--full">
+              <span>Also known as</span>
+              <InputField
+                className="member-form-input"
+                value={editDraft.aliases}
+                onChange={(e) => updateEditField("aliases", e.target.value)}
+                placeholder="Comma separated aliases"
               />
             </label>
             <label className="member-form-field">

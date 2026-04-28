@@ -2134,50 +2134,6 @@ export default function MembersPage({
         <EmptyState>No members found in Firestore.</EmptyState>
       )}
 
-      <SectionBlock
-        className="members-access-matrix"
-        title="Member tiers and access"
-        titleTag="h3"
-        texture={SURFACE_TEXTURES.memberSummary}
-      >
-        <table className="member-tier-table">
-          <thead>
-            <tr>
-              <th>Tier</th>
-              <th>Can manage members</th>
-              <th>Can see all to-dos</th>
-              <th>Can see all projects</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Worker-owner</td>
-              <td>Yes</td>
-              <td>Yes</td>
-              <td>Yes</td>
-            </tr>
-            <tr>
-              <td>Associate</td>
-              <td>No</td>
-              <td>Yes</td>
-              <td>Yes</td>
-            </tr>
-            <tr>
-              <td>Flying member</td>
-              <td>No</td>
-              <td>Own only</td>
-              <td>Assigned only</td>
-            </tr>
-            <tr>
-              <td>External collaborator</td>
-              <td>No</td>
-              <td>Own only</td>
-              <td>Assigned only</td>
-            </tr>
-          </tbody>
-        </table>
-      </SectionBlock>
-
       {memberViewMode === "project" ? (
         <CollectionLayout variant="board" className="backlog-grid">
           {sortedProjectsForView.map((project) => (

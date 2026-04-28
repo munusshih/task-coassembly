@@ -435,6 +435,7 @@ export default function RichEditor({
     currentNoteId,
   });
   const collaboratorsRef = useRef(collaborators);
+  const isInternalUpdateRef = useRef(false);
   const collabCursorExtension = useMemo(
     () => createCollaborationCursorExtension(collaboratorsRef),
     [],
@@ -550,6 +551,7 @@ export default function RichEditor({
       content: normalizeLegacyMentionMarkup(value),
       immediatelyRender: false,
       onUpdate: ({ editor: ed }) => {
+        isInternalUpdateRef.current = true;
         onChange(ed.getHTML());
       },
       onSelectionUpdate: ({ editor: ed }) => {
@@ -564,6 +566,10 @@ export default function RichEditor({
 
   useEffect(() => {
     if (!editor) return;
+    if (isInternalUpdateRef.current) {
+      isInternalUpdateRef.current = false;
+      return;
+    }
     const normalized = normalizeLegacyMentionMarkup(value);
     if (editor.getHTML() === normalized) return;
 
