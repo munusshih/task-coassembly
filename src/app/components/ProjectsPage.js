@@ -193,7 +193,9 @@ function finishedAtTs(taskData) {
 
 function finishedHoursForMember(tasks, projectId, memberId, sinceTs = 0) {
   return tasks
-    .filter((t) => t.data.projectId === projectId && t.data.memberId === memberId)
+    .filter(
+      (t) => t.data.projectId === projectId && t.data.memberId === memberId,
+    )
     .filter((t) => {
       const ts = finishedAtTs(t.data);
       return ts > 0 && (sinceTs <= 0 || ts >= sinceTs);
@@ -201,7 +203,8 @@ function finishedHoursForMember(tasks, projectId, memberId, sinceTs = 0) {
     .reduce(
       (s, t) =>
         s +
-        ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) *
+        ((Number(t.data.timeUnits) || 0) +
+          (Number(t.data.overtimeUnits) || 0)) *
           0.25,
       0,
     );
@@ -296,8 +299,12 @@ function dedupeById(items) {
       continue;
     }
 
-    const existingUpdated = Number(existing?.data?.updatedAt || existing?.data?.createdAt || 0);
-    const incomingUpdated = Number(item?.data?.updatedAt || item?.data?.createdAt || 0);
+    const existingUpdated = Number(
+      existing?.data?.updatedAt || existing?.data?.createdAt || 0,
+    );
+    const incomingUpdated = Number(
+      item?.data?.updatedAt || item?.data?.createdAt || 0,
+    );
     if (incomingUpdated >= existingUpdated) {
       map.set(item.id, item);
     }
@@ -434,10 +441,7 @@ function StaffingEdit({
         maxHours: "",
         allocatedAmount: "",
       };
-      onChange([
-        ...(singleMemberMode ? [] : staffing),
-        nextEntry,
-      ]);
+      onChange([...(singleMemberMode ? [] : staffing), nextEntry]);
     }
   }
 
@@ -601,7 +605,9 @@ function SelfFundingEdit({ selfFunding, members, onChange }) {
                 checked={active}
                 onChange={() => toggleMember(m.id)}
               />
-              <span className="staffing-member-name">{m.data.name || m.id}</span>
+              <span className="staffing-member-name">
+                {m.data.name || m.id}
+              </span>
             </label>
             <label className="staffing-col staffing-col--hours">
               <InputField
@@ -651,7 +657,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       memberId: s.memberId || "",
       roles: Array.isArray(s.roles) ? s.roles : ["doer"],
       maxHours: s.maxHours != null ? String(s.maxHours) : "",
-      allocatedAmount: s.allocatedAmount != null ? String(s.allocatedAmount) : "",
+      allocatedAmount:
+        s.allocatedAmount != null ? String(s.allocatedAmount) : "",
     }));
   }
 
@@ -676,7 +683,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       companyTax: Boolean(data?.companyTax),
       legacyMode: Boolean(data?.legacyMode),
       projectedHourlyWage:
-        data?.projectedHourlyWage != null ? String(data.projectedHourlyWage) : "",
+        data?.projectedHourlyWage != null
+          ? String(data.projectedHourlyWage)
+          : "",
       maxHours: data?.maxHours != null ? String(data.maxHours) : "",
       startDate: data?.startDate || "",
       endDate: data?.endDate || "",
@@ -784,7 +793,11 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       name: form.name.trim(),
       kind: form.kind || null,
       status: form.status || null,
-      budget: selfFunded ? selfFundingTotal : form.budget ? Number(form.budget) : null,
+      budget: selfFunded
+        ? selfFundingTotal
+        : form.budget
+          ? Number(form.budget)
+          : null,
       budgetCurrency: selfFunded ? "TWD" : form.budgetCurrency,
       donationPercent: selfFunded ? 0 : Number(form.donationPercent) || 0,
       companyTax: Boolean(form.companyTax),
@@ -929,7 +942,12 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       const memberId = entry?.memberId;
       if (!memberId) continue;
       map[memberId] = {
-        week: finishedHoursForMember(allTasks, project.id, memberId, weekStartTs),
+        week: finishedHoursForMember(
+          allTasks,
+          project.id,
+          memberId,
+          weekStartTs,
+        ),
         total: finishedHoursForMember(allTasks, project.id, memberId, 0),
       };
     }
@@ -1000,7 +1018,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       ? Math.max(0, Number(form.maxHours) - formStaffingHours)
       : null;
     const passThroughAutoPayByMemberId =
-      formPassThrough && form.staffing.length === 1 && formTeamDistributableTWD != null
+      formPassThrough &&
+      form.staffing.length === 1 &&
+      formTeamDistributableTWD != null
         ? { [form.staffing[0].memberId]: formTeamDistributableTWD }
         : {};
 
@@ -1083,8 +1103,12 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               </label>
               {form.kind === "Self-funded" ? (
                 <div className="edit-field-group">
-                  <span className="edit-field-label">Budget (from self funding)</span>
-                  <p className="finance-section-note">{fmtTWD(formSelfFundingTotal)}</p>
+                  <span className="edit-field-label">
+                    Budget (from self funding)
+                  </span>
+                  <p className="finance-section-note">
+                    {fmtTWD(formSelfFundingTotal)}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -1103,7 +1127,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       <SelectField
                         className="project-field project-field--currency"
                         value={form.budgetCurrency}
-                        onChange={(e) => setField("budgetCurrency", e.target.value)}
+                        onChange={(e) =>
+                          setField("budgetCurrency", e.target.value)
+                        }
                       >
                         <option value="TWD">TWD</option>
                         <option value="USD">USD</option>
@@ -1115,7 +1141,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     <SelectField
                       className="project-field"
                       value={form.donationPercent}
-                      onChange={(e) => setField("donationPercent", e.target.value)}
+                      onChange={(e) =>
+                        setField("donationPercent", e.target.value)
+                      }
                     >
                       {DONATION_OPTIONS.map((pct) => (
                         <option key={pct} value={pct}>
@@ -1142,7 +1170,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     onChange={(e) => setField("legacyMode", e.target.checked)}
                   />
                   <span>Legacy mode</span>
-                  <span className="edit-checkbox-hint">Past projects — set allocated amounts directly</span>
+                  <span className="edit-checkbox-hint">
+                    Past projects — set allocated amounts directly
+                  </span>
                 </label>
               </div>
               {formInternalOrAdmin && (
@@ -1315,7 +1345,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             <>
               <span className="project-row-budget-twd">{fmtTWD(budgTWD)}</span>
               {selfFunded ? (
-                <span className="project-row-budget-orig">From self funding</span>
+                <span className="project-row-budget-orig">
+                  From self funding
+                </span>
               ) : (
                 <span className="project-row-budget-orig">
                   Donation {donationPct}%
@@ -1667,7 +1699,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             <div className="detail-section-head">
               <span className="detail-section-label">Team</span>
               {isLegacyMode && (
-                <span className="detail-section-badge detail-section-badge--legacy">Legacy</span>
+                <span className="detail-section-badge detail-section-badge--legacy">
+                  Legacy
+                </span>
               )}
               <span className="detail-section-meta">
                 {isLegacyMode
@@ -1694,7 +1728,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     s.memberId,
                   );
                   const legacyAllocated =
-                    s.allocatedAmount != null ? Number(s.allocatedAmount) : null;
+                    s.allocatedAmount != null
+                      ? Number(s.allocatedAmount)
+                      : null;
                   const payEst = isLegacyMode
                     ? legacyAllocated
                     : hourly != null
@@ -1717,7 +1753,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       key={s.id || i}
                       className={
                         "detail-team-row" +
-                        (isLead && !isLegacyMode ? " detail-team-row--lead" : "")
+                        (isLead && !isLegacyMode
+                          ? " detail-team-row--lead"
+                          : "")
                       }
                     >
                       <span className="detail-team-name">
@@ -1740,7 +1778,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                             : "—"}
                         {!isLegacyMode && (
                           <span className="detail-team-hours-meta">
-                            done {fmtH(finished.week)} this week · {fmtH(finished.total)} total
+                            done {fmtH(finished.week)} this week ·{" "}
+                            {fmtH(finished.total)} total
                           </span>
                         )}
                       </span>
@@ -1772,7 +1811,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
             <div className="detail-team">
               <div className="detail-section-head">
                 <span className="detail-section-label">Self funding</span>
-                <span className="detail-section-meta">{fmtTWD(selfFundingTotal)} total</span>
+                <span className="detail-section-meta">
+                  {fmtTWD(selfFundingTotal)} total
+                </span>
               </div>
               {selfFundingResolved.length === 0 ? (
                 <p className="snapshot-empty">No self-funding entries yet.</p>
@@ -1790,7 +1831,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       <span className="detail-team-name">
                         {entry.member?.data?.name || entry.memberId}
                       </span>
-                      <span className="detail-team-pay">{fmtTWD(entry.amount)}</span>
+                      <span className="detail-team-pay">
+                        {fmtTWD(entry.amount)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1814,7 +1857,8 @@ function ProjectKanbanCard({ project, allTasks }) {
   const passThrough = isPassThroughKind(d.kind);
   const donationPct = Number(d.donationPercent) || 0;
   const donationTWD = donationAmount(budgTWD, donationPct);
-  const companyTaxTWD = d.companyTax && budgTWD != null ? Math.round(budgTWD * 0.05) : null;
+  const companyTaxTWD =
+    d.companyTax && budgTWD != null ? Math.round(budgTWD * 0.05) : null;
   const effectiveBudgetTWD =
     budgTWD != null
       ? Math.max(0, budgTWD - (donationTWD || 0) - (companyTaxTWD || 0))
@@ -2039,7 +2083,9 @@ export default function ProjectsPage({
       const id = await createDocument("projects", created);
       setProjects((prev) => {
         if (prev.some((row) => row.id === id)) {
-          return prev.map((row) => (row.id === id ? { id, data: created } : row));
+          return prev.map((row) =>
+            row.id === id ? { id, data: created } : row,
+          );
         }
         return [{ id, data: created }, ...prev];
       });
@@ -2107,8 +2153,12 @@ export default function ProjectsPage({
 
   const visibleTasks = useMemo(() => {
     if (!isLimitedViewer) return allTasks;
-    const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
-    return allTasks.filter((task) => visibleProjectIds.has(task?.data?.projectId));
+    const visibleProjectIds = new Set(
+      visibleProjects.map((project) => project.id),
+    );
+    return allTasks.filter((task) =>
+      visibleProjectIds.has(task?.data?.projectId),
+    );
   }, [allTasks, isLimitedViewer, visibleProjects]);
 
   const totalBudgetTWD = useMemo(
@@ -2191,103 +2241,105 @@ export default function ProjectsPage({
           texture={SURFACE_TEXTURES.projectCreate}
         >
           <form className="project-add-form" onSubmit={handleAdd}>
-          <InputField
-            className="project-field project-field--name"
-            type="text"
-            placeholder="Project name *"
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-            required
-          />
-          <SelectField
-            className="project-field project-field--kind"
-            value={form.kind}
-            onChange={(e) => setField("kind", e.target.value)}
-          >
-            <option value="">Kind…</option>
-            {PROJECT_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            className="project-field project-field--status"
-            value={form.status}
-            onChange={(e) => setField("status", e.target.value)}
-          >
-            <option value="">Status…</option>
-            {PROJECT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </SelectField>
-          <div className="project-budget-group">
             <InputField
-              className="project-field project-field--budget"
-              type="number"
-              placeholder="Budget"
-              min="0"
-              step="1"
-              value={form.budget}
-              onChange={(e) => setField("budget", e.target.value)}
-              disabled={form.kind === "Self-funded"}
+              className="project-field project-field--name"
+              type="text"
+              placeholder="Project name *"
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              required
             />
             <SelectField
-              className="project-field project-field--currency"
-              value={form.budgetCurrency}
-              onChange={(e) => setField("budgetCurrency", e.target.value)}
-              disabled={form.kind === "Self-funded"}
+              className="project-field project-field--kind"
+              value={form.kind}
+              onChange={(e) => setField("kind", e.target.value)}
             >
-              <option value="TWD">TWD</option>
-              <option value="USD">USD</option>
-            </SelectField>
-          </div>
-          {form.kind !== "Self-funded" ? (
-            <SelectField
-              className="project-field project-field--donation"
-              value={form.donationPercent}
-              onChange={(e) => setField("donationPercent", e.target.value)}
-              title="Company donation percentage"
-            >
-              {DONATION_OPTIONS.map((pct) => (
-                <option key={pct} value={pct}>
-                  {pct}% donation
+              <option value="">Kind…</option>
+              {PROJECT_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
                 </option>
               ))}
             </SelectField>
-          ) : (
-            <span className="finance-section-note">
-              Budget comes from self funding. Donation is disabled.
-            </span>
-          )}
-          <InputField
-            className="project-field"
-            type="date"
-            value={form.startDate}
-            onChange={(e) => setField("startDate", e.target.value)}
-            title="Project start date"
-          />
-          <InputField
-            className="project-field"
-            type="date"
-            value={form.endDate}
-            onChange={(e) => setField("endDate", e.target.value)}
-            title="Project end date"
-          />
-          {isInternalOrAdminKind(form.kind) && (
+            <SelectField
+              className="project-field project-field--status"
+              value={form.status}
+              onChange={(e) => setField("status", e.target.value)}
+            >
+              <option value="">Status…</option>
+              {PROJECT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </SelectField>
+            <div className="project-budget-group">
+              <InputField
+                className="project-field project-field--budget"
+                type="number"
+                placeholder="Budget"
+                min="0"
+                step="1"
+                value={form.budget}
+                onChange={(e) => setField("budget", e.target.value)}
+                disabled={form.kind === "Self-funded"}
+              />
+              <SelectField
+                className="project-field project-field--currency"
+                value={form.budgetCurrency}
+                onChange={(e) => setField("budgetCurrency", e.target.value)}
+                disabled={form.kind === "Self-funded"}
+              >
+                <option value="TWD">TWD</option>
+                <option value="USD">USD</option>
+              </SelectField>
+            </div>
+            {form.kind !== "Self-funded" ? (
+              <SelectField
+                className="project-field project-field--donation"
+                value={form.donationPercent}
+                onChange={(e) => setField("donationPercent", e.target.value)}
+                title="Company donation percentage"
+              >
+                {DONATION_OPTIONS.map((pct) => (
+                  <option key={pct} value={pct}>
+                    {pct}% donation
+                  </option>
+                ))}
+              </SelectField>
+            ) : (
+              <span className="finance-section-note">
+                Budget comes from self funding. Donation is disabled.
+              </span>
+            )}
             <InputField
               className="project-field"
-              type="number"
-              placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
-              min={MIN_INTERNAL_ADMIN_HOURLY_TWD}
-              step="1"
-              value={form.projectedHourlyWage}
-              onChange={(e) => setField("projectedHourlyWage", e.target.value)}
-              title="Projected hourly wage for Internal/Admin projects (TWD)"
+              type="date"
+              value={form.startDate}
+              onChange={(e) => setField("startDate", e.target.value)}
+              title="Project start date"
             />
-          )}
+            <InputField
+              className="project-field"
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setField("endDate", e.target.value)}
+              title="Project end date"
+            />
+            {isInternalOrAdminKind(form.kind) && (
+              <InputField
+                className="project-field"
+                type="number"
+                placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
+                min={MIN_INTERNAL_ADMIN_HOURLY_TWD}
+                step="1"
+                value={form.projectedHourlyWage}
+                onChange={(e) =>
+                  setField("projectedHourlyWage", e.target.value)
+                }
+                title="Projected hourly wage for Internal/Admin projects (TWD)"
+              />
+            )}
             <Button type="submit" disabled={saving || !form.name.trim()}>
               Add project
             </Button>
@@ -2313,7 +2365,10 @@ export default function ProjectsPage({
           titleTag="h3"
           texture={SURFACE_TEXTURES.projectKanban}
         >
-          <ProjectKanbanBoard projects={visibleProjects} allTasks={visibleTasks} />
+          <ProjectKanbanBoard
+            projects={visibleProjects}
+            allTasks={visibleTasks}
+          />
         </SectionBlock>
       ) : (
         <SectionBlock

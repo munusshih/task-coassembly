@@ -310,8 +310,12 @@ function dedupeItemsById(items) {
       map.set(id, item);
       continue;
     }
-    const prevUpdated = Number(existing?.data?.updatedAt || existing?.data?.createdAt || 0);
-    const nextUpdated = Number(item?.data?.updatedAt || item?.data?.createdAt || 0);
+    const prevUpdated = Number(
+      existing?.data?.updatedAt || existing?.data?.createdAt || 0,
+    );
+    const nextUpdated = Number(
+      item?.data?.updatedAt || item?.data?.createdAt || 0,
+    );
     if (nextUpdated >= prevUpdated) map.set(id, item);
   }
   return [...map.values()];
@@ -370,7 +374,8 @@ function TaskItem({
   const links = normalizeTaskLinkList(todo.data.links);
   const canPushNewestWeek = canPushTaskToNewestWeek(todo.data);
   const canPushWishes = canPushTaskToWishes(todo.data);
-  const canTakeDoneDecision = Boolean(completed) && !Boolean(todo.data.reviewed);
+  const canTakeDoneDecision =
+    Boolean(completed) && !Boolean(todo.data.reviewed);
 
   function handleCheck(checked) {
     onToggle(todo, checked);
@@ -704,7 +709,9 @@ function TaskItem({
         </div>
         <div
           className={
-            canTakeDoneDecision ? "todo-actions todo-actions--decision" : "todo-actions"
+            canTakeDoneDecision
+              ? "todo-actions todo-actions--decision"
+              : "todo-actions"
           }
         >
           {canTakeDoneDecision ? (
@@ -1282,7 +1289,9 @@ function MemberCard({
           {reviewedTodos.length > 0 ? (
             <div className="reviewed-section">
               <div className="reviewed-section-head">
-                <p className="meta-label reviewed-section-label">Reviewed (locked)</p>
+                <p className="meta-label reviewed-section-label">
+                  Reviewed (locked)
+                </p>
                 <Button
                   type="button"
                   size="small"
@@ -1302,9 +1311,17 @@ function MemberCard({
                   return (
                     <li key={todo.id} className="todo-item">
                       <div className="todo-checkbox-cell">
-                        <input type="checkbox" checked={Boolean(todo.data.completed)} disabled tabIndex={-1} />
+                        <input
+                          type="checkbox"
+                          checked={Boolean(todo.data.completed)}
+                          disabled
+                          tabIndex={-1}
+                        />
                       </div>
-                      <div className="todo-content" style={{ cursor: "default" }}>
+                      <div
+                        className="todo-content"
+                        style={{ cursor: "default" }}
+                      >
                         <span
                           className={
                             todo.data.completed
@@ -1316,12 +1333,18 @@ function MemberCard({
                         </span>
                         <div className="todo-chips">
                           {t > 0 ? (
-                            <Pill className="chip--time">{formatTimeUnits(t)}</Pill>
+                            <Pill className="chip--time">
+                              {formatTimeUnits(t)}
+                            </Pill>
                           ) : null}
                           {ot > 0 ? (
-                            <Pill className="chip--ot">+{formatTimeUnits(ot)} OT</Pill>
+                            <Pill className="chip--ot">
+                              +{formatTimeUnits(ot)} OT
+                            </Pill>
                           ) : null}
-                          {projName ? <Pill className="chip--project">{projName}</Pill> : null}
+                          {projName ? (
+                            <Pill className="chip--project">{projName}</Pill>
+                          ) : null}
                         </div>
                       </div>
                     </li>
@@ -1559,7 +1582,12 @@ function MemberCard({
                 return (
                   <li key={todo.id} className="todo-item">
                     <div className="todo-checkbox-cell">
-                      <input type="checkbox" checked={done} readOnly tabIndex={-1} />
+                      <input
+                        type="checkbox"
+                        checked={done}
+                        readOnly
+                        tabIndex={-1}
+                      />
                     </div>
                     <div className="todo-content">
                       <span
@@ -1662,8 +1690,6 @@ function MemberCard({
           )}
         </PaperSurface>
       )}
-
-
     </EntityCard>
   );
 }
@@ -1699,7 +1725,9 @@ export default function MembersPage({
     if (cached.members.length) setMembers(cached.members);
     if (cached.tasks.length)
       setAllTasks(
-        dedupeItemsById(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE)),
+        dedupeItemsById(
+          cached.tasks.filter((i) => i?.data?.type === TODO_TYPE),
+        ),
       );
     if (cached.projects.length) setProjects(cached.projects);
 

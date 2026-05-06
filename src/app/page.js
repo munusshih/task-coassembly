@@ -16,10 +16,7 @@ import {
   update,
 } from "firebase/database";
 import { auth, firebaseReady, realtimeDb } from "../firebase";
-import {
-  subscribeCollection,
-  updateDocument,
-} from "../firestore";
+import { subscribeCollection, updateDocument } from "../firestore";
 import {
   findMemberForAuth,
   hasLimitedWorkspaceAccess,
@@ -154,7 +151,10 @@ function normalizeRealtimeRows(snapshotValue) {
 
 function isPermissionDeniedError(error) {
   const message = String(error?.message || "").toLowerCase();
-  return message.includes("permission_denied") || message.includes("permission denied");
+  return (
+    message.includes("permission_denied") ||
+    message.includes("permission denied")
+  );
 }
 
 function loadStylePrefsFromStorage() {
@@ -234,7 +234,10 @@ export default function Home() {
       }
 
       try {
-        const member = await findMemberForAuth({ uid: user.uid, email: user.email });
+        const member = await findMemberForAuth({
+          uid: user.uid,
+          email: user.email,
+        });
         if (!member || !isMemberEnabled(member.data)) {
           await signOut(auth);
           if (!cancelled && typeof window !== "undefined") {
@@ -335,11 +338,15 @@ export default function Home() {
           return;
         }
       }
-      const created = buildLocalIdentity(currentMember.name || currentMember.email);
+      const created = buildLocalIdentity(
+        currentMember.name || currentMember.email,
+      );
       localStorage.setItem(key, JSON.stringify(created));
       setIdentity(created);
     } catch {
-      setIdentity(buildLocalIdentity(currentMember.name || currentMember.email));
+      setIdentity(
+        buildLocalIdentity(currentMember.name || currentMember.email),
+      );
     }
   }, [authReady, currentMember]);
 
@@ -434,15 +441,23 @@ export default function Home() {
   }, [isPageVisible]);
 
   const viewers = useMemo(() => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
     return presenceRows
       .map((row) => ({ id: row.id, ...row.data }))
+      .filter((v) => v.active !== false && Number(v.lastSeen || 0) > fiveMinutesAgo)
       .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0));
   }, [presenceRows]);
 
   useEffect(() => {
     if (!firebaseReady || !realtimeDb || !identity) return;
-    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    // Must have a confirmed Firebase auth UID — currentMember.authUid is set
+    // from onAuthStateChanged so it's reliable; auth.currentUser.uid is the live value.
+    const authUid = String(
+      auth?.currentUser?.uid || currentMember?.authUid || "",
+    ).trim();
     if (!authUid) return;
+    // Always reset the latch when the effect re-runs with a valid authUid,
+    // so a previous permission-denied error doesn't permanently block presence.
     presenceWriteAllowedRef.current = true;
     let stopped = false;
 
@@ -466,7 +481,9 @@ export default function Home() {
         await set(selfPresenceRef, payload);
       } catch (error) {
         if (isPermissionDeniedError(error)) {
-          presenceWriteAllowedRef.current = false;
+          // Don't latch permanently — the rule requires auth.uid === $uid,
+          // which should always hold here. Log for debugging.
+          console.warn("[presence] permission denied writing to", selfPresenceRef.toString(), error?.message);
           return;
         }
         // Ignore transient network issues; next visibility/tab change retries.
@@ -494,7 +511,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!firebaseReady || !realtimeDb || !identity) return;
-    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    const authUid = String(
+      auth?.currentUser?.uid || currentMember?.authUid || "",
+    ).trim();
     if (!authUid) return;
     const selfPresenceRef = rtdbRef(realtimeDb, `presence/${authUid}`);
 
@@ -515,14 +534,13 @@ export default function Home() {
           x: Math.round(nextX),
           y: Math.round(nextY),
           tab: activeTab,
-          active: typeof document === "undefined" ? true : document.visibilityState === "visible",
+          active:
+            typeof document === "undefined"
+              ? true
+              : document.visibilityState === "visible",
           lastSeen: serverTimestamp(),
         });
-      } catch (error) {
-        if (isPermissionDeniedError(error)) {
-          presenceWriteAllowedRef.current = false;
-          return;
-        }
+      } catch {
         // Ignore transient cursor update failures.
       }
     }
@@ -632,7 +650,9 @@ export default function Home() {
         <div className="splash-card">
           <div className="splash-brand">CoA</div>
           <div className="splash-dots" aria-hidden="true">
-            <span /><span /><span />
+            <span />
+            <span />
+            <span />
           </div>
           <p className="splash-label">Checking access…</p>
         </div>
@@ -645,7 +665,9 @@ export default function Home() {
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
           <div className="splash-brand">CoA</div>
-          <p className="splash-label">Sign in with your approved Google account to continue.</p>
+          <p className="splash-label">
+            Sign in with your approved Google account to continue.
+          </p>
         </div>
       </main>
     );

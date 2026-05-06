@@ -86,7 +86,11 @@ function parseMoney(value) {
 function parseYearFromRow(row, columns) {
   const yearText = String(row[columns.year] || "").trim();
   const explicitYear = Number(yearText);
-  if (Number.isFinite(explicitYear) && explicitYear >= 1900 && explicitYear <= 3000) {
+  if (
+    Number.isFinite(explicitYear) &&
+    explicitYear >= 1900 &&
+    explicitYear <= 3000
+  ) {
     return explicitYear;
   }
 
@@ -146,9 +150,12 @@ function computeProjectProjection(project) {
 
   const budgetTWD = budgetToTWD(d.budget, d.budgetCurrency);
   const donationPct = Number(d.donationPercent) || 0;
-  const donation = budgetTWD != null ? Math.round((budgetTWD * donationPct) / 100) : 0;
-  const companyTax = d.companyTax && budgetTWD != null ? Math.round(budgetTWD * 0.05) : 0;
-  const effectiveBudget = budgetTWD != null ? Math.max(0, budgetTWD - donation - companyTax) : null;
+  const donation =
+    budgetTWD != null ? Math.round((budgetTWD * donationPct) / 100) : 0;
+  const companyTax =
+    d.companyTax && budgetTWD != null ? Math.round(budgetTWD * 0.05) : 0;
+  const effectiveBudget =
+    budgetTWD != null ? Math.max(0, budgetTWD - donation - companyTax) : null;
 
   const leadBonus =
     !internalOrAdmin && !pass && effectiveBudget != null
@@ -219,7 +226,8 @@ function isGovernmentOrTaxPayee(value) {
 
 function normalizeConfig(raw) {
   const base = raw && typeof raw === "object" ? raw : {};
-  const columns = base.columns && typeof base.columns === "object" ? base.columns : {};
+  const columns =
+    base.columns && typeof base.columns === "object" ? base.columns : {};
   return {
     createdAt: Number(base.createdAt) || 0,
     updatedAt: Number(base.updatedAt) || 0,
@@ -227,12 +235,18 @@ function normalizeConfig(raw) {
     columns: {
       member: String(columns.member || DEFAULT_CONFIG.columns.member),
       paid: String(columns.paid || DEFAULT_CONFIG.columns.paid),
-      commonPool: String(columns.commonPool || DEFAULT_CONFIG.columns.commonPool),
+      commonPool: String(
+        columns.commonPool || DEFAULT_CONFIG.columns.commonPool,
+      ),
       date: String(columns.date || DEFAULT_CONFIG.columns.date),
       year: String(columns.year || DEFAULT_CONFIG.columns.year),
     },
-    capitalEntries: Array.isArray(base.capitalEntries) ? base.capitalEntries : [],
-    recurringCosts: Array.isArray(base.recurringCosts) ? base.recurringCosts : [],
+    capitalEntries: Array.isArray(base.capitalEntries)
+      ? base.capitalEntries
+      : [],
+    recurringCosts: Array.isArray(base.recurringCosts)
+      ? base.recurringCosts
+      : [],
   };
 }
 
@@ -579,8 +593,12 @@ function computeCategoryProjectPnl(values) {
     const dateText = String(row[dateIdx] || "").trim();
     if (!dateText) continue;
 
-    const bankIn = bankAccount ? parseSignedAmount(row[bankAccount.creditCol]) : 0;
-    const bankOut = bankAccount ? -parseSignedAmount(row[bankAccount.debitCol]) : 0;
+    const bankIn = bankAccount
+      ? parseSignedAmount(row[bankAccount.creditCol])
+      : 0;
+    const bankOut = bankAccount
+      ? -parseSignedAmount(row[bankAccount.debitCol])
+      : 0;
     if (bankIn === 0 && bankOut === 0) continue;
 
     addCategoryRow(row[categoryIdx], bankIn, bankOut);
@@ -755,7 +773,8 @@ function extractFinanceTransactions(values) {
       expense = bankOut;
     } else if (signedAmount !== 0) {
       if (parsedCategory.flow === "income") income = Math.abs(signedAmount);
-      else if (parsedCategory.flow === "expense") expense = Math.abs(signedAmount);
+      else if (parsedCategory.flow === "expense")
+        expense = Math.abs(signedAmount);
       else if (signedAmount > 0) income = signedAmount;
       else expense = Math.abs(signedAmount);
     } else {
@@ -853,11 +872,14 @@ function computeProjectPanels(values, selectedYear = "overall") {
       const fromAccount = String(tx.fromAccount || "");
 
       // Net receivables based on bank-touching AR rows.
-      if (toAccount.includes("應收帳款")) panel.receivableMissing += tx.amountAbs;
-      if (fromAccount.includes("應收帳款")) panel.receivableMissing -= tx.amountAbs;
+      if (toAccount.includes("應收帳款"))
+        panel.receivableMissing += tx.amountAbs;
+      if (fromAccount.includes("應收帳款"))
+        panel.receivableMissing -= tx.amountAbs;
 
       // Net payables based on bank-touching AP rows (expected minus paid).
-      if (fromAccount.includes("應付帳款")) panel.payableExpected += tx.amountAbs;
+      if (fromAccount.includes("應付帳款"))
+        panel.payableExpected += tx.amountAbs;
       if (toAccount.includes("應付帳款") || toAccount.includes("應付帳戶")) {
         panel.payableExpected -= tx.amountAbs;
       }
@@ -916,7 +938,7 @@ const RING_CHART_COLORS = [
 ];
 
 const RING_LABEL_COLOR_MAP = {
-  "公司池": "#374151",
+  公司池: "#374151",
   Underpaid: "#b91c1c",
   Overpaid: "#1d4ed8",
   Matched: "#15803d",
@@ -977,7 +999,9 @@ function PercentageRows({ rows, max = 8 }) {
             />
             <span className="finance-ring-label">{slice.label}</span>
             <span className="finance-ring-pct">{slice.pct.toFixed(1)}%</span>
-            <span className="finance-ring-amount">{formatTWD(slice.amount)}</span>
+            <span className="finance-ring-amount">
+              {formatTWD(slice.amount)}
+            </span>
           </li>
         ))}
       </ul>
@@ -993,7 +1017,10 @@ function CommonPoolRingRows({
   max = 8,
 }) {
   const top = (rows || []).slice(0, max);
-  const totalAbs = top.reduce((s, r) => s + (Math.abs(Number(r.amount)) || 0), 0);
+  const totalAbs = top.reduce(
+    (s, r) => s + (Math.abs(Number(r.amount)) || 0),
+    0,
+  );
   if (!top.length || totalAbs <= 0) {
     return <p className="finance-dashboard-empty">No entries.</p>;
   }
@@ -1078,7 +1105,9 @@ function CommonPoolRingRows({
                     >
                       <span className="finance-ring-dot finance-ring-dot--sub" />
                       <span className="finance-ring-label">{row.label}</span>
-                      <span className="finance-ring-pct">{pct.toFixed(1)}%</span>
+                      <span className="finance-ring-pct">
+                        {pct.toFixed(1)}%
+                      </span>
                       <span
                         className={
                           amount >= 0
@@ -1142,7 +1171,9 @@ function descriptionWithoutMember(description, matchedPart) {
 
 function resolveMemberIdFromText(text, memberIdByAlias) {
   if (!memberIdByAlias) return "";
-  const raw = String(text || "").trim().toLowerCase();
+  const raw = String(text || "")
+    .trim()
+    .toLowerCase();
   if (!raw) return "";
   if (memberIdByAlias[raw]) return memberIdByAlias[raw];
 
@@ -1215,8 +1246,12 @@ function computeDashboardData(values, opts = {}) {
     const dateText = String(row[dateIdx] || "").trim();
     if (!dateText) continue;
 
-    const bankIn = bankAccount ? parseSignedAmount(row[bankAccount.creditCol]) : 0;
-    const bankOut = bankAccount ? parseSignedAmount(row[bankAccount.debitCol]) : 0;
+    const bankIn = bankAccount
+      ? parseSignedAmount(row[bankAccount.creditCol])
+      : 0;
+    const bankOut = bankAccount
+      ? parseSignedAmount(row[bankAccount.debitCol])
+      : 0;
     const amountFallback = parseSignedAmount(row[amountIdx]);
     const bankImpact = bankIn + bankOut;
     if (bankImpact === 0 && amountFallback === 0) continue;
@@ -1239,9 +1274,9 @@ function computeDashboardData(values, opts = {}) {
     });
   }
 
-  const availableQuarterKeys = [...new Set(
-    transactions.map((t) => t.quarterKey).filter(Boolean),
-  )].sort((a, b) => String(b).localeCompare(String(a)));
+  const availableQuarterKeys = [
+    ...new Set(transactions.map((t) => t.quarterKey).filter(Boolean)),
+  ].sort((a, b) => String(b).localeCompare(String(a)));
 
   const filteredTransactions =
     quarterFilter && quarterFilter !== "overall"
@@ -1263,8 +1298,7 @@ function computeDashboardData(values, opts = {}) {
     if (!byMember[memberId]) {
       byMember[memberId] = {
         memberId,
-        memberName:
-          membersById[memberId]?.data?.name || memberId || "Unknown",
+        memberName: membersById[memberId]?.data?.name || memberId || "Unknown",
         capitalIn: 0,
         paidOut: 0,
         otherIn: 0,
@@ -1408,7 +1442,7 @@ function computeDashboardData(values, opts = {}) {
       expense,
       net: income - expense,
     }))
-    .sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
+    .sort((a, b) => b.income + b.expense - (a.income + a.expense));
 
   let lastBalanceRow = null;
   for (let i = dataRows.length - 1; i >= 0; i -= 1) {
@@ -1424,7 +1458,9 @@ function computeDashboardData(values, opts = {}) {
 
   const accountBalances = accounts.map((a) => ({
     name: a.name,
-    balance: lastBalanceRow ? parseSignedAmount(lastBalanceRow[a.balanceCol]) : 0,
+    balance: lastBalanceRow
+      ? parseSignedAmount(lastBalanceRow[a.balanceCol])
+      : 0,
   }));
 
   const bankBalance =
@@ -1480,7 +1516,8 @@ function CategoryBars({ rows, accent, max, formatter, limit = 8 }) {
   return (
     <ul className="finance-bar-list">
       {top.map((row) => {
-        const pct = max > 0 ? Math.max(2, Math.round((row.amount / max) * 100)) : 0;
+        const pct =
+          max > 0 ? Math.max(2, Math.round((row.amount / max) * 100)) : 0;
         return (
           <li key={row.key} className="finance-bar-row">
             <div className="finance-bar-label">
@@ -1542,7 +1579,9 @@ function FinanceDashboard({ data }) {
         <article className="finance-dashboard-kpi finance-dashboard-kpi--positive">
           <span className="finance-dashboard-kpi-label">Bank cash on hand</span>
           <strong>{formatTWD(bankBalance)}</strong>
-          <span className="finance-dashboard-kpi-hint">國泰世華 latest balance</span>
+          <span className="finance-dashboard-kpi-hint">
+            國泰世華 latest balance
+          </span>
         </article>
         <article
           className={`finance-dashboard-kpi ${
@@ -1551,19 +1590,27 @@ function FinanceDashboard({ data }) {
               : "finance-dashboard-kpi--negative"
           }`}
         >
-          <span className="finance-dashboard-kpi-label">Net asset position</span>
+          <span className="finance-dashboard-kpi-label">
+            Net asset position
+          </span>
           <strong>{formatTWD(netAssetPosition)}</strong>
-          <span className="finance-dashboard-kpi-hint">bank − payables / receivables</span>
+          <span className="finance-dashboard-kpi-hint">
+            bank − payables / receivables
+          </span>
         </article>
         <article className="finance-dashboard-kpi">
           <span className="finance-dashboard-kpi-label">Capital invested</span>
           <strong>{formatTWD(capitalInvested)}</strong>
-          <span className="finance-dashboard-kpi-hint">worker-owner contributions</span>
+          <span className="finance-dashboard-kpi-hint">
+            worker-owner contributions
+          </span>
         </article>
         <article className="finance-dashboard-kpi finance-dashboard-kpi--income">
           <span className="finance-dashboard-kpi-label">Operating revenue</span>
           <strong>{formatTWD(operatingRevenue)}</strong>
-          <span className="finance-dashboard-kpi-hint">cash in, ex-capital</span>
+          <span className="finance-dashboard-kpi-hint">
+            cash in, ex-capital
+          </span>
         </article>
         <article className="finance-dashboard-kpi finance-dashboard-kpi--expense">
           <span className="finance-dashboard-kpi-label">Operating expense</span>
@@ -1582,7 +1629,9 @@ function FinanceDashboard({ data }) {
           <span className="finance-dashboard-kpi-hint">revenue − expense</span>
         </article>
         <article className="finance-dashboard-kpi">
-          <span className="finance-dashboard-kpi-label">Bank-touching transactions</span>
+          <span className="finance-dashboard-kpi-label">
+            Bank-touching transactions
+          </span>
           <strong>{transactionCount.toLocaleString()}</strong>
         </article>
       </div>
@@ -1648,7 +1697,10 @@ function FinanceDashboard({ data }) {
         <section className="finance-dashboard-card finance-dashboard-card--wide">
           <header className="finance-dashboard-card-header">
             <h4>Spending — by category vs by item</h4>
-            <span>{expenseRows.length} categories · {expenseDescriptionRows.length} items</span>
+            <span>
+              {expenseRows.length} categories · {expenseDescriptionRows.length}{" "}
+              items
+            </span>
           </header>
           <div className="finance-split-cols">
             <div className="finance-split-col">
@@ -1661,7 +1713,9 @@ function FinanceDashboard({ data }) {
               />
             </div>
             <div className="finance-split-col">
-              <h5 className="finance-split-title">By item / description (敘述)</h5>
+              <h5 className="finance-split-title">
+                By item / description (敘述)
+              </h5>
               <CategoryBars
                 rows={expenseDescriptionRows}
                 accent="#c2543d"
@@ -1676,7 +1730,10 @@ function FinanceDashboard({ data }) {
         <section className="finance-dashboard-card finance-dashboard-card--wide">
           <header className="finance-dashboard-card-header">
             <h4>Revenue — by category vs by item</h4>
-            <span>{incomeRows.length} categories · {incomeDescriptionRows.length} items</span>
+            <span>
+              {incomeRows.length} categories · {incomeDescriptionRows.length}{" "}
+              items
+            </span>
           </header>
           <div className="finance-split-cols">
             <div className="finance-split-col">
@@ -1689,7 +1746,9 @@ function FinanceDashboard({ data }) {
               />
             </div>
             <div className="finance-split-col">
-              <h5 className="finance-split-title">By item / description (敘述)</h5>
+              <h5 className="finance-split-title">
+                By item / description (敘述)
+              </h5>
               <CategoryBars
                 rows={incomeDescriptionRows}
                 accent="#2f7d56"
@@ -1742,7 +1801,8 @@ function FinanceDashboard({ data }) {
                               {top.en}
                               {top.zh ? (
                                 <em className="finance-balance-meta">
-                                  {" "}· {top.zh}
+                                  {" "}
+                                  · {top.zh}
                                 </em>
                               ) : null}{" "}
                               <em className="finance-balance-meta">
@@ -1828,7 +1888,9 @@ function FinanceDashboard({ data }) {
             <span>{projectCategoryRows.length} rows</span>
           </header>
           {projectCategoryRows.length === 0 ? (
-            <p className="finance-dashboard-empty">No categorized project entries.</p>
+            <p className="finance-dashboard-empty">
+              No categorized project entries.
+            </p>
           ) : (
             <div className="finance-table-wrap">
               <table className="finance-table">
@@ -1848,7 +1910,11 @@ function FinanceDashboard({ data }) {
                       <td>{row.category}</td>
                       <td>{formatTWD(row.income)}</td>
                       <td>{formatTWD(row.expense)}</td>
-                      <td className={row.net >= 0 ? "finance-plus" : "finance-minus"}>
+                      <td
+                        className={
+                          row.net >= 0 ? "finance-plus" : "finance-minus"
+                        }
+                      >
                         {formatTWD(row.net)}
                       </td>
                     </tr>
@@ -1865,7 +1931,9 @@ function FinanceDashboard({ data }) {
             <span>{projectPayeeRows.length} payee rows</span>
           </header>
           {projectPayeeRows.length === 0 ? (
-            <p className="finance-dashboard-empty">No payee data found for expenses.</p>
+            <p className="finance-dashboard-empty">
+              No payee data found for expenses.
+            </p>
           ) : (
             <div className="finance-table-wrap">
               <table className="finance-table">
@@ -1881,7 +1949,9 @@ function FinanceDashboard({ data }) {
                     <tr key={`${row.project}-${row.payee}-${idx}`}>
                       <td>{row.project}</td>
                       <td>{row.payee}</td>
-                      <td className="finance-minus">{formatTWD(row.expense)}</td>
+                      <td className="finance-minus">
+                        {formatTWD(row.expense)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1959,7 +2029,10 @@ export default function FinancePage() {
     const unMembers = subscribeCollection("members", setMembers);
     const unProjects = subscribeCollection("projects", setProjects);
     const unTasks = subscribeCollection("tasks", setTasks);
-    const unReimbursements = subscribeCollection("reimbursements", setReimbursements);
+    const unReimbursements = subscribeCollection(
+      "reimbursements",
+      setReimbursements,
+    );
     const unFinance = subscribeCollection("financeConfig", (items) => {
       const doc = items.find((row) => row.id === CONFIG_DOC_ID) || null;
       const normalized = normalizeConfig(doc?.data || DEFAULT_CONFIG);
@@ -1983,7 +2056,14 @@ export default function FinancePage() {
 
   useEffect(() => {
     // Hardcoded fallback rates (TWD per 1 unit) — used if fetch fails
-    const FALLBACK_RATES = { USD: 32, JPY: 0.21, EUR: 35, GBP: 41, CNY: 4.4, HKD: 4.1 };
+    const FALLBACK_RATES = {
+      USD: 32,
+      JPY: 0.21,
+      EUR: 35,
+      GBP: 41,
+      CNY: 4.4,
+      HKD: 4.1,
+    };
     setFxRates(FALLBACK_RATES);
     // Fetch live rates from open.er-api.com (free, no key required)
     // rates[X] = X per 1 USD, so TWD per 1 X = rates[TWD] / rates[X]
@@ -2180,7 +2260,10 @@ export default function FinancePage() {
   }, [actualRowsNormalized, projectProjections, configDraft, rawSheetValues]);
 
   useEffect(() => {
-    if (selectedYear !== "overall" && !allYears.includes(Number(selectedYear))) {
+    if (
+      selectedYear !== "overall" &&
+      !allYears.includes(Number(selectedYear))
+    ) {
       setSelectedYear(allYears[0] ? String(allYears[0]) : "overall");
     }
   }, [allYears, selectedYear]);
@@ -2220,7 +2303,8 @@ export default function FinancePage() {
       const memberId = String(row?.memberId || "").trim();
       if (!Number.isFinite(year) || year <= 0 || !memberId) continue;
       if (!map[year]) map[year] = {};
-      map[year][memberId] = (map[year][memberId] || 0) + (Number(row?.amountTwd) || 0);
+      map[year][memberId] =
+        (map[year][memberId] || 0) + (Number(row?.amountTwd) || 0);
     }
     return map;
   }, [configDraft.capitalEntries]);
@@ -2241,9 +2325,12 @@ export default function FinancePage() {
       map[year].budget += Number(row.budgetTWD) || 0;
       map[year].payout += Number(row.projectedMemberPayoutTWD) || 0;
 
-      for (const [memberId, amount] of Object.entries(row.memberPayoutByMemberId || {})) {
+      for (const [memberId, amount] of Object.entries(
+        row.memberPayoutByMemberId || {},
+      )) {
         map[year].memberPayoutByMemberId[memberId] =
-          (map[year].memberPayoutByMemberId[memberId] || 0) + (Number(amount) || 0);
+          (map[year].memberPayoutByMemberId[memberId] || 0) +
+          (Number(amount) || 0);
       }
     }
     return map;
@@ -2273,7 +2360,8 @@ export default function FinancePage() {
         const cap = capitalByYearMember[year]?.[memberId];
         if (cap) contributedCapital += Number(cap) || 0;
 
-        const projMember = projectionByYearMember[year]?.memberPayoutByMemberId?.[memberId];
+        const projMember =
+          projectionByYearMember[year]?.memberPayoutByMemberId?.[memberId];
         if (projMember) projectedPayout += Number(projMember) || 0;
       }
 
@@ -2302,16 +2390,28 @@ export default function FinancePage() {
   }
 
   const yearRows = useMemo(
-    () =>
-      selectedYear === "overall"
-        ? []
-        : aggregateMemberRows(selectedYear),
-    [selectedYear, workerOwners, allYears, actualByYearMember, capitalByYearMember, projectionByYearMember, membersById],
+    () => (selectedYear === "overall" ? [] : aggregateMemberRows(selectedYear)),
+    [
+      selectedYear,
+      workerOwners,
+      allYears,
+      actualByYearMember,
+      capitalByYearMember,
+      projectionByYearMember,
+      membersById,
+    ],
   );
 
   const overallRows = useMemo(
     () => aggregateMemberRows("overall"),
-    [workerOwners, allYears, actualByYearMember, capitalByYearMember, projectionByYearMember, membersById],
+    [
+      workerOwners,
+      allYears,
+      actualByYearMember,
+      capitalByYearMember,
+      projectionByYearMember,
+      membersById,
+    ],
   );
 
   function summarizeScope(scopeYear) {
@@ -2351,14 +2451,19 @@ export default function FinancePage() {
       projectedCommonPool,
       projectedPayout,
       recurringCost,
-      netCashAfterRecurring:
-        actualCommonPool - actualPaid - recurringCost,
+      netCashAfterRecurring: actualCommonPool - actualPaid - recurringCost,
     };
   }
 
   const yearSummary = useMemo(
     () => (selectedYear === "overall" ? null : summarizeScope(selectedYear)),
-    [selectedYear, allYears, actualByYearMember, recurringByYear, projectionByYearMember],
+    [
+      selectedYear,
+      allYears,
+      actualByYearMember,
+      recurringByYear,
+      projectionByYearMember,
+    ],
   );
 
   const overallSummary = useMemo(
@@ -2411,7 +2516,8 @@ export default function FinancePage() {
   );
 
   const allProjectsPanel = useMemo(
-    () => projectPanels.find((panel) => panel.projectName === "__ALL__") || null,
+    () =>
+      projectPanels.find((panel) => panel.projectName === "__ALL__") || null,
     [projectPanels],
   );
 
@@ -2501,167 +2607,173 @@ export default function FinancePage() {
     return out;
   }, [rawSheetValues, memberIdByAlias, selectedYear]);
 
-  const projectCategoryViewRows = useMemo(
-    () => {
-      const txRows = singleProjectPanels.map((row) => {
-        const categoryName = row.projectName;
-        const needsProjectMatch = !isNonProjectCategory(categoryName);
-        const autoMatchProject =
-          needsProjectMatch
-            ? systemProjectByNormalizedName[normalizeProjectNameKey(categoryName)] || null
-            : null;
-        const manualMatchProjectId = categoryProjectMap?.[categoryName];
-        const matchedProjectId =
-          needsProjectMatch && manualMatchProjectId !== undefined
-            ? manualMatchProjectId
-            : autoMatchProject?.id || "";
-        const matchedProject =
-          systemProjectsSorted.find((p) => p.id === matchedProjectId) || null;
-        const isMatched = needsProjectMatch ? Boolean(matchedProject) : true;
-        const expectedAmountTwd = matchedProject
-          ? budgetToTWD(
-              Number(matchedProject?.data?.budget) || 0,
-              matchedProject?.data?.budgetCurrency,
-            ) || 0
-          : 0;
-        const projection = matchedProject
-          ? computeProjectProjection(matchedProject)
-          : null;
-        const expectedExpenseTwd = projection
-          ? (Number(projection.projectedMemberPayoutTWD) || 0) +
-            (Number(projection.projectedCompanyTaxTWD) || 0)
-          : 0;
-        const actualExpectedExpenseTwd =
-          Number(actualRequiredExpenseByCategory[categoryName]) || 0;
-        const expectedOutstandingTwd = Math.max(0, expectedAmountTwd - row.income);
-        const receivableDisplayTwd = Math.max(
-          Number(row.receivableMissing) || 0,
-          expectedOutstandingTwd,
-        );
+  const projectCategoryViewRows = useMemo(() => {
+    const txRows = singleProjectPanels.map((row) => {
+      const categoryName = row.projectName;
+      const needsProjectMatch = !isNonProjectCategory(categoryName);
+      const autoMatchProject = needsProjectMatch
+        ? systemProjectByNormalizedName[
+            normalizeProjectNameKey(categoryName)
+          ] || null
+        : null;
+      const manualMatchProjectId = categoryProjectMap?.[categoryName];
+      const matchedProjectId =
+        needsProjectMatch && manualMatchProjectId !== undefined
+          ? manualMatchProjectId
+          : autoMatchProject?.id || "";
+      const matchedProject =
+        systemProjectsSorted.find((p) => p.id === matchedProjectId) || null;
+      const isMatched = needsProjectMatch ? Boolean(matchedProject) : true;
+      const expectedAmountTwd = matchedProject
+        ? budgetToTWD(
+            Number(matchedProject?.data?.budget) || 0,
+            matchedProject?.data?.budgetCurrency,
+          ) || 0
+        : 0;
+      const projection = matchedProject
+        ? computeProjectProjection(matchedProject)
+        : null;
+      const expectedExpenseTwd = projection
+        ? (Number(projection.projectedMemberPayoutTWD) || 0) +
+          (Number(projection.projectedCompanyTaxTWD) || 0)
+        : 0;
+      const actualExpectedExpenseTwd =
+        Number(actualRequiredExpenseByCategory[categoryName]) || 0;
+      const expectedOutstandingTwd = Math.max(
+        0,
+        expectedAmountTwd - row.income,
+      );
+      const receivableDisplayTwd = Math.max(
+        Number(row.receivableMissing) || 0,
+        expectedOutstandingTwd,
+      );
 
-        let hoursEarnedPayableTwd = 0;
-        if (matchedProject) {
-          const projection = computeProjectProjection(matchedProject);
-          const staffing = Array.isArray(matchedProject?.data?.staffing)
-            ? matchedProject.data.staffing
-            : [];
-          for (const entry of staffing) {
-            const memberId = String(entry?.memberId || "").trim();
-            if (!memberId) continue;
-            const maxHours = Number(entry?.maxHours) || 0;
-            if (maxHours <= 0) continue;
-            const atMax = Number(projection.memberPayoutByMemberId?.[memberId]) || 0;
-            if (atMax <= 0) continue;
-            const finishedHours =
-              Number(finishedHoursByProjectMember[`${matchedProject.id}::${memberId}`]) ||
-              0;
-            if (finishedHours <= 0) continue;
-            const ratio = Math.max(0, Math.min(1, finishedHours / maxHours));
-            hoursEarnedPayableTwd += atMax * ratio;
-          }
+      let hoursEarnedPayableTwd = 0;
+      if (matchedProject) {
+        const projection = computeProjectProjection(matchedProject);
+        const staffing = Array.isArray(matchedProject?.data?.staffing)
+          ? matchedProject.data.staffing
+          : [];
+        for (const entry of staffing) {
+          const memberId = String(entry?.memberId || "").trim();
+          if (!memberId) continue;
+          const maxHours = Number(entry?.maxHours) || 0;
+          if (maxHours <= 0) continue;
+          const atMax =
+            Number(projection.memberPayoutByMemberId?.[memberId]) || 0;
+          if (atMax <= 0) continue;
+          const finishedHours =
+            Number(
+              finishedHoursByProjectMember[`${matchedProject.id}::${memberId}`],
+            ) || 0;
+          if (finishedHours <= 0) continue;
+          const ratio = Math.max(0, Math.min(1, finishedHours / maxHours));
+          hoursEarnedPayableTwd += atMax * ratio;
         }
+      }
 
-        const actualMemberPaidTwd = Number(actualMemberExpenseByCategory[categoryName]) || 0;
-        const hoursOutstandingPayableTwd = Math.max(
-          0,
-          Math.round(hoursEarnedPayableTwd - actualMemberPaidTwd),
-        );
-        const payableDisplayTwd = Math.max(
-          Number(row.payableExpected) || 0,
-          hoursOutstandingPayableTwd,
-        );
+      const actualMemberPaidTwd =
+        Number(actualMemberExpenseByCategory[categoryName]) || 0;
+      const hoursOutstandingPayableTwd = Math.max(
+        0,
+        Math.round(hoursEarnedPayableTwd - actualMemberPaidTwd),
+      );
+      const payableDisplayTwd = Math.max(
+        Number(row.payableExpected) || 0,
+        hoursOutstandingPayableTwd,
+      );
 
+      return {
+        ...row,
+        category: categoryName,
+        needsProjectMatch,
+        autoMatchProject,
+        matchedProject,
+        matchedProjectId,
+        isMatched,
+        isManual: manualMatchProjectId !== undefined,
+        expectedAmountTwd,
+        expectedExpenseTwd,
+        actualExpectedExpenseTwd,
+        incomeGapTwd: row.income - expectedAmountTwd,
+        expectedOutstandingTwd,
+        receivableDisplayTwd,
+        hoursEarnedPayableTwd,
+        actualMemberPaidTwd,
+        payableDisplayTwd,
+        noTransactionsYet: false,
+      };
+    });
+
+    const txCategoryNameSet = new Set(
+      txRows.map((row) => normalizeProjectNameKey(row.category)),
+    );
+    const mappedProjectIdSet = new Set(
+      txRows.map((row) => row.matchedProjectId).filter(Boolean),
+    );
+
+    const systemOnlyRows = systemProjectsSorted
+      .filter((project) => {
+        const normalizedProjectName = normalizeProjectNameKey(
+          project?.data?.name || "",
+        );
+        if (!normalizedProjectName) return false;
+        if (txCategoryNameSet.has(normalizedProjectName)) return false;
+        if (mappedProjectIdSet.has(project.id)) return false;
+        return true;
+      })
+      .map((project) => {
+        const expectedAmountTwd =
+          budgetToTWD(
+            Number(project?.data?.budget) || 0,
+            project?.data?.budgetCurrency,
+          ) || 0;
         return {
-          ...row,
-          category: categoryName,
-          needsProjectMatch,
-          autoMatchProject,
-          matchedProject,
-          matchedProjectId,
-          isMatched,
-          isManual: manualMatchProjectId !== undefined,
+          projectName: project?.data?.name || project.id,
+          category: project?.data?.name || project.id,
+          income: 0,
+          expense: 0,
+          net: 0,
+          receivableMissing: 0,
+          payableExpected: 0,
+          spendByCategory: [],
+          payeeBreakdown: [],
+          transactions: [],
+          needsProjectMatch: false,
+          autoMatchProject: project,
+          matchedProject: project,
+          matchedProjectId: project.id,
+          isMatched: true,
+          isManual: false,
           expectedAmountTwd,
-          expectedExpenseTwd,
-          actualExpectedExpenseTwd,
-          incomeGapTwd: row.income - expectedAmountTwd,
-          expectedOutstandingTwd,
-          receivableDisplayTwd,
-          hoursEarnedPayableTwd,
-          actualMemberPaidTwd,
-          payableDisplayTwd,
-          noTransactionsYet: false,
+          expectedExpenseTwd: (() => {
+            const projection = computeProjectProjection(project);
+            return (
+              (Number(projection.projectedMemberPayoutTWD) || 0) +
+              (Number(projection.projectedCompanyTaxTWD) || 0)
+            );
+          })(),
+          actualExpectedExpenseTwd: 0,
+          incomeGapTwd: -expectedAmountTwd,
+          expectedOutstandingTwd: Math.max(0, expectedAmountTwd),
+          receivableDisplayTwd: Math.max(0, expectedAmountTwd),
+          hoursEarnedPayableTwd: 0,
+          actualMemberPaidTwd: 0,
+          payableDisplayTwd: 0,
+          noTransactionsYet: true,
         };
       });
 
-      const txCategoryNameSet = new Set(
-        txRows.map((row) => normalizeProjectNameKey(row.category)),
-      );
-      const mappedProjectIdSet = new Set(
-        txRows.map((row) => row.matchedProjectId).filter(Boolean),
-      );
-
-      const systemOnlyRows = systemProjectsSorted
-        .filter((project) => {
-          const normalizedProjectName = normalizeProjectNameKey(project?.data?.name || "");
-          if (!normalizedProjectName) return false;
-          if (txCategoryNameSet.has(normalizedProjectName)) return false;
-          if (mappedProjectIdSet.has(project.id)) return false;
-          return true;
-        })
-        .map((project) => {
-          const expectedAmountTwd =
-            budgetToTWD(
-              Number(project?.data?.budget) || 0,
-              project?.data?.budgetCurrency,
-            ) || 0;
-          return {
-            projectName: project?.data?.name || project.id,
-            category: project?.data?.name || project.id,
-            income: 0,
-            expense: 0,
-            net: 0,
-            receivableMissing: 0,
-            payableExpected: 0,
-            spendByCategory: [],
-            payeeBreakdown: [],
-            transactions: [],
-            needsProjectMatch: false,
-            autoMatchProject: project,
-            matchedProject: project,
-            matchedProjectId: project.id,
-            isMatched: true,
-            isManual: false,
-            expectedAmountTwd,
-            expectedExpenseTwd: (() => {
-              const projection = computeProjectProjection(project);
-              return (
-                (Number(projection.projectedMemberPayoutTWD) || 0) +
-                (Number(projection.projectedCompanyTaxTWD) || 0)
-              );
-            })(),
-            actualExpectedExpenseTwd: 0,
-            incomeGapTwd: -expectedAmountTwd,
-            expectedOutstandingTwd: Math.max(0, expectedAmountTwd),
-            receivableDisplayTwd: Math.max(0, expectedAmountTwd),
-            hoursEarnedPayableTwd: 0,
-            actualMemberPaidTwd: 0,
-            payableDisplayTwd: 0,
-            noTransactionsYet: true,
-          };
-        });
-
-      return [...txRows, ...systemOnlyRows];
-    },
-    [
-      singleProjectPanels,
-      categoryProjectMap,
-      systemProjectByNormalizedName,
-      systemProjectsSorted,
-      actualRequiredExpenseByCategory,
-      actualMemberExpenseByCategory,
-      finishedHoursByProjectMember,
-    ],
-  );
+    return [...txRows, ...systemOnlyRows];
+  }, [
+    singleProjectPanels,
+    categoryProjectMap,
+    systemProjectByNormalizedName,
+    systemProjectsSorted,
+    actualRequiredExpenseByCategory,
+    actualMemberExpenseByCategory,
+    finishedHoursByProjectMember,
+  ]);
 
   const unmatchedProjectCategoryRows = useMemo(
     () =>
@@ -2745,15 +2857,20 @@ export default function FinancePage() {
         continue;
       }
       const projectLabel =
-        projection.projectName || project?.data?.name || project?.id || "(unknown project)";
+        projection.projectName ||
+        project?.data?.name ||
+        project?.id ||
+        "(unknown project)";
       for (const [memberId, amount] of Object.entries(
         projection.memberPayoutByMemberId || {},
       )) {
         expectedByMember[memberId] =
           (expectedByMember[memberId] || 0) + (Number(amount) || 0);
-        if (!expectedByMemberProject[memberId]) expectedByMemberProject[memberId] = {};
+        if (!expectedByMemberProject[memberId])
+          expectedByMemberProject[memberId] = {};
         expectedByMemberProject[memberId][projectLabel] =
-          (expectedByMemberProject[memberId][projectLabel] || 0) + (Number(amount) || 0);
+          (expectedByMemberProject[memberId][projectLabel] || 0) +
+          (Number(amount) || 0);
       }
 
       // Self-funded contributions are money members need to pay back to company,
@@ -2770,7 +2887,8 @@ export default function FinancePage() {
 
           expectedByMember[memberId] =
             (expectedByMember[memberId] || 0) - amount;
-          if (!expectedByMemberProject[memberId]) expectedByMemberProject[memberId] = {};
+          if (!expectedByMemberProject[memberId])
+            expectedByMemberProject[memberId] = {};
           const paybackLabel = `${projectLabel} · Self-funding payback`;
           expectedByMemberProject[memberId][paybackLabel] =
             (expectedByMemberProject[memberId][paybackLabel] || 0) - amount;
@@ -2788,17 +2906,21 @@ export default function FinancePage() {
       if ((Number(tx.expense) || 0) <= 0) continue;
 
       const byPayee = resolveMemberIdFromText(tx.payee, memberIdByAlias);
-      const byDescription = attributeMember(tx.description, memberIdByAlias)?.memberId || "";
+      const byDescription =
+        attributeMember(tx.description, memberIdByAlias)?.memberId || "";
       const memberId = byPayee || byDescription;
       if (!memberId) continue;
 
       paidByMember[memberId] =
         (paidByMember[memberId] || 0) + (Number(tx.expense) || 0);
 
-      const projectLabel = String(tx.projectName || "(unknown project)").trim() || "(unknown project)";
+      const projectLabel =
+        String(tx.projectName || "(unknown project)").trim() ||
+        "(unknown project)";
       if (!paidByMemberProject[memberId]) paidByMemberProject[memberId] = {};
       paidByMemberProject[memberId][projectLabel] =
-        (paidByMemberProject[memberId][projectLabel] || 0) + (Number(tx.expense) || 0);
+        (paidByMemberProject[memberId][projectLabel] || 0) +
+        (Number(tx.expense) || 0);
     }
 
     const memberIds = new Set([
@@ -2819,7 +2941,9 @@ export default function FinancePage() {
           .map((projectName) => {
             const rawExpected = Number(expectedProjects[projectName] || 0);
             const projectPaid = Number(paidProjects[projectName] || 0);
-            const projectExpected = isExpectedActualAlwaysMatchProject(projectName)
+            const projectExpected = isExpectedActualAlwaysMatchProject(
+              projectName,
+            )
               ? projectPaid
               : rawExpected;
             const projectGap = projectPaid - projectExpected;
@@ -2865,7 +2989,14 @@ export default function FinancePage() {
         };
       })
       .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
-  }, [projects, rawSheetValues, memberIdByAlias, membersById, selectedYear, reimbursementsByMember]);
+  }, [
+    projects,
+    rawSheetValues,
+    memberIdByAlias,
+    membersById,
+    selectedYear,
+    reimbursementsByMember,
+  ]);
 
   const payoutMismatchChartRows = useMemo(() => {
     let underpaid = 0;
@@ -2915,7 +3046,8 @@ export default function FinancePage() {
       seenProjectIds.add(projectId);
       const expectedRows = expectedPayeeRowsFromProject(project, membersById);
       for (const item of expectedRows) {
-        byLabel[item.label] = (byLabel[item.label] || 0) + (Number(item.amount) || 0);
+        byLabel[item.label] =
+          (byLabel[item.label] || 0) + (Number(item.amount) || 0);
       }
     }
 
@@ -2968,7 +3100,9 @@ export default function FinancePage() {
   }, [companyCommonPoolCapital, companyCommonPoolNetAll]);
 
   const companyCommonPoolTotal = useMemo(
-    () => (Number(companyCommonPoolCapital) || 0) + (Number(companyCommonPoolNetAll) || 0),
+    () =>
+      (Number(companyCommonPoolCapital) || 0) +
+      (Number(companyCommonPoolNetAll) || 0),
     [companyCommonPoolCapital, companyCommonPoolNetAll],
   );
 
@@ -3056,7 +3190,8 @@ export default function FinancePage() {
         const existing = Number(existingPositiveByLabel[label] || 0);
         // Expected should represent projects that have not yet contributed net-positive cash.
         // If a project already contributes positively in current data, do not add extra expected amount.
-        const additionalExpected = existing > 0 ? 0 : Math.max(0, Number(projected || 0));
+        const additionalExpected =
+          existing > 0 ? 0 : Math.max(0, Number(projected || 0));
         return { label, amount: additionalExpected };
       })
       .filter((row) => row.amount > 0)
@@ -3108,14 +3243,17 @@ export default function FinancePage() {
     for (const row of companyCommonPoolNetItemizedRows) {
       const label = String(row?.label || "").trim();
       if (!label) continue;
-      amountByLabel[label] = (amountByLabel[label] || 0) + (Number(row.amount) || 0);
+      amountByLabel[label] =
+        (amountByLabel[label] || 0) + (Number(row.amount) || 0);
       if (!keyByLabel[label]) keyByLabel[label] = row.key || `merged-${label}`;
     }
 
     for (const row of commonPoolExpectedByProjectRows) {
       const label = `Project · ${row.label}`;
-      amountByLabel[label] = (amountByLabel[label] || 0) + (Number(row.amount) || 0);
-      if (!keyByLabel[label]) keyByLabel[label] = `expected-project-${row.label}`;
+      amountByLabel[label] =
+        (amountByLabel[label] || 0) + (Number(row.amount) || 0);
+      if (!keyByLabel[label])
+        keyByLabel[label] = `expected-project-${row.label}`;
     }
 
     return Object.entries(amountByLabel)
@@ -3175,7 +3313,11 @@ export default function FinancePage() {
               >
                 Open spreadsheet
               </Button>
-              <Button variant="ghost" onClick={loadActualRows} disabled={loadingActual}>
+              <Button
+                variant="ghost"
+                onClick={loadActualRows}
+                disabled={loadingActual}
+              >
                 {loadingActual ? "Refreshing..." : "Refresh from sheet"}
               </Button>
             </div>
@@ -3183,11 +3325,16 @@ export default function FinancePage() {
         >
           {projectCategoryViewRows.length === 0 ? (
             <EmptyState>
-              No categorized transactions found yet. Refresh the sheet to load rows.
+              No categorized transactions found yet. Refresh the sheet to load
+              rows.
             </EmptyState>
           ) : (
             <>
-              <div className="finance-category-tabs" role="tablist" aria-label="Finance main view tabs">
+              <div
+                className="finance-category-tabs"
+                role="tablist"
+                aria-label="Finance main view tabs"
+              >
                 <button
                   type="button"
                   role="tab"
@@ -3213,7 +3360,10 @@ export default function FinancePage() {
               {financeMainView === "project" ? (
                 <>
                   <div className="finance-controls-inline">
-                    <label className="finance-field-label" htmlFor="finance-year-filter">
+                    <label
+                      className="finance-field-label"
+                      htmlFor="finance-year-filter"
+                    >
                       Year
                     </label>
                     <SelectField
@@ -3230,331 +3380,38 @@ export default function FinancePage() {
                     </SelectField>
                   </div>
                   <p className="finance-section-note">
-                    Unmatched categories: {unmatchedProjectCategoryRows.length} / {matchRequiredCount}
+                    Unmatched categories: {unmatchedProjectCategoryRows.length}{" "}
+                    / {matchRequiredCount}
                   </p>
 
                   <div className="finance-project-list">
-                {allProjectsPanel ? (
-                  <details className="project-row finance-project-row" open>
-                    <summary className="project-row-summary finance-project-summary">
-                      <div className="project-row-main">
-                        <span className="project-row-name">ALL projects combined</span>
-                        <div className="project-row-badges">
-                          <span className="project-row-kind">Finance rollup</span>
-                        </div>
-                      </div>
-                      <div className="project-row-budget-cell">
-                        <span className="project-row-budget-twd">{formatTWD(allProjectsPanel.net)}</span>
-                        <span className="project-row-budget-orig">net</span>
-                      </div>
-                      <div className="project-row-hours-cell">
-                        <span className="project-row-hours-assigned">{formatTWD(allProjectsReceivableDisplay)}</span>
-                        <span className="project-row-hours-max">應收</span>
-                      </div>
-                      <div className="project-row-wage">
-                        {formatTWD(allProjectsPayableDisplay)}
-                        <span className="project-row-wage-unit"> 應付</span>
-                      </div>
-                      <div className="project-row-actions">
-                        <span className="project-row-chevron">▾</span>
-                      </div>
-                    </summary>
-                    <div className="project-detail finance-project-detail">
-                      <div className="finance-project-charts">
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Company cost (non-project expenses)</h5>
-                          <PercentageRows rows={allProjectsCompanyCostRows} />
-                          <h5 className="finance-split-title finance-split-title--spaced">Net income contribution sources</h5>
-                          <PercentageRows rows={netContributionSourceRows} />
-                        </div>
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Common pool (Expected vs Actual)</h5>
-                          <h5 className="finance-split-title">Expected</h5>
-                          <CommonPoolRingRows
-                            rows={companyCommonPoolExpectedRows}
-                            itemizedRows={companyCommonPoolExpectedNetItemizedRows}
-                            itemizedKey="all-net"
-                            totalOverride={companyCommonPoolExpectedTotal}
-                          />
-                          <h5 className="finance-split-title finance-split-title--spaced">Actual (transaction history)</h5>
-                          <CommonPoolRingRows
-                            rows={companyCommonPoolRows}
-                            itemizedRows={companyCommonPoolNetItemizedRows}
-                            itemizedKey="all-net"
-                            totalOverride={companyCommonPoolTotal}
-                          />
-                        </div>
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Who is getting paid (Expected vs Actual)</h5>
-                          <div className="finance-split-cols">
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Expected</h5>
-                              <PercentageRows rows={allProjectsExpectedPayeeRows} />
-                            </div>
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Actual (transaction history)</h5>
-                              <PercentageRows rows={allProjectsPayeeRowsForChart} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="finance-table-wrap">
-                        <table className="finance-table">
-                          <thead>
-                            <tr>
-                              <th>日期</th>
-                              <th>敘述</th>
-                              <th>金額</th>
-                              <th>收款人</th>
-                              <th>流水號</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(allProjectsPanel.transactions || []).length === 0 ? (
-                              <tr>
-                                <td colSpan={5}>No transactions.</td>
-                              </tr>
-                            ) : (
-                              [...(allProjectsPanel.transactions || [])]
-                                .slice(-10)
-                                .reverse()
-                                .map((tx, idx) => (
-                                <tr key={`all-project-tx-${tx.serialNumber || "na"}-${idx}`}>
-                                  <td>{tx.date || "—"}</td>
-                                  <td>{tx.description || "—"}</td>
-                                  <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
-                                    {formatTWD(tx.amount)}
-                                  </td>
-                                  <td>{tx.payee || "—"}</td>
-                                  <td>{tx.serialNumber || "—"}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </details>
-                ) : null}
-                  </div>
-
-                  <div className="finance-category-tabs" role="tablist" aria-label="Finance category tabs">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={financeCategoryTab === "projects"}
-                  className={`finance-category-tab ${financeCategoryTab === "projects" ? "is-active" : ""}`}
-                  onClick={() => setFinanceCategoryTab("projects")}
-                >
-                  <IconFolder size={14} />
-                  <span>Projects ({projectOnlyRows.length})</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={financeCategoryTab === "non-projects"}
-                  className={`finance-category-tab ${financeCategoryTab === "non-projects" ? "is-active" : ""}`}
-                  onClick={() => setFinanceCategoryTab("non-projects")}
-                >
-                  <IconDocument size={14} />
-                  <span>Non-projects ({nonProjectRows.length})</span>
-                </button>
-                  </div>
-
-                  <div className="finance-project-list">
-
-                {financeCategoryTab === "projects"
-                  ? projectOnlyRows.map((row) => (
-                  <details
-                    key={`project-category-${row.category}`}
-                    className="project-row finance-project-row"
-                  >
-                    <summary className="project-row-summary finance-project-summary">
-                      <div className="project-row-main">
-                        <span className="project-row-name">{row.category}</span>
-                        <div className="project-row-badges">
-                          <span className="project-row-kind">
-                            {row.noTransactionsYet
-                              ? "No transactions yet"
-                              : row.needsProjectMatch
-                              ? row.isMatched
-                                ? "Matched"
-                                : "Unmatched"
-                              : "No project mapping needed"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="project-row-budget-cell">
-                        <span className={row.net >= 0 ? "project-row-budget-twd finance-plus" : "project-row-budget-twd finance-minus"}>
-                          {formatTWD(row.net)}
-                        </span>
-                        <span className="project-row-budget-orig">net</span>
-                      </div>
-                      <div className="project-row-hours-cell">
-                        <span className="project-row-hours-assigned">{formatTWD(row.receivableDisplayTwd)}</span>
-                        <span className="project-row-hours-max">應收</span>
-                      </div>
-                      <div className="project-row-wage">
-                        {formatTWD(row.payableDisplayTwd)}
-                        <span className="project-row-wage-unit"> 應付</span>
-                      </div>
-                      <div className="project-row-actions">
-                        <span className="project-row-chevron">▾</span>
-                      </div>
-                    </summary>
-                    <div className="project-detail finance-project-detail">
-                      <div className="finance-project-metrics">
-                        {row.needsProjectMatch ? (
-                          <div className="finance-map-editor-wrap">
-                            <span className="finance-map-editor-current">
-                              {row.matchedProject?.data?.name || "Unmatched"}
-                            </span>
-                            {mappingEditorCategory === row.category ? (
-                              <div className="finance-map-editor-panel">
-                                <SelectField
-                                  value={row.matchedProjectId || ""}
-                                  onChange={(e) => {
-                                    handleMatchCategoryProject(row.category, e.target.value);
-                                    setMappingEditorCategory("");
-                                  }}
-                                >
-                                  <option value="">Unmatched</option>
-                                  {systemProjectsSorted.map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                      {project?.data?.name || project.id}
-                                    </option>
-                                  ))}
-                                </SelectField>
-                                <Button
-                                  variant="ghost"
-                                  onClick={() => setMappingEditorCategory("")}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                onClick={() => setMappingEditorCategory(row.category)}
-                              >
-                                Change mapping
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <p>No project mapping needed</p>
-                        )}
-                      </div>
-
-                      <div className="finance-project-charts">
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Expected vs Actual (Income + Expense)</h5>
-                          <div className="finance-split-cols">
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Income</h5>
-                              <MismatchBars
-                                expected={row.expectedAmountTwd}
-                                actual={row.income}
-                              />
-                            </div>
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Expense</h5>
-                              <MismatchBars
-                                expected={row.expectedExpenseTwd}
-                                actual={row.actualExpectedExpenseTwd}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Spend breakdown (%)</h5>
-                          <PercentageRows rows={row.spendByCategory} />
-                        </div>
-                        <div className="finance-project-chart-block">
-                          <h5 className="finance-split-title">Who is getting paid (Expected vs Actual)</h5>
-                          <div className="finance-split-cols">
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Expected</h5>
-                              <PercentageRows rows={expectedPayeeRowsFromProject(row.matchedProject, membersById)} />
-                            </div>
-                            <div className="finance-split-col">
-                              <h5 className="finance-split-title">Actual (transaction history)</h5>
-                              <PercentageRows rows={row.payeeBreakdown} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="finance-table-wrap">
-                        <table className="finance-table">
-                          <thead>
-                            <tr>
-                              <th>日期</th>
-                              <th>敘述</th>
-                              <th>金額</th>
-                              <th>收款人</th>
-                              <th>流水號</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(row.transactions || []).length === 0 ? (
-                              <tr>
-                                <td colSpan={5}>No transactions.</td>
-                              </tr>
-                            ) : (
-                              (row.transactions || []).map((tx, idx) => (
-                                <tr key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}>
-                                  <td>{tx.date || "—"}</td>
-                                  <td>{tx.description || "—"}</td>
-                                  <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
-                                    {formatTWD(tx.amount)}
-                                  </td>
-                                  <td>{tx.payee || "—"}</td>
-                                  <td>{tx.serialNumber || "—"}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                    </div>
-                  </details>
-                ))
-                  : null}
-                  </div>
-
-                  {financeCategoryTab === "non-projects" && nonProjectRows.length > 0 ? (
-                <>
-                  <p className="finance-section-note">
-                    Non-project categories (included in ALL projects combined): {nonProjectRows.length}
-                  </p>
-                  <div className="finance-project-list">
-                    {nonProjectRows.map((row) => (
-                      <details
-                        key={`non-project-category-${row.category}`}
-                        className="project-row finance-project-row"
-                      >
+                    {allProjectsPanel ? (
+                      <details className="project-row finance-project-row" open>
                         <summary className="project-row-summary finance-project-summary">
                           <div className="project-row-main">
-                            <span className="project-row-name">{row.category}</span>
+                            <span className="project-row-name">
+                              ALL projects combined
+                            </span>
                             <div className="project-row-badges">
-                              <span className="project-row-kind">Non-project</span>
+                              <span className="project-row-kind">
+                                Finance rollup
+                              </span>
                             </div>
                           </div>
                           <div className="project-row-budget-cell">
-                            <span className={row.net >= 0 ? "project-row-budget-twd finance-plus" : "project-row-budget-twd finance-minus"}>
-                              {formatTWD(row.net)}
+                            <span className="project-row-budget-twd">
+                              {formatTWD(allProjectsPanel.net)}
                             </span>
                             <span className="project-row-budget-orig">net</span>
                           </div>
                           <div className="project-row-hours-cell">
-                            <span className="project-row-hours-assigned">{formatTWD(row.receivableMissing)}</span>
+                            <span className="project-row-hours-assigned">
+                              {formatTWD(allProjectsReceivableDisplay)}
+                            </span>
                             <span className="project-row-hours-max">應收</span>
                           </div>
                           <div className="project-row-wage">
-                            {formatTWD(row.payableExpected)}
+                            {formatTWD(allProjectsPayableDisplay)}
                             <span className="project-row-wage-unit"> 應付</span>
                           </div>
                           <div className="project-row-actions">
@@ -3564,12 +3421,64 @@ export default function FinancePage() {
                         <div className="project-detail finance-project-detail">
                           <div className="finance-project-charts">
                             <div className="finance-project-chart-block">
-                              <h5 className="finance-split-title">Spend breakdown (%)</h5>
-                              <PercentageRows rows={row.spendByCategory} />
+                              <h5 className="finance-split-title">
+                                Company cost (non-project expenses)
+                              </h5>
+                              <PercentageRows
+                                rows={allProjectsCompanyCostRows}
+                              />
+                              <h5 className="finance-split-title finance-split-title--spaced">
+                                Net income contribution sources
+                              </h5>
+                              <PercentageRows
+                                rows={netContributionSourceRows}
+                              />
                             </div>
                             <div className="finance-project-chart-block">
-                              <h5 className="finance-split-title">Who is getting paid (收款人 %)</h5>
-                              <PercentageRows rows={row.payeeBreakdown} />
+                              <h5 className="finance-split-title">
+                                Common pool (Expected vs Actual)
+                              </h5>
+                              <h5 className="finance-split-title">Expected</h5>
+                              <CommonPoolRingRows
+                                rows={companyCommonPoolExpectedRows}
+                                itemizedRows={
+                                  companyCommonPoolExpectedNetItemizedRows
+                                }
+                                itemizedKey="all-net"
+                                totalOverride={companyCommonPoolExpectedTotal}
+                              />
+                              <h5 className="finance-split-title finance-split-title--spaced">
+                                Actual (transaction history)
+                              </h5>
+                              <CommonPoolRingRows
+                                rows={companyCommonPoolRows}
+                                itemizedRows={companyCommonPoolNetItemizedRows}
+                                itemizedKey="all-net"
+                                totalOverride={companyCommonPoolTotal}
+                              />
+                            </div>
+                            <div className="finance-project-chart-block">
+                              <h5 className="finance-split-title">
+                                Who is getting paid (Expected vs Actual)
+                              </h5>
+                              <div className="finance-split-cols">
+                                <div className="finance-split-col">
+                                  <h5 className="finance-split-title">
+                                    Expected
+                                  </h5>
+                                  <PercentageRows
+                                    rows={allProjectsExpectedPayeeRows}
+                                  />
+                                </div>
+                                <div className="finance-split-col">
+                                  <h5 className="finance-split-title">
+                                    Actual (transaction history)
+                                  </h5>
+                                  <PercentageRows
+                                    rows={allProjectsPayeeRowsForChart}
+                                  />
+                                </div>
+                              </div>
                             </div>
                           </div>
 
@@ -3585,130 +3494,556 @@ export default function FinancePage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {(row.transactions || []).length === 0 ? (
+                                {(allProjectsPanel.transactions || [])
+                                  .length === 0 ? (
                                   <tr>
                                     <td colSpan={5}>No transactions.</td>
                                   </tr>
                                 ) : (
-                                  (row.transactions || []).map((tx, idx) => (
-                                    <tr key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}>
-                                      <td>{tx.date || "—"}</td>
-                                      <td>{tx.description || "—"}</td>
-                                      <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
-                                        {formatTWD(tx.amount)}
-                                      </td>
-                                      <td>{tx.payee || "—"}</td>
-                                      <td>{tx.serialNumber || "—"}</td>
-                                    </tr>
-                                  ))
+                                  [...(allProjectsPanel.transactions || [])]
+                                    .slice(-10)
+                                    .reverse()
+                                    .map((tx, idx) => (
+                                      <tr
+                                        key={`all-project-tx-${tx.serialNumber || "na"}-${idx}`}
+                                      >
+                                        <td>{tx.date || "—"}</td>
+                                        <td>{tx.description || "—"}</td>
+                                        <td
+                                          className={
+                                            Number(tx.amount) >= 0
+                                              ? "finance-plus"
+                                              : "finance-minus"
+                                          }
+                                        >
+                                          {formatTWD(tx.amount)}
+                                        </td>
+                                        <td>{tx.payee || "—"}</td>
+                                        <td>{tx.serialNumber || "—"}</td>
+                                      </tr>
+                                    ))
                                 )}
                               </tbody>
                             </table>
                           </div>
                         </div>
                       </details>
-                    ))}
+                    ) : null}
                   </div>
-                </>
+
+                  <div
+                    className="finance-category-tabs"
+                    role="tablist"
+                    aria-label="Finance category tabs"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={financeCategoryTab === "projects"}
+                      className={`finance-category-tab ${financeCategoryTab === "projects" ? "is-active" : ""}`}
+                      onClick={() => setFinanceCategoryTab("projects")}
+                    >
+                      <IconFolder size={14} />
+                      <span>Projects ({projectOnlyRows.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={financeCategoryTab === "non-projects"}
+                      className={`finance-category-tab ${financeCategoryTab === "non-projects" ? "is-active" : ""}`}
+                      onClick={() => setFinanceCategoryTab("non-projects")}
+                    >
+                      <IconDocument size={14} />
+                      <span>Non-projects ({nonProjectRows.length})</span>
+                    </button>
+                  </div>
+
+                  <div className="finance-project-list">
+                    {financeCategoryTab === "projects"
+                      ? projectOnlyRows.map((row) => (
+                          <details
+                            key={`project-category-${row.category}`}
+                            className="project-row finance-project-row"
+                          >
+                            <summary className="project-row-summary finance-project-summary">
+                              <div className="project-row-main">
+                                <span className="project-row-name">
+                                  {row.category}
+                                </span>
+                                <div className="project-row-badges">
+                                  <span className="project-row-kind">
+                                    {row.noTransactionsYet
+                                      ? "No transactions yet"
+                                      : row.needsProjectMatch
+                                        ? row.isMatched
+                                          ? "Matched"
+                                          : "Unmatched"
+                                        : "No project mapping needed"}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="project-row-budget-cell">
+                                <span
+                                  className={
+                                    row.net >= 0
+                                      ? "project-row-budget-twd finance-plus"
+                                      : "project-row-budget-twd finance-minus"
+                                  }
+                                >
+                                  {formatTWD(row.net)}
+                                </span>
+                                <span className="project-row-budget-orig">
+                                  net
+                                </span>
+                              </div>
+                              <div className="project-row-hours-cell">
+                                <span className="project-row-hours-assigned">
+                                  {formatTWD(row.receivableDisplayTwd)}
+                                </span>
+                                <span className="project-row-hours-max">
+                                  應收
+                                </span>
+                              </div>
+                              <div className="project-row-wage">
+                                {formatTWD(row.payableDisplayTwd)}
+                                <span className="project-row-wage-unit">
+                                  {" "}
+                                  應付
+                                </span>
+                              </div>
+                              <div className="project-row-actions">
+                                <span className="project-row-chevron">▾</span>
+                              </div>
+                            </summary>
+                            <div className="project-detail finance-project-detail">
+                              <div className="finance-project-metrics">
+                                {row.needsProjectMatch ? (
+                                  <div className="finance-map-editor-wrap">
+                                    <span className="finance-map-editor-current">
+                                      {row.matchedProject?.data?.name ||
+                                        "Unmatched"}
+                                    </span>
+                                    {mappingEditorCategory === row.category ? (
+                                      <div className="finance-map-editor-panel">
+                                        <SelectField
+                                          value={row.matchedProjectId || ""}
+                                          onChange={(e) => {
+                                            handleMatchCategoryProject(
+                                              row.category,
+                                              e.target.value,
+                                            );
+                                            setMappingEditorCategory("");
+                                          }}
+                                        >
+                                          <option value="">Unmatched</option>
+                                          {systemProjectsSorted.map(
+                                            (project) => (
+                                              <option
+                                                key={project.id}
+                                                value={project.id}
+                                              >
+                                                {project?.data?.name ||
+                                                  project.id}
+                                              </option>
+                                            ),
+                                          )}
+                                        </SelectField>
+                                        <Button
+                                          variant="ghost"
+                                          onClick={() =>
+                                            setMappingEditorCategory("")
+                                          }
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        onClick={() =>
+                                          setMappingEditorCategory(row.category)
+                                        }
+                                      >
+                                        Change mapping
+                                      </Button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p>No project mapping needed</p>
+                                )}
+                              </div>
+
+                              <div className="finance-project-charts">
+                                <div className="finance-project-chart-block">
+                                  <h5 className="finance-split-title">
+                                    Expected vs Actual (Income + Expense)
+                                  </h5>
+                                  <div className="finance-split-cols">
+                                    <div className="finance-split-col">
+                                      <h5 className="finance-split-title">
+                                        Income
+                                      </h5>
+                                      <MismatchBars
+                                        expected={row.expectedAmountTwd}
+                                        actual={row.income}
+                                      />
+                                    </div>
+                                    <div className="finance-split-col">
+                                      <h5 className="finance-split-title">
+                                        Expense
+                                      </h5>
+                                      <MismatchBars
+                                        expected={row.expectedExpenseTwd}
+                                        actual={row.actualExpectedExpenseTwd}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="finance-project-chart-block">
+                                  <h5 className="finance-split-title">
+                                    Spend breakdown (%)
+                                  </h5>
+                                  <PercentageRows rows={row.spendByCategory} />
+                                </div>
+                                <div className="finance-project-chart-block">
+                                  <h5 className="finance-split-title">
+                                    Who is getting paid (Expected vs Actual)
+                                  </h5>
+                                  <div className="finance-split-cols">
+                                    <div className="finance-split-col">
+                                      <h5 className="finance-split-title">
+                                        Expected
+                                      </h5>
+                                      <PercentageRows
+                                        rows={expectedPayeeRowsFromProject(
+                                          row.matchedProject,
+                                          membersById,
+                                        )}
+                                      />
+                                    </div>
+                                    <div className="finance-split-col">
+                                      <h5 className="finance-split-title">
+                                        Actual (transaction history)
+                                      </h5>
+                                      <PercentageRows
+                                        rows={row.payeeBreakdown}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="finance-table-wrap">
+                                <table className="finance-table">
+                                  <thead>
+                                    <tr>
+                                      <th>日期</th>
+                                      <th>敘述</th>
+                                      <th>金額</th>
+                                      <th>收款人</th>
+                                      <th>流水號</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(row.transactions || []).length === 0 ? (
+                                      <tr>
+                                        <td colSpan={5}>No transactions.</td>
+                                      </tr>
+                                    ) : (
+                                      (row.transactions || []).map(
+                                        (tx, idx) => (
+                                          <tr
+                                            key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}
+                                          >
+                                            <td>{tx.date || "—"}</td>
+                                            <td>{tx.description || "—"}</td>
+                                            <td
+                                              className={
+                                                Number(tx.amount) >= 0
+                                                  ? "finance-plus"
+                                                  : "finance-minus"
+                                              }
+                                            >
+                                              {formatTWD(tx.amount)}
+                                            </td>
+                                            <td>{tx.payee || "—"}</td>
+                                            <td>{tx.serialNumber || "—"}</td>
+                                          </tr>
+                                        ),
+                                      )
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </details>
+                        ))
+                      : null}
+                  </div>
+
+                  {financeCategoryTab === "non-projects" &&
+                  nonProjectRows.length > 0 ? (
+                    <>
+                      <p className="finance-section-note">
+                        Non-project categories (included in ALL projects
+                        combined): {nonProjectRows.length}
+                      </p>
+                      <div className="finance-project-list">
+                        {nonProjectRows.map((row) => (
+                          <details
+                            key={`non-project-category-${row.category}`}
+                            className="project-row finance-project-row"
+                          >
+                            <summary className="project-row-summary finance-project-summary">
+                              <div className="project-row-main">
+                                <span className="project-row-name">
+                                  {row.category}
+                                </span>
+                                <div className="project-row-badges">
+                                  <span className="project-row-kind">
+                                    Non-project
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="project-row-budget-cell">
+                                <span
+                                  className={
+                                    row.net >= 0
+                                      ? "project-row-budget-twd finance-plus"
+                                      : "project-row-budget-twd finance-minus"
+                                  }
+                                >
+                                  {formatTWD(row.net)}
+                                </span>
+                                <span className="project-row-budget-orig">
+                                  net
+                                </span>
+                              </div>
+                              <div className="project-row-hours-cell">
+                                <span className="project-row-hours-assigned">
+                                  {formatTWD(row.receivableMissing)}
+                                </span>
+                                <span className="project-row-hours-max">
+                                  應收
+                                </span>
+                              </div>
+                              <div className="project-row-wage">
+                                {formatTWD(row.payableExpected)}
+                                <span className="project-row-wage-unit">
+                                  {" "}
+                                  應付
+                                </span>
+                              </div>
+                              <div className="project-row-actions">
+                                <span className="project-row-chevron">▾</span>
+                              </div>
+                            </summary>
+                            <div className="project-detail finance-project-detail">
+                              <div className="finance-project-charts">
+                                <div className="finance-project-chart-block">
+                                  <h5 className="finance-split-title">
+                                    Spend breakdown (%)
+                                  </h5>
+                                  <PercentageRows rows={row.spendByCategory} />
+                                </div>
+                                <div className="finance-project-chart-block">
+                                  <h5 className="finance-split-title">
+                                    Who is getting paid (收款人 %)
+                                  </h5>
+                                  <PercentageRows rows={row.payeeBreakdown} />
+                                </div>
+                              </div>
+
+                              <div className="finance-table-wrap">
+                                <table className="finance-table">
+                                  <thead>
+                                    <tr>
+                                      <th>日期</th>
+                                      <th>敘述</th>
+                                      <th>金額</th>
+                                      <th>收款人</th>
+                                      <th>流水號</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(row.transactions || []).length === 0 ? (
+                                      <tr>
+                                        <td colSpan={5}>No transactions.</td>
+                                      </tr>
+                                    ) : (
+                                      (row.transactions || []).map(
+                                        (tx, idx) => (
+                                          <tr
+                                            key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}
+                                          >
+                                            <td>{tx.date || "—"}</td>
+                                            <td>{tx.description || "—"}</td>
+                                            <td
+                                              className={
+                                                Number(tx.amount) >= 0
+                                                  ? "finance-plus"
+                                                  : "finance-minus"
+                                              }
+                                            >
+                                              {formatTWD(tx.amount)}
+                                            </td>
+                                            <td>{tx.payee || "—"}</td>
+                                            <td>{tx.serialNumber || "—"}</td>
+                                          </tr>
+                                        ),
+                                      )
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    </>
                   ) : null}
                 </>
               ) : null}
 
               {financeMainView === "person" ? (
                 <div className="finance-table-wrap">
-                <div className="finance-project-chart-block">
-                  <h5 className="finance-split-title">Payout mismatch (%)</h5>
-                  <PercentageRows rows={payoutMismatchChartRows} />
-                </div>
-                <table className="finance-table">
-                  <thead>
-                    <tr>
-                      <th>Member</th>
-                      <th>Expected (system)</th>
-                      <th>Has paid (actual)</th>
-                      <th>Gap</th>
-                      <th>Net requests</th>
-                      <th>Adjusted gap</th>
-                      <th>Status</th>
-                      <th>Why (by project)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {memberPayoutReconciliationRows.length === 0 ? (
+                  <div className="finance-project-chart-block">
+                    <h5 className="finance-split-title">Payout mismatch (%)</h5>
+                    <PercentageRows rows={payoutMismatchChartRows} />
+                  </div>
+                  <table className="finance-table">
+                    <thead>
                       <tr>
-                        <td colSpan={8}>No member payout data.</td>
+                        <th>Member</th>
+                        <th>Expected (system)</th>
+                        <th>Has paid (actual)</th>
+                        <th>Gap</th>
+                        <th>Net requests</th>
+                        <th>Adjusted gap</th>
+                        <th>Status</th>
+                        <th>Why (by project)</th>
                       </tr>
-                    ) : (
-                      memberPayoutReconciliationRows.map((row) => {
-                        const reqSummary = reimbursementsByMember[row.memberId];
-                        // netTWD > 0 → company owes member; < 0 → member owes company
-                        const netTWD = reqSummary?.netTWD || 0;
-                        const unconverted = reqSummary?.unconverted || [];
-                        const hasAnyRequest = netTWD !== 0 || unconverted.length > 0;
-                        // adjustedGap: subtract what company owes member (netTWD) from gap
-                        const adjustedGap = row.gap - netTWD;
-                        return (
-                        <tr key={`member-payout-${row.memberId}`}>
-                          <td>{row.memberName}</td>
-                          <td>{formatTWD(row.expected)}</td>
-                          <td>{formatTWD(row.hasPaid)}</td>
-                          <td className={row.gap >= 0 ? "finance-plus" : "finance-minus"}>
-                            {formatTWD(row.gap)}
-                          </td>
-                          <td className={!hasAnyRequest ? "" : (netTWD > 0 || (netTWD === 0 && unconverted.some(u => u.amt > 0))) ? "finance-minus" : "finance-plus"}>
-                            {hasAnyRequest ? (
-                              <>
-                                {netTWD !== 0 && (
-                                  <span>{netTWD > 0 ? "co. owes " : "member owes "}{formatTWD(Math.abs(netTWD))}</span>
-                                )}
-                                {unconverted.map((u, i) => (
-                                  <em key={i} className="finance-balance-meta" style={{ display: "block" }}>
-                                    {u.amt > 0 ? "co. owes " : "member owes "}{Math.abs(u.amt).toFixed(2)} {u.currency}
-                                  </em>
-                                ))}
-                              </>
-                            ) : "—"}
-                          </td>
-                          <td className={adjustedGap >= 0 ? "finance-plus" : "finance-minus"}>
-                            {formatTWD(adjustedGap)}
-                          </td>
-                          <td>{row.status}</td>
-                          <td>
-                            {row.projectBreakdown?.length ? (
-                              <ul className="finance-balance-list">
-                                {row.projectBreakdown.map((item) => (
-                                  <li
-                                    key={`${row.memberId}-${item.projectName}`}
-                                    className="finance-balance-row"
-                                  >
-                                    <span className="finance-balance-name">
-                                      {item.projectName}
-                                      <em className="finance-balance-meta">
-                                        {` expected ${formatTWD(item.expected)} · actual ${formatTWD(item.hasPaid)}`}
-                                      </em>
-                                    </span>
-                                    <span className={item.gap >= 0 ? "finance-plus" : "finance-minus"}>
-                                      {formatTWD(item.gap)}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
+                    </thead>
+                    <tbody>
+                      {memberPayoutReconciliationRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={8}>No member payout data.</td>
                         </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        memberPayoutReconciliationRows.map((row) => {
+                          const reqSummary =
+                            reimbursementsByMember[row.memberId];
+                          // netTWD > 0 → company owes member; < 0 → member owes company
+                          const netTWD = reqSummary?.netTWD || 0;
+                          const unconverted = reqSummary?.unconverted || [];
+                          const hasAnyRequest =
+                            netTWD !== 0 || unconverted.length > 0;
+                          // adjustedGap: subtract what company owes member (netTWD) from gap
+                          const adjustedGap = row.gap - netTWD;
+                          return (
+                            <tr key={`member-payout-${row.memberId}`}>
+                              <td>{row.memberName}</td>
+                              <td>{formatTWD(row.expected)}</td>
+                              <td>{formatTWD(row.hasPaid)}</td>
+                              <td
+                                className={
+                                  row.gap >= 0
+                                    ? "finance-plus"
+                                    : "finance-minus"
+                                }
+                              >
+                                {formatTWD(row.gap)}
+                              </td>
+                              <td
+                                className={
+                                  !hasAnyRequest
+                                    ? ""
+                                    : netTWD > 0 ||
+                                        (netTWD === 0 &&
+                                          unconverted.some((u) => u.amt > 0))
+                                      ? "finance-minus"
+                                      : "finance-plus"
+                                }
+                              >
+                                {hasAnyRequest ? (
+                                  <>
+                                    {netTWD !== 0 && (
+                                      <span>
+                                        {netTWD > 0
+                                          ? "co. owes "
+                                          : "member owes "}
+                                        {formatTWD(Math.abs(netTWD))}
+                                      </span>
+                                    )}
+                                    {unconverted.map((u, i) => (
+                                      <em
+                                        key={i}
+                                        className="finance-balance-meta"
+                                        style={{ display: "block" }}
+                                      >
+                                        {u.amt > 0
+                                          ? "co. owes "
+                                          : "member owes "}
+                                        {Math.abs(u.amt).toFixed(2)}{" "}
+                                        {u.currency}
+                                      </em>
+                                    ))}
+                                  </>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td
+                                className={
+                                  adjustedGap >= 0
+                                    ? "finance-plus"
+                                    : "finance-minus"
+                                }
+                              >
+                                {formatTWD(adjustedGap)}
+                              </td>
+                              <td>{row.status}</td>
+                              <td>
+                                {row.projectBreakdown?.length ? (
+                                  <ul className="finance-balance-list">
+                                    {row.projectBreakdown.map((item) => (
+                                      <li
+                                        key={`${row.memberId}-${item.projectName}`}
+                                        className="finance-balance-row"
+                                      >
+                                        <span className="finance-balance-name">
+                                          {item.projectName}
+                                          <em className="finance-balance-meta">
+                                            {` expected ${formatTWD(item.expected)} · actual ${formatTWD(item.hasPaid)}`}
+                                          </em>
+                                        </span>
+                                        <span
+                                          className={
+                                            item.gap >= 0
+                                              ? "finance-plus"
+                                              : "finance-minus"
+                                          }
+                                        >
+                                          {formatTWD(item.gap)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               ) : null}
             </>
           )}
         </SectionBlock>
-
       </CollectionLayout>
 
       <StatusStack>

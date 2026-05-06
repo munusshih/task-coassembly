@@ -44,9 +44,10 @@ export default function Navigation({
     }
   }
 
-  const allowed = Array.isArray(allowedTabs) && allowedTabs.length
-    ? new Set(allowedTabs)
-    : null;
+  const allowed =
+    Array.isArray(allowedTabs) && allowedTabs.length
+      ? new Set(allowedTabs)
+      : null;
 
   return (
     <aside className="nav-wrap">
