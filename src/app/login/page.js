@@ -25,11 +25,11 @@ export default async function LoginPage({ searchParams }) {
   return (
     <main className="login-page">
       <section className="login-card" aria-label="Sign in">
-        <p className="login-kicker">CoAssembly</p>
-        <h1 className="login-title">Welcome Back</h1>
-        <p className="login-subtitle">
-          Sign in to continue to your workspace dashboard.
-        </p>
+        <div className="login-brand" aria-hidden="true">
+          <span className="login-brand-text">CoA</span>
+        </div>
+        <h1 className="login-title">CoAssembly</h1>
+        <p className="login-subtitle">Members only.</p>
 
         <LoginClient
           next={next}
@@ -37,8 +37,6 @@ export default async function LoginPage({ searchParams }) {
           showExpired={showExpired}
           showDenied={showDenied}
         />
-
-        <p className="login-help">Use your assigned Google account.</p>
       </section>
     </main>
   );

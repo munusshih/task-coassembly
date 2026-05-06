@@ -94,7 +94,7 @@ export default function LoginClient({
         onClick={handleGoogleSignIn}
         disabled={busy}
       >
-        {busy ? "Signing in..." : "Continue with Google"}
+        {busy ? "Signing in…" : "Sign in with Google"}
       </button>
     </div>
   );
