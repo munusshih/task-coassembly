@@ -514,13 +514,22 @@ function MismatchBars({ expected, actual }) {
 function expectedPayeeRowsFromProject(project, membersById) {
   if (!project) return [];
   const projection = computeProjectProjection(project);
-  return Object.entries(projection.memberPayoutByMemberId || {})
+  const rows = Object.entries(projection.memberPayoutByMemberId || {})
     .map(([memberId, amount]) => ({
       label: membersById?.[memberId]?.data?.name || memberId,
       amount: Number(amount) || 0,
     }))
     .filter((row) => row.amount > 0)
     .sort((a, b) => b.amount - a.amount);
+
+  const tax = Number(projection.projectedCompanyTaxTWD) || 0;
+  const commonPool = Number(projection.projectedCommonPoolTWD) || 0;
+  const poolOnly = Math.max(0, commonPool - tax);
+
+  if (tax > 0) rows.push({ label: "稅", amount: tax });
+  if (poolOnly > 0) rows.push({ label: "公司池", amount: poolOnly });
+
+  return rows;
 }
 
 function upsertCompanyPoolRow(rows, amount) {
