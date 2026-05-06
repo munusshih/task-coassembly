@@ -26,6 +26,11 @@ import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
+import {
+  currentWeekKey,
+  getAssignableMembersForProject,
+  isMemberAssignedToProject,
+} from "./taskBoardRules";
 
 const TODO_TYPE = "memberTodo";
 const REACTION_OPTIONS = [
@@ -72,7 +77,7 @@ function formatCommentTime(ts) {
 
 function WishItem({
   item,
-  members,
+  assignableMembers,
   currentUsername,
   sessionChecked,
   onSessionExpired,
@@ -206,6 +211,10 @@ function WishItem({
 
   async function handlePushConfirm() {
     if (!selectedMember) return;
+    const allowed = assignableMembers.some(
+      (member) => member.id === selectedMember,
+    );
+    if (!allowed) return;
     await onPush(item, selectedMember);
     setPushed(true);
     setPushing(false);
@@ -289,12 +298,17 @@ function WishItem({
                 autoFocus
               >
                 <option value="">Pick a member…</option>
-                {members.map((m) => (
+                {assignableMembers.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.data?.name || m.id}
                   </option>
                 ))}
               </SelectField>
+              {assignableMembers.length === 0 ? (
+                <p className="todo-empty">
+                  No assigned members for this project.
+                </p>
+              ) : null}
             </ModalShell>
           )}
           {pushed ? (
@@ -524,6 +538,10 @@ function ProjectSection({
   const [showAll, setShowAll] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
+  const assignableMembers = useMemo(() => {
+    return getAssignableMembersForProject(members, project);
+  }, [members, project]);
+
   const sortedItems = useMemo(
     () =>
       [...items].sort((a, b) => {
@@ -567,7 +585,7 @@ function ProjectSection({
               <WishItem
                 key={item.id}
                 item={item}
-                members={members}
+                assignableMembers={assignableMembers}
                 currentUsername={currentUsername}
                 sessionChecked={sessionChecked}
                 onSessionExpired={onSessionExpired}
@@ -616,7 +634,7 @@ function ProjectSection({
                   <WishItem
                     key={item.id}
                     item={item}
-                    members={members}
+                    assignableMembers={assignableMembers}
                     currentUsername={currentUsername}
                     sessionChecked={sessionChecked}
                     onSessionExpired={onSessionExpired}
@@ -782,10 +800,10 @@ export default function BacklogPage({ viewerName = "" }) {
     filteredItems
       .filter((item) => Boolean(item?.data?.archived))
       .forEach((item) => {
-      const pid = item.data.projectId || "__none__";
-      if (!map[pid]) map[pid] = [];
-      map[pid].push(item);
-    });
+        const pid = item.data.projectId || "__none__";
+        if (!map[pid]) map[pid] = [];
+        map[pid].push(item);
+      });
     return map;
   }, [filteredItems]);
 
@@ -807,7 +825,8 @@ export default function BacklogPage({ viewerName = "" }) {
       if (!linkedTasks.length) continue;
 
       const allFinished = linkedTasks.every(
-        (task) => Boolean(task?.data?.completed) || Boolean(task?.data?.archived),
+        (task) =>
+          Boolean(task?.data?.completed) || Boolean(task?.data?.archived),
       );
       const currentlyArchived = Boolean(wish?.data?.archived);
       if (allFinished === currentlyArchived) continue;
@@ -865,13 +884,24 @@ export default function BacklogPage({ viewerName = "" }) {
   }
 
   async function handlePush(item, memberId) {
+    const projectId = item?.data?.projectId || null;
+    if (projectId) {
+      const project = projects.find((entry) => entry.id === projectId);
+      if (!isMemberAssignedToProject(project, memberId)) {
+        console.error(
+          "Cannot push wish to member not assigned to this project",
+        );
+        return;
+      }
+    }
+
     const now = Date.now();
     try {
       const taskId = await createDocument("tasks", {
         type: TODO_TYPE,
         memberId,
         title: item.data.text,
-        projectId: item.data.projectId || null,
+        projectId,
         sourceWishId: item.id,
         sourceWishText: item.data.text || "",
         sourceWishSnapshotAt: now,
@@ -880,7 +910,10 @@ export default function BacklogPage({ viewerName = "" }) {
         subtasks: [],
         links: [],
         completed: false,
+        reviewed: false,
+        completionState: "open",
         archived: false,
+        taskWeek: currentWeekKey(),
         orderIndex: now,
         createdAt: now,
         updatedAt: now,
@@ -896,8 +929,8 @@ export default function BacklogPage({ viewerName = "" }) {
       await replaceDocument("backlogItems", item.id, {
         ...item.data,
         linkedTaskIds,
-        archived: false,
-        archivedAt: null,
+        archived: true,
+        archivedAt: now,
         lastAssignedAt: now,
         updatedAt: now,
       });

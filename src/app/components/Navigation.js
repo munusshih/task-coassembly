@@ -9,6 +9,7 @@ import {
   IconDocument,
   IconFolder,
   IconLink,
+  IconReceipt,
   IconUsers,
 } from "./icons";
 
@@ -18,6 +19,7 @@ const TABS = [
   { key: "projects", label: "Projects", Icon: IconFolder },
   { key: "backlog", label: "Wishes", Icon: IconBacklog },
   { key: "finance", label: "Finance", Icon: IconChartLine },
+  { key: "payouts", label: "Requests", Icon: IconReceipt },
   { key: "meetingNotes", label: "Notes / doc", Icon: IconDocument },
   { key: "resources", label: "Resources", Icon: IconLink },
 ];

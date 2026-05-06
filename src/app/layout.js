@@ -7,12 +7,14 @@ const sentient = localFont({
   variable: "--font-sentient",
   display: "swap",
   weight: "100 900",
+  preload: false,
 });
 
 const sponact = localFont({
   src: "../assets/fonts/sponact015001-Regular (1).otf",
   variable: "--font-sponact",
   display: "swap",
+  preload: false,
 });
 
 export const metadata = {
@@ -25,7 +27,7 @@ export default function RootLayout({ children }) {
     <html lang="en" className={`${sentient.variable} ${sponact.variable}`}>
       <body>
         {children}
-        <Analytics />
+        {process.env.NODE_ENV === "production" ? <Analytics /> : null}
       </body>
     </html>
   );

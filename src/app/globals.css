@@ -473,6 +473,59 @@ input[type="radio"] {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* ─── Splash / loading screen ──────────────────────────────────────────────── */
+
+.splash-screen {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding-left: clamp(14px, 2.5vw, 28px) !important;
+}
+
+.splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.splash-brand {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #3d3028;
+  opacity: 0.9;
+}
+
+.splash-label {
+  font-size: 13px;
+  color: #9a8878;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.splash-dots {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.splash-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b8a898;
+  animation: splash-pulse 1.2s ease-in-out infinite;
+}
+
+.splash-dots span:nth-child(2) { animation-delay: 0.2s; }
+.splash-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes splash-pulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+  40%           { opacity: 1;    transform: scale(1); }
+}
+
 @keyframes slide-in-left {
   from {
     opacity: 0;
@@ -927,6 +980,7 @@ input[type="radio"] {
     gap: 4px;
     flex-wrap: wrap;
   }
+
   .nav-signout-btn {
     width: auto;
     padding: 6px 10px;
@@ -1593,6 +1647,28 @@ input[type="radio"] {
 
 .member-archive-controls-row {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reviewed-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #ddd8ce;
+}
+
+.reviewed-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 10px 8px 42px;
+}
+
+.reviewed-section-label {
+  margin: 0;
 }
 
 /* ─── Paper textures ─────────────────────────────────────────────────────── */
@@ -1841,11 +1917,47 @@ input[type="radio"] {
 }
 
 .todo-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  padding-right: 6px;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 6px 0 0;
   opacity: 0;
   transition: opacity 0.1s;
+}
+
+.todo-actions--decision {
+  opacity: 1;
+  padding-top: 0;
+}
+
+.todo-decision-btn {
+  border: 1px solid #ddd2c6;
+  background: #fff9f2;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  color: #6a5a4a;
+  padding: 4px 8px;
+}
+
+.todo-decision-btn:hover {
+  border-color: #cdb9a5;
+  color: #4d3f33;
+  background: #fff3e8;
+}
+
+.todo-decision-btn--danger {
+  border-color: #e1c2bf;
+  color: #8b3d35;
+  background: #fff3f2;
+}
+
+.todo-decision-btn--danger:hover {
+  border-color: #cf9e99;
+  color: #6d2c25;
+  background: #ffe9e8;
 }
 
 .todo-item:hover .todo-actions {
@@ -1855,10 +1967,20 @@ input[type="radio"] {
 .icon-btn {
   border: 0;
   background: transparent;
-  padding: 3px 4px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   color: #bbb;
   font-size: 13px;
   line-height: 1;
+}
+
+.todo-actions .icon-btn>svg {
+  width: 14px;
+  height: 14px;
 }
 
 .icon-btn:hover {
@@ -3744,7 +3866,7 @@ input[type="radio"] {
   gap: 5px;
 }
 
-.finance-field > span {
+.finance-field>span {
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3757,7 +3879,7 @@ input[type="radio"] {
   gap: 4px;
 }
 
-.finance-year-picker > span {
+.finance-year-picker>span {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4046,6 +4168,287 @@ input[type="radio"] {
   color: #2a2620;
   text-align: right;
   white-space: nowrap;
+}
+
+.finance-project-list {
+  display: grid;
+  gap: 12px;
+}
+
+.finance-category-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.finance-category-tab {
+  border: 1px solid #ddd4c5;
+  background: rgba(255, 255, 255, 0.7);
+  color: #5c5348;
+  border-radius: 999px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.finance-category-tab.is-active {
+  background: #efe7d8;
+  color: #2f2820;
+  border-color: #c9bea9;
+}
+
+.finance-project-row {
+  border: 1px solid #e3ddcf;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8f4ec 0%, #f2ecdf 100%);
+  box-shadow: 0 10px 24px rgba(27, 23, 18, 0.08);
+}
+
+.finance-project-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.finance-project-summary::-webkit-details-marker {
+  display: none;
+}
+
+.finance-project-row .project-row-chevron {
+  transition: transform 0.16s ease;
+}
+
+.finance-project-row[open] .project-row-chevron {
+  transform: rotate(180deg);
+}
+
+.finance-project-detail {
+  border-top: 1px solid #e6dece;
+}
+
+.finance-project-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 12px;
+}
+
+.finance-project-metrics p {
+  margin: 0;
+  font-size: 13px;
+  color: #3f3a33;
+}
+
+.finance-map-editor-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.finance-map-editor-current {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3f3a33;
+}
+
+.finance-map-editor-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.finance-controls-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.finance-field-label {
+  font-size: 12px;
+  color: #6e675c;
+  font-weight: 600;
+}
+
+.finance-project-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.finance-project-chart-block {
+  border: 1px solid #e2dbcf;
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.finance-project-chart-block .finance-split-title {
+  margin-bottom: 10px;
+}
+
+.finance-project-chart-block .finance-split-title--spaced {
+  margin-top: 14px;
+}
+
+.finance-mismatch-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-mismatch-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.finance-mismatch-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-mismatch-label {
+  font-size: 12px;
+  color: #6e675c;
+}
+
+.finance-mismatch-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.finance-mismatch-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.finance-mismatch-fill--expected {
+  background: #9a7b4f;
+}
+
+.finance-mismatch-fill--actual {
+  background: #2d6f9f;
+}
+
+.finance-mismatch-amount {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2a2620;
+}
+
+.finance-mismatch-gap {
+  margin: 0;
+  font-size: 12px;
+  color: #5f584f;
+}
+
+.finance-ring-wrap {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.finance-ring-chart {
+  width: 170px;
+  height: 170px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d8d3c9;
+}
+
+.finance-ring-hole {
+  width: 98px;
+  height: 98px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e5dfd4;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 8px;
+}
+
+.finance-ring-hole strong {
+  font-size: 12px;
+  line-height: 1.2;
+  color: #2a2620;
+}
+
+.finance-ring-hole span {
+  font-size: 10px;
+  color: #8e887d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.finance-ring-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.finance-ring-legend-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.finance-ring-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.finance-ring-legend-row--sub {
+  opacity: 0.92;
+}
+
+.finance-ring-legend-row--sub .finance-ring-label {
+  padding-left: 12px;
+}
+
+.finance-ring-dot--sub {
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  background: #a8a194;
+}
+
+.finance-ring-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #2a2620;
+}
+
+.finance-ring-pct {
+  color: #6a6257;
+  font-weight: 700;
+}
+
+.finance-ring-amount {
+  color: #8e887d;
+}
+
+@media (max-width: 760px) {
+  .finance-ring-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-ring-chart {
+    margin: 0 auto;
+  }
 }
 
 .finance-month-chart {
@@ -4374,30 +4777,6 @@ input[type="radio"] {
 .snapshot-list {
   display: grid;
   gap: 4px;
-}
-
-.snapshot-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid #f5f5f3;
-  font-size: 13px;
-  color: #444;
-}
-
-.snapshot-check {
-  flex-shrink: 0;
-  color: #1e8e3e;
-  font-size: 13px;
-  margin-top: 1px;
-}
-
-.snapshot-hours {
-  font-size: 11px;
-  color: #aaa;
-  margin-left: auto;
-  white-space: nowrap;
 }
 
 /* ─── Meeting Notes ────────────────────────────────────────────────────── */
@@ -6898,7 +7277,7 @@ input[type="radio"] {
 .wish-item-controls {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -7461,4 +7840,395 @@ input[type="radio"] {
   padding: 10px 12px;
   background: #f8f6f4;
   border-radius: 8px;
+}
+/* ─── Requests page — thermal receipt slips ─────────────────────────────── */
+
+.req-receipts-area {
+  padding: 14px 16px 10px;
+}
+
+.req-receipt-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+/* ── Thermal receipt slip ── */
+
+.thermal {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  /* real thermal paper shadow: subtle lift with slight warmth */
+  filter:
+    drop-shadow(0 1px 2px rgba(0,0,0,0.22))
+    drop-shadow(0 4px 10px rgba(0,0,0,0.12));
+}
+
+/* faded / voided states */
+.thermal--rejected {
+  opacity: 0.45;
+}
+
+.thermal--paid {
+  opacity: 0.6;
+}
+
+/* ── Torn bottom edge ── */
+
+.thermal-tear {
+  width: 100%;
+  height: 9px;
+  background: #fff;
+  flex-shrink: 0;
+  clip-path: polygon(
+    0% 0%,
+    3.33% 100%, 6.67% 0%,
+    10%   100%, 13.33% 0%,
+    16.67% 100%, 20% 0%,
+    23.33% 100%, 26.67% 0%,
+    30%   100%, 33.33% 0%,
+    36.67% 100%, 40% 0%,
+    43.33% 100%, 46.67% 0%,
+    50%   100%, 53.33% 0%,
+    56.67% 100%, 60% 0%,
+    63.33% 100%, 66.67% 0%,
+    70%   100%, 73.33% 0%,
+    76.67% 100%, 80% 0%,
+    83.33% 100%, 86.67% 0%,
+    90%   100%, 93.33% 0%,
+    96.67% 100%, 100% 0%
+  );
+}
+
+/* ── Receipt body ── */
+
+.thermal-paper {
+  background: #fff;
+  padding: 14px 14px 10px;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 11px;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  min-width: 0;
+  /* subtle grain typical of thermal paper */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* org header — centered, bold */
+.thermal-org {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 1px;
+}
+
+.thermal-org-sub {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+/* horizontal rules */
+.thermal-rule {
+  border: none;
+  border-top: 1px solid #111;
+  margin: 5px 0;
+}
+
+.thermal-rule--dashed {
+  border-top: 1px dashed #888;
+}
+
+/* key-value metadata grid */
+.thermal-meta-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 8px;
+  margin: 4px 0;
+}
+
+.thermal-meta-key {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #555;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.thermal-meta-val {
+  font-size: 9.5px;
+  color: #111;
+  word-break: break-all;
+}
+
+/* description */
+.thermal-item-label {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: #555;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.thermal-item-desc {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+  margin-bottom: 2px;
+}
+
+.thermal-item-notes {
+  font-size: 9.5px;
+  color: #555;
+  line-height: 1.4;
+  margin-bottom: 2px;
+  font-style: italic;
+}
+
+/* total */
+.thermal-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 3px 0;
+}
+
+.thermal-total-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #555;
+}
+
+.thermal-total-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+/* receipt ref link */
+.thermal-ref-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0;
+}
+
+.thermal-ref-label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+.thermal-ref-link {
+  font-size: 9px;
+  color: #111;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+  line-height: 1.3;
+  font-family: inherit;
+}
+
+/* footer row: stamp + admin buttons */
+.thermal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+  min-height: 26px;
+}
+
+.thermal-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* rubber stamp */
+.thermal-stamp {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  display: inline-block;
+  transform: rotate(-6deg);
+  transform-origin: center;
+  opacity: 0.78;
+  line-height: 1;
+}
+
+.thermal-stamp--submitted { color: #8a6500; }
+.thermal-stamp--approved  { color: #145a14; }
+.thermal-stamp--paid      { color: #0a3580; }
+.thermal-stamp--rejected  { color: #8b1010; }
+
+/* tiny approve/reject buttons inside receipt */
+.thermal-btn {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border: 1px solid #aaa;
+  border-radius: 2px;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.thermal-btn:hover {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.thermal-btn--danger {
+  border-color: #aaa;
+  color: #555;
+}
+
+.thermal-btn--danger:hover {
+  background: #111;
+  color: #fff;
+}
+
+/* delete icon inside receipt — stay monochrome */
+.thermal-actions .icon-btn {
+  color: #888;
+}
+
+.thermal-actions .icon-btn:hover {
+  color: #111;
+}
+
+/* barcode decoration */
+.thermal-barcode {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.thermal-barcode-lines {
+  width: 100%;
+  height: 28px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #111 0px, #111 1px,
+    transparent 1px, transparent 3px,
+    #111 3px, #111 5px,
+    transparent 5px, transparent 7px,
+    #111 7px, #111 8px,
+    transparent 8px, transparent 11px,
+    #111 11px, #111 13px,
+    transparent 13px, transparent 15px,
+    #111 15px, #111 16px,
+    transparent 16px, transparent 18px,
+    #111 18px, #111 21px,
+    transparent 21px, transparent 23px,
+    #111 23px, #111 24px,
+    transparent 24px, transparent 27px,
+    #111 27px, #111 29px,
+    transparent 29px, transparent 32px
+  );
+  background-size: 32px 100%;
+}
+
+.thermal-barcode-num {
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  color: #333;
+}
+
+/* pending chip on member card header */
+.member-card-meta-chip--pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.req-type-hint {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+/* ── Add form ── */
+
+.req-add-form {
+  padding: 10px 0 4px;
+  border-top: 1px dashed #ccc;
+  margin-top: 6px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.req-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* reset notepad-add-input inside the req form so it doesn't overflow */
+.req-add-form .notepad-add-input {
+  min-width: 0;
+  width: auto;
+  flex: 1;
+  box-sizing: border-box;
+}
+
+.req-amount-input {
+  width: 80px !important;
+  flex: 0 0 80px !important;
+  min-width: 0;
+}
+
+.req-receipt-input {
+  flex: 1 1 0 !important;
+  min-width: 0;
+}
+
+/* reset the 42px gutter indent — that's for the lined notepad margin column */
+.req-add-actions {
+  padding-left: 0 !important;
+}
+
+.req-notes-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: transparent;
+  resize: none;
+  margin-bottom: 8px;
+  font-family: inherit;
+  color: #222;
+  box-sizing: border-box;
 }

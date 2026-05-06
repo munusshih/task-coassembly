@@ -9,6 +9,10 @@ export default function ModalShell({
   className = "",
   bodyClassName = "",
   closeTitle = "Close",
+  closeOnOverlayClick = false,
+  hasUnsavedChanges = false,
+  unsavedWarning = "You have unsaved changes. Close anyway?",
+  onDiscardChanges,
 }) {
   const modalClasses = [
     "edit-modal",
@@ -23,8 +27,23 @@ export default function ModalShell({
     .filter(Boolean)
     .join(" ");
 
+  function requestClose() {
+    if (!onClose) return;
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm(unsavedWarning);
+      if (!confirmed) return;
+      if (typeof onDiscardChanges === "function") onDiscardChanges();
+    }
+    onClose();
+  }
+
+  function handleOverlayClick() {
+    if (!closeOnOverlayClick) return;
+    requestClose();
+  }
+
   return (
-    <div className="edit-modal-overlay" onClick={onClose}>
+    <div className="edit-modal-overlay" onClick={handleOverlayClick}>
       <div
         className={modalClasses}
         onClick={(event) => event.stopPropagation()}
@@ -36,7 +55,7 @@ export default function ModalShell({
               <button
                 type="button"
                 className="edit-modal-close"
-                onClick={onClose}
+                onClick={requestClose}
                 title={closeTitle}
               >
                 ✕

@@ -10,7 +10,12 @@ import {
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
-import { DELETE_ICON, MEMBER_VIEW_ICON, PROJECT_VIEW_ICON } from "./icons";
+import {
+  DELETE_ICON,
+  MEMBER_VIEW_ICON,
+  PROJECT_VIEW_ICON,
+  IconBacklog,
+} from "./icons";
 import BoardSection from "./ui/BoardSection";
 import CollectionLayout from "./ui/CollectionLayout";
 import CreateBar from "./ui/CreateBar";
@@ -26,11 +31,26 @@ import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import ModalShell from "./ui/ModalShell";
 import {
   memberPlanningTexture,
   memberSnapshotTexture,
   SURFACE_TEXTURES,
 } from "./ui/paperTextures";
+import {
+  canPushTaskToWishes,
+  canPushTaskToNewestWeek,
+  canViewerManageMemberTask,
+  currentWeekKey,
+  getAssignableProjects,
+  isMemberActive,
+  isMemberAssignedToProject,
+  isUnfinishedTaskOutsideWeek,
+  isProjectIdAssignable,
+  taskWeekKey,
+  weekKeyFromTs,
+  weekStartDateForTs,
+} from "./taskBoardRules";
 
 // ─── Constants ───────────────────────────────────────────────────────────────────────────────
 
@@ -227,9 +247,7 @@ function formatDeadline(dateStr) {
 }
 
 function totalWeeklyMinutes(todos) {
-  return todos
-    .filter((t) => !t.data.archived)
-    .reduce((s, t) => s + (Number(t.data.timeUnits) || 0) * 15, 0);
+  return todos.reduce((s, t) => s + (Number(t.data.timeUnits) || 0) * 15, 0);
 }
 
 function formatWeeklyTime(minutes) {
@@ -237,20 +255,6 @@ function formatWeeklyTime(minutes) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
-// Returns the Monday of the week containing `ts` (timestamp ms), Mon-Fri only
-function getMondayOf(ts) {
-  const d = new Date(ts);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function weekKey(ts) {
-  return getMondayOf(ts).toISOString().slice(0, 10);
 }
 
 function weekLabel(mondayDate) {
@@ -265,10 +269,6 @@ function weekLabel(mondayDate) {
   return `${fmt(mondayDate)}–${fmt(friday)}${yearSuffix}`;
 }
 
-function currentWeekKey() {
-  return weekKey(Date.now());
-}
-
 function quarterLabel(weekKeyStr) {
   // weekKeyStr is "YYYY-MM-DD" (Monday)
   const [y, m] = weekKeyStr.split("-").map(Number);
@@ -278,7 +278,7 @@ function quarterLabel(weekKeyStr) {
 
 function relativeWeekTitle(weekKeyStr) {
   const selected = new Date(weekKeyStr + "T00:00:00");
-  const current = getMondayOf(Date.now());
+  const current = weekStartDateForTs(Date.now());
   const diff = Math.round(
     (selected.getTime() - current.getTime()) / (7 * 24 * 60 * 60 * 1000),
   );
@@ -300,24 +300,21 @@ function sortTodos(items) {
   });
 }
 
-function isMemberAssignedToProject(project, memberId) {
-  if (!project || !memberId) return false;
-  const staffing = Array.isArray(project.data?.staffing)
-    ? project.data.staffing
-    : [];
-  return staffing.some((entry) => entry?.memberId === memberId);
-}
-
-function getAssignableProjects(projects, memberId) {
-  return (projects || []).filter((project) =>
-    isMemberAssignedToProject(project, memberId),
-  );
-}
-
-function isProjectIdAssignable(projects, memberId, projectId) {
-  if (!projectId) return true;
-  const project = (projects || []).find((item) => item.id === projectId);
-  return isMemberAssignedToProject(project, memberId);
+function dedupeItemsById(items) {
+  const map = new Map();
+  for (const item of items || []) {
+    const id = item?.id;
+    if (!id) continue;
+    const existing = map.get(id);
+    if (!existing) {
+      map.set(id, item);
+      continue;
+    }
+    const prevUpdated = Number(existing?.data?.updatedAt || existing?.data?.createdAt || 0);
+    const nextUpdated = Number(item?.data?.updatedAt || item?.data?.createdAt || 0);
+    if (nextUpdated >= prevUpdated) map.set(id, item);
+  }
+  return [...map.values()];
 }
 
 // ─── TaskItem ─────────────────────────────────────────────────────────────────────────────────
@@ -340,6 +337,10 @@ function TaskItem({
   onEditCancel,
   onToggle,
   onToggleSubtask,
+  onPushBacklog,
+  onPushNewestWeek,
+  onReviewDoneTask,
+  onRejectDoneTask,
   onDelete,
   onOvertimeSave,
   getProjectRemaining,
@@ -367,6 +368,9 @@ function TaskItem({
 
   const subtasks = normalizeTaskSubtaskList(todo.data.subtasks);
   const links = normalizeTaskLinkList(todo.data.links);
+  const canPushNewestWeek = canPushTaskToNewestWeek(todo.data);
+  const canPushWishes = canPushTaskToWishes(todo.data);
+  const canTakeDoneDecision = Boolean(completed) && !Boolean(todo.data.reviewed);
 
   function handleCheck(checked) {
     onToggle(todo, checked);
@@ -698,15 +702,57 @@ function TaskItem({
             </details>
           )}
         </div>
-        <div className="todo-actions">
-          <IconButton
-            type="button"
-            variant="delete"
-            onClick={() => onDelete(todo)}
-            title="Delete"
-          >
-            {DELETE_ICON}
-          </IconButton>
+        <div
+          className={
+            canTakeDoneDecision ? "todo-actions todo-actions--decision" : "todo-actions"
+          }
+        >
+          {canTakeDoneDecision ? (
+            <>
+              <button
+                type="button"
+                className="todo-decision-btn"
+                onClick={() => onReviewDoneTask(todo)}
+              >
+                Review
+              </button>
+              <button
+                type="button"
+                className="todo-decision-btn todo-decision-btn--danger"
+                onClick={() => onRejectDoneTask(todo)}
+              >
+                Reject
+              </button>
+            </>
+          ) : null}
+          {!canTakeDoneDecision && canPushNewestWeek ? (
+            <IconButton
+              type="button"
+              title="Push to newest week"
+              onClick={() => onPushNewestWeek(todo)}
+            >
+              <span>{">>"}</span>
+            </IconButton>
+          ) : null}
+          {!canTakeDoneDecision && canPushWishes ? (
+            <IconButton
+              type="button"
+              title="Push back to wishes"
+              onClick={() => onPushBacklog(todo)}
+            >
+              <IconBacklog />
+            </IconButton>
+          ) : null}
+          {!completed ? (
+            <IconButton
+              type="button"
+              variant="delete"
+              onClick={() => onDelete(todo)}
+              title="Delete"
+            >
+              {DELETE_ICON}
+            </IconButton>
+          ) : null}
         </div>
       </li>
       {showOT && (
@@ -742,155 +788,6 @@ function TaskItem({
   );
 }
 
-// ─── Archive section ──────────────────────────────────────────────────────────────────
-
-function ArchiveSection({ archivedTodos, projects, onUnarchiveAll }) {
-  const [open, setOpen] = useState(false);
-  const [confirmUnflush, setConfirmUnflush] = useState(false);
-
-  // Group by week key (descending), then by projectId within each week
-  const weekGroups = useMemo(() => {
-    const byWeek = {};
-    for (const todo of archivedTodos) {
-      const ts = Number(todo.data.archivedAt || todo.data.updatedAt || 0);
-      const key = ts ? weekKey(ts) : "unknown";
-      if (!byWeek[key])
-        byWeek[key] = { monday: ts ? getMondayOf(ts) : null, todos: [] };
-      byWeek[key].todos.push(todo);
-    }
-    // Sort weeks descending
-    return Object.entries(byWeek)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([key, { monday, todos }]) => {
-        // Group todos by project within this week
-        const byProject = {};
-        for (const todo of todos) {
-          const pid = todo.data.projectId || "__none__";
-          if (!byProject[pid]) byProject[pid] = [];
-          byProject[pid].push(todo);
-        }
-        const totalMin = todos.reduce(
-          (s, t) =>
-            s +
-            ((Number(t.data.timeUnits) || 0) +
-              (Number(t.data.overtimeUnits) || 0)) *
-              15,
-          0,
-        );
-        return { key, monday, byProject, totalMin, count: todos.length };
-      });
-  }, [archivedTodos]);
-
-  if (!archivedTodos.length) return null;
-
-  return (
-    <div className="archive-section">
-      <div className="archive-header-row">
-        <button
-          type="button"
-          className="archive-toggle"
-          onClick={() => setOpen((s) => !s)}
-        >
-          Archive ({archivedTodos.length}){open ? " ▲" : " ▼"}
-        </button>
-        {!confirmUnflush ? (
-          <button
-            type="button"
-            className="flush-btn flush-btn--danger"
-            onClick={() => setConfirmUnflush(true)}
-          >
-            Restore all
-          </button>
-        ) : (
-          <span className="archive-unflush-confirm">
-            <button
-              type="button"
-              className="flush-btn flush-btn--danger-confirm"
-              onClick={() => {
-                setConfirmUnflush(false);
-                onUnarchiveAll();
-              }}
-            >
-              Confirm restore
-            </button>
-            <button
-              type="button"
-              className="flush-btn"
-              onClick={() => setConfirmUnflush(false)}
-            >
-              Cancel
-            </button>
-          </span>
-        )}
-      </div>
-      {open && (
-        <div className="archive-body">
-          {weekGroups.map(({ key, monday, byProject, totalMin, count }) => (
-            <div key={key} className="archive-week">
-              <div className="archive-week-header">
-                <span className="archive-week-label">
-                  {monday ? weekLabel(monday) : "Unknown week"}
-                </span>
-                <span className="archive-week-total">
-                  {count} task{count !== 1 ? "s" : ""} ·{" total "}
-                  {formatWeeklyTime(totalMin) || "0m"}
-                </span>
-              </div>
-              {Object.entries(byProject).map(([pid, todos]) => {
-                const projName =
-                  pid === "__none__"
-                    ? null
-                    : projects.find((p) => p.id === pid)?.data?.name || pid;
-                const projMin = todos.reduce(
-                  (s, t) =>
-                    s +
-                    ((Number(t.data.timeUnits) || 0) +
-                      (Number(t.data.overtimeUnits) || 0)) *
-                      15,
-                  0,
-                );
-                return (
-                  <div key={pid} className="archive-project-group">
-                    {projName && (
-                      <div className="archive-project-header">
-                        <span className="archive-project-name">{projName}</span>
-                        <span className="archive-project-time">
-                          {formatWeeklyTime(projMin) || "0m"}
-                        </span>
-                      </div>
-                    )}
-                    <ul className="archive-list">
-                      {todos.map((todo) => {
-                        const planned = Number(todo.data.timeUnits) || 0;
-                        const ot = Number(todo.data.overtimeUnits) || 0;
-                        return (
-                          <li key={todo.id} className="archive-item">
-                            <span className="archive-item-text">
-                              {todo.data.title || "Untitled"}
-                            </span>
-                            <span className="archive-item-meta">
-                              {planned ? formatTimeUnits(planned) : null}
-                              {ot ? (
-                                <span className="archive-ot">
-                                  +{formatTimeUnits(ot)}
-                                </span>
-                              ) : null}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── ProjectGroupCard ─────────────────────────────────────────────────────────────────────────
 
 function ProjectGroupCard({
@@ -899,6 +796,10 @@ function ProjectGroupCard({
   members,
   onCreate,
   onToggle,
+  onPushBacklog,
+  onPushNewestWeek,
+  onReviewDoneTask,
+  onRejectDoneTask,
   onDelete,
 }) {
   const [addOpen, setAddOpen] = useState(false);
@@ -988,14 +889,52 @@ function ProjectGroupCard({
                           {formatTimeUnits(task.data.timeUnits)}
                         </Pill>
                       )}
-                      <IconButton
-                        type="button"
-                        variant="delete"
-                        onClick={() => onDelete(task)}
-                        title="Delete"
-                      >
-                        {DELETE_ICON}
-                      </IconButton>
+                      {canPushTaskToNewestWeek(task.data) ? (
+                        <IconButton
+                          type="button"
+                          title="Push to newest week"
+                          onClick={() => onPushNewestWeek(task)}
+                        >
+                          <span>{">>"}</span>
+                        </IconButton>
+                      ) : null}
+                      {canPushTaskToWishes(task.data) ? (
+                        <IconButton
+                          type="button"
+                          title="Push back to wishes"
+                          onClick={() => onPushBacklog(task)}
+                        >
+                          <IconBacklog />
+                        </IconButton>
+                      ) : null}
+                      {task.data.completed && !task.data.reviewed ? (
+                        <div className="wish-item-controls">
+                          <button
+                            type="button"
+                            className="todo-decision-btn"
+                            onClick={() => onReviewDoneTask(task)}
+                          >
+                            Review
+                          </button>
+                          <button
+                            type="button"
+                            className="todo-decision-btn todo-decision-btn--danger"
+                            onClick={() => onRejectDoneTask(task)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : null}
+                      {!task.data.completed ? (
+                        <IconButton
+                          type="button"
+                          variant="delete"
+                          onClick={() => onDelete(task)}
+                          title="Delete"
+                        >
+                          {DELETE_ICON}
+                        </IconButton>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -1073,9 +1012,12 @@ function MemberCard({
   onToggle,
   onToggleSubtask,
   onSaveEdit,
+  onPushBacklog,
+  onPushNewestWeek,
+  onReviewDoneTask,
+  onRejectDoneTask,
   onDelete,
-  onArchiveAll,
-  onUnarchiveAll,
+  onUndoReviewWeek,
   onOvertimeSave,
   onProjectRemaining,
   selectedWeek,
@@ -1084,14 +1026,14 @@ function MemberCard({
   const addInputRef = useRef(null);
 
   const isCurrentWeek = !selectedWeek || selectedWeek === currentWeekKey();
-
-  const activeTodos = sortTodos(todos.filter((t) => !t.data.archived));
-  const archivedTodos = todos
-    .filter((t) => t.data.archived)
-    .sort(
-      (a, b) =>
-        (Number(b.data.archivedAt) || 0) - (Number(a.data.archivedAt) || 0),
-    );
+  const memberWeekTodos = useMemo(
+    () => todos.filter((t) => taskWeekKey(t.data) === selectedWeek),
+    [todos, selectedWeek],
+  );
+  const weekTodos = sortTodos(memberWeekTodos.filter((t) => !t.data.reviewed));
+  const reviewedTodos = sortTodos(
+    memberWeekTodos.filter((t) => Boolean(t.data.reviewed)),
+  );
 
   const {
     addActive,
@@ -1105,13 +1047,8 @@ function MemberCard({
     editDraft,
   } = ui;
 
-  // For past-week snapshot: only tasks archived in that week
-  const snapshotTodos = !isCurrentWeek
-    ? archivedTodos.filter((t) => {
-        const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
-        return ts && weekKey(ts) === selectedWeek;
-      })
-    : [];
+  // For past-week snapshot: show all tasks assigned to that week
+  const snapshotTodos = !isCurrentWeek ? sortTodos(memberWeekTodos) : [];
 
   const snapshotMin = snapshotTodos.reduce(
     (s, t) =>
@@ -1120,8 +1057,8 @@ function MemberCard({
         15,
     0,
   );
-  const activeCount = activeTodos.length;
-  const archivedCount = archivedTodos.length;
+  const activeCount = weekTodos.length;
+  const reviewedCount = reviewedTodos.length;
 
   const addRemainingHint = addProject
     ? onProjectRemaining?.(member.id, addProject, null)
@@ -1131,7 +1068,7 @@ function MemberCard({
     [projects, member.id],
   );
 
-  const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(todos));
+  const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(memberWeekTodos));
   const memberTexture = memberPlanningTexture(member?.data?.role);
   const snapshotTexture = memberSnapshotTexture(member?.data?.role);
 
@@ -1141,7 +1078,7 @@ function MemberCard({
 
   useEffect(() => {
     if (!editingId) return;
-    const stillExists = activeTodos.some((todo) => todo.id === editingId);
+    const stillExists = weekTodos.some((todo) => todo.id === editingId);
     if (!stillExists) {
       setUi((prev) => ({
         ...prev,
@@ -1149,7 +1086,7 @@ function MemberCard({
         editDraft: emptyEditDraft(),
       }));
     }
-  }, [editingId, activeTodos]);
+  }, [editingId, weekTodos]);
 
   useEffect(() => {
     if (!addProject) return;
@@ -1294,7 +1231,7 @@ function MemberCard({
           <div className="member-card-meta">
             <span className="member-card-meta-chip">{activeCount} active</span>
             <span className="member-card-meta-chip">
-              {archivedCount} archived
+              {reviewedCount} reviewed
             </span>
           </div>
         </div>
@@ -1308,10 +1245,10 @@ function MemberCard({
       {isCurrentWeek ? (
         <PaperSurface texture={memberTexture}>
           <ul className="todo-list">
-            {activeTodos.length === 0 && (
+            {weekTodos.length === 0 && (
               <li className="todo-empty">No tasks yet.</li>
             )}
-            {activeTodos.map((todo) => (
+            {weekTodos.map((todo) => (
               <TaskItem
                 key={todo.id}
                 todo={todo}
@@ -1331,12 +1268,68 @@ function MemberCard({
                 onEditCancel={cancelEdit}
                 onToggle={onToggle}
                 onToggleSubtask={onToggleSubtask}
+                onPushBacklog={onPushBacklog}
+                onPushNewestWeek={onPushNewestWeek}
+                onReviewDoneTask={onReviewDoneTask}
+                onRejectDoneTask={onRejectDoneTask}
                 onDelete={onDelete}
                 onOvertimeSave={onOvertimeSave}
                 getProjectRemaining={onProjectRemaining}
               />
             ))}
           </ul>
+
+          {reviewedTodos.length > 0 ? (
+            <div className="reviewed-section">
+              <div className="reviewed-section-head">
+                <p className="meta-label reviewed-section-label">Reviewed (locked)</p>
+                <Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  onClick={() => onUndoReviewWeek(member.id)}
+                >
+                  Undo review this week
+                </Button>
+              </div>
+              <ul className="todo-list reviewed-list">
+                {reviewedTodos.map((todo) => {
+                  const projName = projects.find(
+                    (p) => p.id === todo.data.projectId,
+                  )?.data?.name;
+                  const t = Number(todo.data.timeUnits) || 0;
+                  const ot = Number(todo.data.overtimeUnits) || 0;
+                  return (
+                    <li key={todo.id} className="todo-item">
+                      <div className="todo-checkbox-cell">
+                        <input type="checkbox" checked={Boolean(todo.data.completed)} disabled tabIndex={-1} />
+                      </div>
+                      <div className="todo-content" style={{ cursor: "default" }}>
+                        <span
+                          className={
+                            todo.data.completed
+                              ? "todo-text todo-text--done"
+                              : "todo-text"
+                          }
+                        >
+                          {todo.data.title || "Untitled"}
+                        </span>
+                        <div className="todo-chips">
+                          {t > 0 ? (
+                            <Pill className="chip--time">{formatTimeUnits(t)}</Pill>
+                          ) : null}
+                          {ot > 0 ? (
+                            <Pill className="chip--ot">+{formatTimeUnits(ot)} OT</Pill>
+                          ) : null}
+                          {projName ? <Pill className="chip--project">{projName}</Pill> : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
 
           {!addActive ? (
             <button className="notepad-add-trigger" onClick={activateAdd}>
@@ -1551,7 +1544,7 @@ function MemberCard({
       ) : (
         <PaperSurface texture={snapshotTexture}>
           {snapshotTodos.length === 0 ? (
-            <p className="todo-empty">No tasks completed this week.</p>
+            <p className="todo-empty">No tasks in this week.</p>
           ) : (
             <ul className="todo-list snapshot-list">
               {snapshotTodos.map((todo) => {
@@ -1560,11 +1553,20 @@ function MemberCard({
                 )?.data?.name;
                 const t = Number(todo.data.timeUnits) || 0;
                 const ot = Number(todo.data.overtimeUnits) || 0;
+                const subtasks = normalizeTaskSubtaskList(todo.data.subtasks);
+                const links = normalizeTaskLinkList(todo.data.links);
+                const done = Boolean(todo.data.completed);
                 return (
-                  <li key={todo.id} className="todo-item snapshot-item">
-                    <div className="snapshot-check">✓</div>
+                  <li key={todo.id} className="todo-item">
+                    <div className="todo-checkbox-cell">
+                      <input type="checkbox" checked={done} readOnly tabIndex={-1} />
+                    </div>
                     <div className="todo-content">
-                      <span className="todo-text todo-text--done">
+                      <span
+                        className={
+                          done ? "todo-text todo-text--done" : "todo-text"
+                        }
+                      >
                         {todo.data.title || "Untitled"}
                       </span>
                       <div className="todo-chips">
@@ -1582,6 +1584,76 @@ function MemberCard({
                           <Pill className="chip--project">{projName}</Pill>
                         )}
                       </div>
+                      {(subtasks.length > 0 || links.length > 0) && (
+                        <details className="todo-inline-details">
+                          <summary className="todo-inline-details-summary">
+                            Details
+                            {subtasks.length > 0
+                              ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}`
+                              : ""}
+                            {links.length > 0
+                              ? ` · ${links.length} link${links.length > 1 ? "s" : ""}`
+                              : ""}
+                          </summary>
+                          {subtasks.length > 0 && (
+                            <ul className="todo-subtasks">
+                              {subtasks.map((subtask, idx) => (
+                                <li
+                                  key={`snapshot-subtask-${todo.id}-${idx}`}
+                                  className="todo-subtask-item"
+                                >
+                                  <span
+                                    className={
+                                      subtask.completed
+                                        ? "todo-subtask-text todo-subtask-text--done"
+                                        : "todo-subtask-text"
+                                    }
+                                  >
+                                    {subtask.completed ? "[x] " : "[ ] "}
+                                    {subtask.text}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {links.length > 0 && (
+                            <div className="todo-links">
+                              {links.map((link, idx) => (
+                                <a
+                                  key={`snapshot-link-${todo.id}-${idx}`}
+                                  className="todo-link"
+                                  href={toLinkHref(link.url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={link.url}
+                                >
+                                  {link.name || formatLinkLabel(link.url)}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </details>
+                      )}
+                    </div>
+                    <div className="todo-actions">
+                      {canPushTaskToNewestWeek(todo.data) ? (
+                        <IconButton
+                          type="button"
+                          title="Push to newest week"
+                          onClick={() => onPushNewestWeek(todo)}
+                        >
+                          <span>{">>"}</span>
+                        </IconButton>
+                      ) : null}
+                      {canPushTaskToWishes(todo.data) ? (
+                        <IconButton
+                          type="button"
+                          title="Push back to wishes"
+                          onClick={() => onPushBacklog(todo)}
+                        >
+                          <IconBacklog />
+                        </IconButton>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -1591,30 +1663,7 @@ function MemberCard({
         </PaperSurface>
       )}
 
-      {isCurrentWeek && (
-        <div className="member-card-footer">
-          <div className="member-archive-controls">
-            {activeTodos.length > 0 && (
-              <div className="member-archive-controls-row">
-                <button
-                  type="button"
-                  className="flush-btn"
-                  onClick={() => onArchiveAll(member.id)}
-                >
-                  Flush completed
-                </button>
-              </div>
-            )}
-            <div className="member-archive-controls-row">
-              <ArchiveSection
-                archivedTodos={archivedTodos}
-                projects={projects}
-                onUnarchiveAll={() => onUnarchiveAll(member.id)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+
     </EntityCard>
   );
 }
@@ -1635,6 +1684,8 @@ export default function MembersPage({
   const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
   const [memberViewMode, setMemberViewMode] = useState("member");
   const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
+  const [actionConfirm, setActionConfirm] = useState(null);
+  const createInFlightRef = useRef(false);
   const isLimitedViewer =
     viewerRole === "flying-member" || viewerRole === "external-collaborator";
   const hasSharedData =
@@ -1647,7 +1698,9 @@ export default function MembersPage({
     const cached = readTaskBoardCache();
     if (cached.members.length) setMembers(cached.members);
     if (cached.tasks.length)
-      setAllTasks(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE));
+      setAllTasks(
+        dedupeItemsById(cached.tasks.filter((i) => i?.data?.type === TODO_TYPE)),
+      );
     if (cached.projects.length) setProjects(cached.projects);
 
     const storedWeek = readLocalJSON(TASK_BOARD_WEEK_KEY, null);
@@ -1660,7 +1713,9 @@ export default function MembersPage({
     if (!hasSharedData) return;
     setMembers(sharedMembers);
     setProjects(sharedProjects);
-    setAllTasks(sharedTasks.filter((i) => i?.data?.type === TODO_TYPE));
+    setAllTasks(
+      dedupeItemsById(sharedTasks.filter((i) => i?.data?.type === TODO_TYPE)),
+    );
   }, [hasSharedData, sharedMembers, sharedProjects, sharedTasks]);
 
   useEffect(() => {
@@ -1668,7 +1723,9 @@ export default function MembersPage({
     if (!firebaseReady) return;
     const u1 = subscribeCollection("members", setMembers);
     const u2 = subscribeCollection("tasks", (items) =>
-      setAllTasks(items.filter((i) => i.data.type === TODO_TYPE)),
+      setAllTasks(
+        dedupeItemsById(items.filter((i) => i.data.type === TODO_TYPE)),
+      ),
     );
     const u3 = subscribeCollection("projects", setProjects);
     return () => {
@@ -1699,10 +1756,16 @@ export default function MembersPage({
   }, [isLimitedViewer, memberViewMode]);
 
   const visibleMembers = useMemo(() => {
-    if (!isLimitedViewer) return members;
+    const activeMembers = members.filter(isMemberActive);
+    if (!isLimitedViewer) return activeMembers;
     if (!viewerMemberId) return [];
-    return members.filter((member) => member.id === viewerMemberId);
+    return activeMembers.filter((member) => member.id === viewerMemberId);
   }, [isLimitedViewer, members, viewerMemberId]);
+
+  const visibleMemberIds = useMemo(
+    () => new Set(visibleMembers.map((member) => member.id)),
+    [visibleMembers],
+  );
 
   const visibleProjects = useMemo(() => {
     if (!isLimitedViewer) return projects;
@@ -1713,10 +1776,15 @@ export default function MembersPage({
   }, [isLimitedViewer, projects, viewerMemberId]);
 
   const visibleTasks = useMemo(() => {
-    if (!isLimitedViewer) return allTasks;
+    const tasksForVisibleMembers = dedupeItemsById(allTasks).filter((task) =>
+      visibleMemberIds.has(task?.data?.memberId),
+    );
+    if (!isLimitedViewer) return tasksForVisibleMembers;
     if (!viewerMemberId) return [];
-    return allTasks.filter((task) => task?.data?.memberId === viewerMemberId);
-  }, [allTasks, isLimitedViewer, viewerMemberId]);
+    return tasksForVisibleMembers.filter(
+      (task) => task?.data?.memberId === viewerMemberId,
+    );
+  }, [allTasks, isLimitedViewer, viewerMemberId, visibleMemberIds]);
 
   const tasksByMember = useMemo(() => {
     const g = {};
@@ -1740,24 +1808,29 @@ export default function MembersPage({
   const tasksByProject = useMemo(() => {
     const g = {};
     for (const t of visibleTasks) {
-      if (t.data.archived) continue;
+      if (taskWeekKey(t.data) !== selectedWeek) continue;
+      if (t.data.reviewed) continue;
       const pid = t.data.projectId || "__none__";
       if (!g[pid]) g[pid] = [];
       g[pid].push(t);
     }
     return g;
-  }, [visibleTasks]);
+  }, [visibleTasks, selectedWeek]);
 
-  // Collect all weeks that have archived tasks, plus current week
+  // Collect all weeks that have tasks, plus current week
   const availableWeeks = useMemo(() => {
     const weeks = new Set([currentWeekKey()]);
     for (const t of visibleTasks) {
-      if (t.data.archived) {
-        const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
-        if (ts) weeks.add(weekKey(ts));
-      }
+      weeks.add(taskWeekKey(t.data));
     }
     return [...weeks].sort().reverse(); // newest first
+  }, [visibleTasks]);
+
+  const movableUnfinishedCount = useMemo(() => {
+    const targetWeek = currentWeekKey();
+    return visibleTasks.filter((task) =>
+      isUnfinishedTaskOutsideWeek(task.data, targetWeek),
+    ).length;
   }, [visibleTasks]);
 
   useEffect(() => {
@@ -1777,7 +1850,10 @@ export default function MembersPage({
   }
 
   async function handleCreate(memberId, taskData) {
-    if (isLimitedViewer && memberId !== viewerMemberId) {
+    if (createInFlightRef.current) return false;
+    if (
+      !canViewerManageMemberTask({ isLimitedViewer, viewerMemberId, memberId })
+    ) {
       addToast("You can only add tasks to your own board", true);
       return false;
     }
@@ -1792,6 +1868,7 @@ export default function MembersPage({
     }
 
     try {
+      createInFlightRef.current = true;
       const created = {
         type: TODO_TYPE,
         memberId,
@@ -1802,18 +1879,23 @@ export default function MembersPage({
         subtasks: normalizeTaskSubtaskList(taskData.subtasks),
         links: normalizeTaskLinkList(taskData.links),
         completed: false,
+        reviewed: false,
+        completionState: "open",
         archived: false,
+        taskWeek: weekKeyFromTs(now),
         orderIndex: now,
         createdAt: now,
         updatedAt: now,
       };
       const id = await createDocument("tasks", created);
-      setAllTasks((prev) => [{ id, data: created }, ...prev]);
+      setAllTasks((prev) => dedupeItemsById([{ id, data: created }, ...prev]));
       addToast("Task added");
       return true;
     } catch (e) {
       addToast(e.message || "Could not add task", true);
       return false;
+    } finally {
+      createInFlightRef.current = false;
     }
   }
 
@@ -1865,7 +1947,13 @@ export default function MembersPage({
     const title = (draft.title || "").trim();
     if (!title) return false;
     const memberId = task.data.memberId;
-    if (isLimitedViewer && memberId !== viewerMemberId) {
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
       addToast("You can only edit your own tasks", true);
       return false;
     }
@@ -1909,6 +1997,10 @@ export default function MembersPage({
   }
 
   async function handleDelete(task) {
+    if (task?.data?.completed) {
+      addToast("Completed tasks cannot be deleted", true);
+      return;
+    }
     setDeleteTarget({
       label: task.data?.title || "this task",
       onConfirm: async () => {
@@ -1921,6 +2013,113 @@ export default function MembersPage({
         } finally {
           setDeleteTarget(null);
         }
+      },
+    });
+  }
+
+  async function handlePushBackToBacklog(task) {
+    const memberId = task?.data?.memberId;
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
+      addToast("You can only move your own tasks", true);
+      return;
+    }
+
+    if (!canPushTaskToWishes(task?.data)) {
+      addToast("Completed tasks cannot be pushed to wishes", true);
+      return;
+    }
+
+    const now = Date.now();
+    const title = String(task?.data?.title || "").trim() || "Untitled";
+    try {
+      await createDocument("backlogItems", {
+        text: title,
+        projectId: task?.data?.projectId || null,
+        reactions: {},
+        comments: [],
+        linkedTaskIds: [],
+        archived: false,
+        archivedAt: null,
+        sourceTaskId: task.id,
+        sourceMemberId: memberId || null,
+        sourceTaskSnapshotAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await deleteDocument("tasks", task.id);
+      setAllTasks((prev) => prev.filter((item) => item.id !== task.id));
+      addToast("Moved back to wishes");
+    } catch (e) {
+      addToast(e.message || "Could not move task to wishes", true);
+    }
+  }
+
+  function requestPushBackToBacklog(task) {
+    const title = String(task?.data?.title || "Untitled");
+    setActionConfirm({
+      title: "Confirm move to wishes",
+      message: `Move \"${title}\" back to wishes?`,
+      confirmLabel: "Move to wishes",
+      onConfirm: async () => {
+        await handlePushBackToBacklog(task);
+      },
+    });
+  }
+
+  async function handlePushTaskToNewestWeek(task) {
+    const memberId = task?.data?.memberId;
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
+      addToast("You can only move your own tasks", true);
+      return;
+    }
+    const thisWeek = currentWeekKey();
+    if (taskWeekKey(task.data) === thisWeek) return;
+    if (!canPushTaskToNewestWeek(task?.data, thisWeek)) {
+      addToast("Completed tasks can only be pushed to wishes", true);
+      return;
+    }
+
+    try {
+      const now = Date.now();
+      const nextData = {
+        ...task.data,
+        taskWeek: thisWeek,
+        updatedAt: now,
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
+      setSelectedWeek(thisWeek);
+      addToast("Moved to newest week");
+    } catch (e) {
+      addToast(e.message || "Could not move task to newest week", true);
+    }
+  }
+
+  function requestPushTaskToNewestWeek(task) {
+    const title = String(task?.data?.title || "Untitled");
+    setActionConfirm({
+      title: "Confirm move to newest week",
+      message: `Move \"${title}\" to the newest week?`,
+      confirmLabel: "Move to newest week",
+      onConfirm: async () => {
+        await handlePushTaskToNewestWeek(task);
       },
     });
   }
@@ -1943,26 +2142,118 @@ export default function MembersPage({
     }
   }
 
-  async function handleArchiveAll(memberId) {
-    if (isLimitedViewer && memberId !== viewerMemberId) {
-      addToast("You can only archive your own tasks", true);
+  async function handleReviewDoneTask(task) {
+    const memberId = task?.data?.memberId;
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
+      addToast("You can only review your own tasks", true);
       return;
     }
-    const tasks = (tasksByMember[memberId] || []).filter(
-      (t) => !t.data.archived && t.data.completed,
+    if (!task?.data?.completed) {
+      addToast("Only done tasks can be reviewed", true);
+      return;
+    }
+
+    try {
+      const now = Date.now();
+      const nextData = {
+        ...task.data,
+        reviewed: true,
+        reviewedAt: now,
+        completionState: "completed",
+        updatedAt: now,
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
+      addToast("Task moved to reviewed");
+    } catch (e) {
+      addToast(e.message || "Could not review task", true);
+    }
+  }
+
+  async function handleRejectDoneTask(task) {
+    const memberId = task?.data?.memberId;
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
+      addToast("You can only reject your own tasks", true);
+      return;
+    }
+    if (!task?.data?.completed) return;
+
+    try {
+      const now = Date.now();
+      const nextData = {
+        ...task.data,
+        completed: false,
+        reviewed: false,
+        reviewedAt: null,
+        completionState: "open",
+        updatedAt: now,
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
+      addToast("Task rejected and moved back to active");
+    } catch (e) {
+      addToast(e.message || "Could not reject task", true);
+    }
+  }
+
+  async function handleUndoReviewWeek(memberId) {
+    if (
+      !canViewerManageMemberTask({
+        isLimitedViewer,
+        viewerMemberId,
+        memberId,
+      })
+    ) {
+      addToast("You can only undo review for your own tasks", true);
+      return;
+    }
+
+    const tasks = visibleTasks.filter(
+      (t) =>
+        taskWeekKey(t.data) === selectedWeek &&
+        t.data.memberId === memberId &&
+        Boolean(t.data.reviewed),
     );
-    if (!tasks.length) return;
+
+    if (!tasks.length) {
+      addToast("No reviewed tasks to revert this week", true);
+      return;
+    }
+
     const now = Date.now();
     try {
       await Promise.all(
         tasks.map((t) =>
           replaceDocument("tasks", t.id, {
             ...t.data,
-            archived: true,
-            archivedAt: now,
+            reviewed: false,
+            reviewedAt: null,
+            completionState: t.data.completed ? "completed" : "open",
+            updatedAt: now,
           }),
         ),
       );
+
       const taskIdSet = new Set(tasks.map((task) => task.id));
       setAllTasks((prev) =>
         prev.map((item) => {
@@ -1971,34 +2262,50 @@ export default function MembersPage({
             ...item,
             data: {
               ...item.data,
-              archived: true,
-              archivedAt: now,
+              reviewed: false,
+              reviewedAt: null,
+              completionState: item.data.completed ? "completed" : "open",
+              updatedAt: now,
             },
           };
         }),
       );
-      addToast("Flushed completed tasks to archive");
+
+      addToast("Reverted reviewed tasks for this week");
     } catch (e) {
-      addToast(e.message || "Could not archive", true);
+      addToast(e.message || "Could not undo review", true);
     }
   }
 
-  async function handleUnarchiveAll(memberId) {
-    if (isLimitedViewer && memberId !== viewerMemberId) {
-      addToast("You can only restore your own tasks", true);
-      return;
-    }
-    const tasks = (tasksByMember[memberId] || []).filter(
-      (t) => t.data.archived,
+  function requestUndoReviewWeek(memberId) {
+    const memberName =
+      visibleMembers.find((member) => member.id === memberId)?.data?.name ||
+      "this member";
+    setActionConfirm({
+      title: "Confirm undo review",
+      message: `Move reviewed tasks for ${memberName} in this week back to active?`,
+      confirmLabel: "Undo review",
+      onConfirm: async () => {
+        await handleUndoReviewWeek(memberId);
+      },
+    });
+  }
+
+  async function handleMoveUnfinishedToCurrentWeek() {
+    const thisWeek = currentWeekKey();
+    const tasks = visibleTasks.filter((task) =>
+      isUnfinishedTaskOutsideWeek(task.data, thisWeek),
     );
     if (!tasks.length) return;
+
     try {
+      const now = Date.now();
       await Promise.all(
-        tasks.map((t) =>
-          replaceDocument("tasks", t.id, {
-            ...t.data,
-            archived: false,
-            archivedAt: null,
+        tasks.map((task) =>
+          replaceDocument("tasks", task.id, {
+            ...task.data,
+            taskWeek: thisWeek,
+            updatedAt: now,
           }),
         ),
       );
@@ -2010,16 +2317,31 @@ export default function MembersPage({
             ...item,
             data: {
               ...item.data,
-              archived: false,
-              archivedAt: null,
+              taskWeek: thisWeek,
+              updatedAt: now,
             },
           };
         }),
       );
-      addToast("Restored all archived tasks");
+      setSelectedWeek(thisWeek);
+      addToast(
+        `Moved ${tasks.length} unfinished task${tasks.length === 1 ? "" : "s"} to current week`,
+      );
     } catch (e) {
-      addToast(e.message || "Could not restore", true);
+      addToast(e.message || "Could not move unfinished tasks", true);
     }
+  }
+
+  function requestMoveAllUnfinishedToCurrentWeek() {
+    if (movableUnfinishedCount === 0) return;
+    setActionConfirm({
+      title: "Confirm move all unfinished",
+      message: `Move all unfinished tasks (${movableUnfinishedCount}) to the newest week?`,
+      confirmLabel: "Move all unfinished",
+      onConfirm: async () => {
+        await handleMoveUnfinishedToCurrentWeek();
+      },
+    });
   }
 
   function projectRemainingHint(memberId, projectId, excludeTaskId = null) {
@@ -2035,7 +2357,7 @@ export default function MembersPage({
     const capacityHours = Number(memberStaffing.maxHours) || 0;
     const assignedHours = visibleTasks
       .filter((t) => t.id !== excludeTaskId)
-      .filter((t) => !t.data.archived)
+      .filter((t) => taskWeekKey(t.data) === selectedWeek)
       .filter((t) => t.data.memberId === memberId)
       .filter((t) => t.data.projectId === projectId)
       .reduce((sum, t) => sum + (Number(t.data.timeUnits) || 0) * 0.25, 0);
@@ -2127,6 +2449,15 @@ export default function MembersPage({
               );
             })}
           </SelectField>
+          <Button
+            type="button"
+            size="small"
+            variant="ghost"
+            onClick={requestMoveAllUnfinishedToCurrentWeek}
+            disabled={movableUnfinishedCount === 0}
+          >
+            Move all unfinished to current week ({movableUnfinishedCount})
+          </Button>
         </PageControls>
       }
     >
@@ -2144,6 +2475,10 @@ export default function MembersPage({
               members={visibleMembers}
               onCreate={handleCreate}
               onToggle={handleToggle}
+              onPushBacklog={requestPushBackToBacklog}
+              onPushNewestWeek={requestPushTaskToNewestWeek}
+              onReviewDoneTask={handleReviewDoneTask}
+              onRejectDoneTask={handleRejectDoneTask}
               onDelete={handleDelete}
             />
           ))}
@@ -2155,6 +2490,10 @@ export default function MembersPage({
               members={visibleMembers}
               onCreate={handleCreate}
               onToggle={handleToggle}
+              onPushBacklog={requestPushBackToBacklog}
+              onPushNewestWeek={requestPushTaskToNewestWeek}
+              onReviewDoneTask={handleReviewDoneTask}
+              onRejectDoneTask={handleRejectDoneTask}
               onDelete={handleDelete}
             />
           )}
@@ -2177,9 +2516,12 @@ export default function MembersPage({
                     onToggle={handleToggle}
                     onToggleSubtask={handleToggleSubtask}
                     onSaveEdit={handleSaveEdit}
+                    onPushBacklog={requestPushBackToBacklog}
+                    onPushNewestWeek={requestPushTaskToNewestWeek}
+                    onReviewDoneTask={handleReviewDoneTask}
+                    onRejectDoneTask={handleRejectDoneTask}
                     onDelete={handleDelete}
-                    onArchiveAll={handleArchiveAll}
-                    onUnarchiveAll={handleUnarchiveAll}
+                    onUndoReviewWeek={requestUndoReviewWeek}
                     onOvertimeSave={handleOvertimeSave}
                     onProjectRemaining={projectRemainingHint}
                     selectedWeek={selectedWeek}
@@ -2208,6 +2550,41 @@ export default function MembersPage({
           onConfirm={deleteTarget.onConfirm}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+
+      {actionConfirm && (
+        <ModalShell
+          title={actionConfirm.title}
+          onClose={() => setActionConfirm(null)}
+          size="sm"
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setActionConfirm(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="small"
+                onClick={async () => {
+                  try {
+                    await actionConfirm.onConfirm?.();
+                  } finally {
+                    setActionConfirm(null);
+                  }
+                }}
+              >
+                {actionConfirm.confirmLabel || "Confirm"}
+              </Button>
+            </>
+          }
+        >
+          <p className="delete-confirm-body">{actionConfirm.message}</p>
+        </ModalShell>
       )}
     </TabPage>
   );

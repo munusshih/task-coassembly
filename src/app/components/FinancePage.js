@@ -11,9 +11,12 @@ import SectionBlock from "./ui/SectionBlock";
 import SelectField from "./ui/SelectField";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
+import { IconDocument, IconFolder, IconUsers } from "./ui/icons";
 import { SURFACE_TEXTURES } from "./ui/paperTextures";
 
 const CONFIG_DOC_ID = "company";
+const FINANCE_SPREADSHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1lkDGH44Ut3sBiMe9Jr70hRX-YQSCqAPgUb1ubs82uqc/edit?usp=sharing";
 
 const DEFAULT_CONFIG = {
   createdAt: 0,
@@ -29,6 +32,26 @@ const DEFAULT_CONFIG = {
   capitalEntries: [],
   recurringCosts: [],
 };
+
+function readLocalJSON(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJSON(key, value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
 
 function normalizeMemberRole(value) {
   const v = String(value || "")
@@ -181,10 +204,17 @@ function computeProjectProjection(project) {
     projectName: d.name || "Untitled project",
     year,
     budgetTWD: budgetTWD || 0,
+    projectedCompanyTaxTWD: companyTax,
     projectedCommonPoolTWD: donation + companyTax,
     projectedMemberPayoutTWD: memberPayoutTotal,
     memberPayoutByMemberId,
   };
+}
+
+function isGovernmentOrTaxPayee(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return /(政府|國稅|稅務|稅捐|稅|tax|gov|勞保|健保)/i.test(text);
 }
 
 function normalizeConfig(raw) {
@@ -235,6 +265,7 @@ const DASHBOARD_COLS = {
   fromAccount: "轉出帳戶",
   toAccount: "轉入帳戶",
   project: "專案",
+  payee: "收款人",
   note: "註記",
   yearMonth: "Year Month",
 };
@@ -267,6 +298,806 @@ function parseYearMonthLabel(value) {
   const match = text.match(/^(\d{4})[\/\-](\d{1,2})/);
   if (!match) return "";
   return `${match[1]}-${String(match[2]).padStart(2, "0")}`;
+}
+
+function parseQuarterKey(dateText, yearMonthText) {
+  const yearMonth = parseYearMonthLabel(yearMonthText);
+  if (yearMonth) {
+    const [y, m] = yearMonth.split("-").map(Number);
+    if (y > 0 && m >= 1 && m <= 12) {
+      return `${y}-Q${Math.floor((m - 1) / 3) + 1}`;
+    }
+  }
+
+  const rawDate = String(dateText || "").trim();
+  if (!rawDate) return "";
+  const parsed = new Date(rawDate);
+  if (!Number.isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = parsed.getMonth() + 1;
+    return `${y}-Q${Math.floor((m - 1) / 3) + 1}`;
+  }
+
+  const match = rawDate.match(/(\d{4})[\/\-](\d{1,2})/);
+  if (match) {
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    if (y > 0 && m >= 1 && m <= 12) {
+      return `${y}-Q${Math.floor((m - 1) / 3) + 1}`;
+    }
+  }
+
+  return "";
+}
+
+function formatQuarterLabel(quarterKey) {
+  const match = String(quarterKey || "").match(/^(\d{4})-Q([1-4])$/);
+  if (!match) return "Overall";
+  return `Q${match[2]} ${match[1]}`;
+}
+
+const NON_PROJECT_CATEGORY_KEYS = new Set(
+  [
+    "Capital",
+    "Yearly Internal Cost",
+    "Salary",
+    "Taxes",
+    "Insurance",
+    "Other Revenue",
+    "Other Expenses",
+    "Contractors",
+    "外包費用",
+    "Bank Charge",
+  ].map((value) => normalizeProjectNameKey(value)),
+);
+
+const NON_PROJECT_CATEGORY_KEYWORDS = [
+  "capital",
+  "yearly internal cost",
+  "internal cost",
+  "salary",
+  "tax",
+  "taxes",
+  "insurance",
+  "other revenue",
+  "other expenses",
+  "other expense",
+  "contractor",
+  "contractors",
+  "outsourcing",
+  "外包",
+  "外包費用",
+  "bank charge",
+  "capital",
+  "內部成本",
+  "年成本",
+  "薪資",
+  "稅",
+  "保險",
+  "其他收入",
+  "手續費",
+  "銀行費",
+];
+
+function isNonProjectCategory(categoryName) {
+  const normalized = normalizeProjectNameKey(categoryName || "");
+  if (!normalized) return false;
+  if (NON_PROJECT_CATEGORY_KEYS.has(normalized)) return true;
+  return NON_PROJECT_CATEGORY_KEYWORDS.some((token) =>
+    normalized.includes(normalizeProjectNameKey(token)),
+  );
+}
+
+function isCapitalCategory(categoryName) {
+  const normalized = normalizeProjectNameKey(categoryName || "");
+  if (!normalized) return false;
+  return normalized.includes("capital") || normalized.includes("實收資本");
+}
+
+function isExpectedActualAlwaysMatchProject(projectName) {
+  const normalized = normalizeProjectNameKey(projectName || "");
+  if (!normalized) return false;
+  return (
+    normalized.includes(normalizeProjectNameKey("salary")) ||
+    normalized.includes(normalizeProjectNameKey("薪資")) ||
+    normalized.includes(normalizeProjectNameKey("台灣設計展"))
+  );
+}
+
+function normalizeProjectNameKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[()（）\[\]{}【】]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function parseCategoryProjectAndFlow(rawCategory) {
+  const text = String(rawCategory || "").trim();
+  if (!text) return { projectName: "Uncategorized", flow: null };
+
+  const parts = text
+    .split(/[｜|]/)
+    .map((p) => String(p || "").trim())
+    .filter(Boolean);
+
+  let projectName = text;
+  let flowToken = "";
+
+  if (parts.length >= 2) {
+    flowToken = parts[parts.length - 1];
+    projectName = parts.slice(0, -1).join("｜") || text;
+  }
+
+  const flowText = flowToken.toLowerCase();
+  let flow = null;
+  if (/收入|income|revenue/.test(flowText)) flow = "income";
+  if (/成本|支出|expense|cost/.test(flowText)) flow = "expense";
+
+  return {
+    projectName: projectName || text,
+    flow,
+  };
+}
+
+function normalizeSpendDescription(description, projectName) {
+  const source = String(description || "").trim();
+  const project = String(projectName || "").trim();
+  if (!source) return "(no description)";
+  if (!project) return source;
+
+  const escaped = project.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withoutProject = source
+    .replace(new RegExp(escaped, "gi"), "")
+    .replace(/[｜|:\-_/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return withoutProject || "(no description)";
+}
+
+function MismatchBars({ expected, actual }) {
+  const exp = Math.max(0, Number(expected) || 0);
+  const act = Math.max(0, Number(actual) || 0);
+  const max = Math.max(exp, act, 1);
+  const gap = act - exp;
+
+  return (
+    <div className="finance-mismatch-wrap">
+      <div className="finance-mismatch-bars">
+        <div className="finance-mismatch-row">
+          <span className="finance-mismatch-label">預期</span>
+          <div className="finance-mismatch-track">
+            <div
+              className="finance-mismatch-fill finance-mismatch-fill--expected"
+              style={{ width: `${Math.round((exp / max) * 100)}%` }}
+            />
+          </div>
+          <span className="finance-mismatch-amount">{formatTWD(exp)}</span>
+        </div>
+        <div className="finance-mismatch-row">
+          <span className="finance-mismatch-label">實際</span>
+          <div className="finance-mismatch-track">
+            <div
+              className="finance-mismatch-fill finance-mismatch-fill--actual"
+              style={{ width: `${Math.round((act / max) * 100)}%` }}
+            />
+          </div>
+          <span className="finance-mismatch-amount">{formatTWD(act)}</span>
+        </div>
+      </div>
+      <p className="finance-mismatch-gap">
+        差額{" "}
+        <span className={gap >= 0 ? "finance-plus" : "finance-minus"}>
+          {formatTWD(gap)}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+function expectedPayeeRowsFromProject(project, membersById) {
+  if (!project) return [];
+  const projection = computeProjectProjection(project);
+  return Object.entries(projection.memberPayoutByMemberId || {})
+    .map(([memberId, amount]) => ({
+      label: membersById?.[memberId]?.data?.name || memberId,
+      amount: Number(amount) || 0,
+    }))
+    .filter((row) => row.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function upsertCompanyPoolRow(rows, amount) {
+  const base = Array.isArray(rows) ? rows : [];
+  const filtered = base.filter((row) => String(row?.label || "") !== "公司池");
+  filtered.push({ label: "公司池", amount: Math.max(0, Number(amount) || 0) });
+  return filtered;
+}
+
+function computeCategoryProjectPnl(values) {
+  if (!Array.isArray(values) || values.length <= DASHBOARD_FIRST_DATA_ROW) {
+    return [];
+  }
+
+  const headerRow = values[DASHBOARD_HEADER_ROW] || [];
+  const headerIndex = {};
+  headerRow.forEach((header, i) => {
+    const key = String(header || "").trim();
+    if (key && headerIndex[key] === undefined) headerIndex[key] = i;
+  });
+
+  const idxOf = (label) => headerIndex[label] ?? -1;
+  const dateIdx = idxOf(DASHBOARD_COLS.date);
+  const categoryIdx = idxOf(DASHBOARD_COLS.category);
+
+  const accounts = [];
+  for (
+    let col = DASHBOARD_ACCOUNT_FIRST_COL;
+    col < headerRow.length;
+    col += DASHBOARD_ACCOUNT_STRIDE
+  ) {
+    const name = String(headerRow[col] || "").trim();
+    if (!name) continue;
+    accounts.push({
+      name,
+      debitCol: col,
+      creditCol: col + 1,
+    });
+  }
+
+  const bankAccount = accounts.find((a) => a.name === DASHBOARD_BANK_NAME);
+  const rows = values.slice(DASHBOARD_FIRST_DATA_ROW);
+  const byCategory = {};
+
+  function addCategoryRow(category, income, expense) {
+    const parsed = parseCategoryProjectAndFlow(category);
+    const key = parsed.projectName;
+    if (!byCategory[key]) {
+      byCategory[key] = { category: key, income: 0, expense: 0 };
+    }
+
+    const inVal = Number(income) || 0;
+    const outVal = Number(expense) || 0;
+
+    if (parsed.flow === "income") {
+      byCategory[key].income += Math.abs(inVal) + Math.abs(outVal);
+      return;
+    }
+    if (parsed.flow === "expense") {
+      byCategory[key].expense += Math.abs(inVal) + Math.abs(outVal);
+      return;
+    }
+
+    byCategory[key].income += inVal;
+    byCategory[key].expense += outVal;
+  }
+
+  // Primary path: accountant dashboard layout with explicit bank debit/credit columns.
+  for (const row of rows) {
+    const dateText = String(row[dateIdx] || "").trim();
+    if (!dateText) continue;
+
+    const bankIn = bankAccount ? parseSignedAmount(row[bankAccount.creditCol]) : 0;
+    const bankOut = bankAccount ? -parseSignedAmount(row[bankAccount.debitCol]) : 0;
+    if (bankIn === 0 && bankOut === 0) continue;
+
+    addCategoryRow(row[categoryIdx], bankIn, bankOut);
+  }
+
+  let result = Object.values(byCategory)
+    .map((row) => ({
+      ...row,
+      net: row.income - row.expense,
+    }))
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+  if (result.length > 0) return result;
+
+  // Fallback path: generic sheet layout where first row is headers and 金額 is signed.
+  let headerRowIndex = -1;
+  let genericCategoryIdx = -1;
+  let genericAmountIdx = -1;
+  for (let i = 0; i < Math.min(values.length, 8); i += 1) {
+    const row = values[i] || [];
+    const idx = {};
+    row.forEach((cell, col) => {
+      const key = String(cell || "").trim();
+      if (key) idx[key] = col;
+    });
+    if (idx[DASHBOARD_COLS.category] !== undefined) {
+      headerRowIndex = i;
+      genericCategoryIdx = idx[DASHBOARD_COLS.category];
+      genericAmountIdx = idx[DASHBOARD_COLS.amount] ?? -1;
+      break;
+    }
+  }
+
+  if (headerRowIndex < 0 || genericCategoryIdx < 0) return [];
+
+  const genericByCategory = {};
+  for (const row of values.slice(headerRowIndex + 1)) {
+    const category = String(row[genericCategoryIdx] || "").trim();
+    if (!category) continue;
+
+    const amountRaw = genericAmountIdx >= 0 ? row[genericAmountIdx] : 0;
+    const amount = parseSignedAmount(amountRaw);
+    if (amount === 0) continue;
+
+    const parsed = parseCategoryProjectAndFlow(category);
+    const projectName = parsed.projectName;
+    if (!genericByCategory[projectName]) {
+      genericByCategory[projectName] = {
+        category: projectName,
+        income: 0,
+        expense: 0,
+      };
+    }
+
+    if (parsed.flow === "income") {
+      genericByCategory[projectName].income += Math.abs(amount);
+      continue;
+    }
+    if (parsed.flow === "expense") {
+      genericByCategory[projectName].expense += Math.abs(amount);
+      continue;
+    }
+
+    if (amount > 0) genericByCategory[projectName].income += amount;
+    if (amount < 0) genericByCategory[projectName].expense += Math.abs(amount);
+  }
+
+  result = Object.values(genericByCategory)
+    .map((row) => ({
+      ...row,
+      net: row.income - row.expense,
+    }))
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+  return result;
+}
+
+function buildHeaderIndex(row) {
+  const idx = {};
+  (row || []).forEach((cell, i) => {
+    const key = String(cell || "").trim();
+    if (key && idx[key] === undefined) idx[key] = i;
+  });
+  return idx;
+}
+
+function isBankAccountText(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (text.includes(DASHBOARD_BANK_NAME)) return true;
+  return /(銀行|bank|國泰世華)/i.test(text);
+}
+
+function isReceivableOrPayableAccountText(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return /應收帳款|應付帳款|應付帳戶/.test(text);
+}
+
+function extractFinanceTransactions(values) {
+  if (!Array.isArray(values) || values.length === 0) return [];
+
+  let headerRowIndex = -1;
+  let headerIndex = {};
+  for (let i = 0; i < Math.min(values.length, 10); i += 1) {
+    const candidate = buildHeaderIndex(values[i]);
+    if (candidate[DASHBOARD_COLS.category] !== undefined) {
+      headerRowIndex = i;
+      headerIndex = candidate;
+      break;
+    }
+  }
+
+  if (headerRowIndex < 0) return [];
+
+  const idxOf = (label) => headerIndex[label] ?? -1;
+  const categoryIdx = idxOf(DASHBOARD_COLS.category);
+  const dateIdx = idxOf(DASHBOARD_COLS.date);
+  const idIdx = idxOf(DASHBOARD_COLS.id);
+  const descriptionIdx = idxOf(DASHBOARD_COLS.description);
+  const amountIdx = idxOf(DASHBOARD_COLS.amount);
+  const fromIdx = idxOf(DASHBOARD_COLS.fromAccount);
+  const toIdx = idxOf(DASHBOARD_COLS.toAccount);
+  const payeeIdx = idxOf(DASHBOARD_COLS.payee);
+
+  const headerRow = values[headerRowIndex] || [];
+  let bankDebitCol = -1;
+  let bankCreditCol = -1;
+  for (
+    let col = DASHBOARD_ACCOUNT_FIRST_COL;
+    col < headerRow.length;
+    col += DASHBOARD_ACCOUNT_STRIDE
+  ) {
+    const name = String(headerRow[col] || "").trim();
+    if (name === DASHBOARD_BANK_NAME) {
+      bankDebitCol = col;
+      bankCreditCol = col + 1;
+      break;
+    }
+  }
+
+  const rows = values.slice(headerRowIndex + 1);
+  const out = [];
+
+  for (const row of rows) {
+    const rawCategory = String(row[categoryIdx] || "").trim();
+    if (!rawCategory) continue;
+    const fromAccount = String(row[fromIdx] || "").trim();
+    const toAccount = String(row[toIdx] || "").trim();
+    if (!fromAccount && !toAccount) continue;
+
+    const hasArApAccount =
+      isReceivableOrPayableAccountText(fromAccount) ||
+      isReceivableOrPayableAccountText(toAccount);
+    const hasBankAccount =
+      isBankAccountText(fromAccount) || isBankAccountText(toAccount);
+    // Ignore internal AR/AP reclass rows that do not touch any bank account.
+    if (hasArApAccount && !hasBankAccount) continue;
+
+    const parsedCategory = parseCategoryProjectAndFlow(rawCategory);
+    const bankIn =
+      bankCreditCol >= 0 ? parseSignedAmount(row[bankCreditCol]) : 0;
+    const bankOut =
+      bankDebitCol >= 0 ? Math.abs(parseSignedAmount(row[bankDebitCol])) : 0;
+    const signedAmount = amountIdx >= 0 ? parseSignedAmount(row[amountIdx]) : 0;
+
+    let income = 0;
+    let expense = 0;
+
+    if (bankIn > 0 || bankOut > 0) {
+      income = bankIn;
+      expense = bankOut;
+    } else if (signedAmount !== 0) {
+      if (parsedCategory.flow === "income") income = Math.abs(signedAmount);
+      else if (parsedCategory.flow === "expense") expense = Math.abs(signedAmount);
+      else if (signedAmount > 0) income = signedAmount;
+      else expense = Math.abs(signedAmount);
+    } else {
+      continue;
+    }
+
+    out.push({
+      serialNumber: String(row[idIdx] || "").trim(),
+      date: String(row[dateIdx] || "").trim(),
+      description: String(row[descriptionIdx] || "").trim(),
+      projectName: parsedCategory.projectName,
+      rawCategory,
+      categoryFlow: parsedCategory.flow,
+      income,
+      expense,
+      signedAmount: signedAmount !== 0 ? signedAmount : income - expense,
+      amountAbs: Math.abs(signedAmount) || income || expense,
+      payee: String(row[payeeIdx] || "").trim() || "(unknown payee)",
+      fromAccount,
+      toAccount,
+    });
+  }
+
+  return out;
+}
+
+function parseTransactionYear(dateText) {
+  const raw = String(dateText || "").trim();
+  if (!raw) return 0;
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.getFullYear();
+
+  const match = raw.match(/(19|20)\d{2}/);
+  return match ? Number(match[0]) : 0;
+}
+
+function transactionMatchesYear(tx, selectedYear) {
+  if (selectedYear === "overall") return true;
+  const targetYear = Number(selectedYear);
+  if (!Number.isFinite(targetYear)) return true;
+  return parseTransactionYear(tx?.date) === targetYear;
+}
+
+function computeProjectPanels(values, selectedYear = "overall") {
+  const txs = extractFinanceTransactions(values).filter((tx) =>
+    transactionMatchesYear(tx, selectedYear),
+  );
+  if (!txs.length) return [];
+
+  const map = {};
+  function ensure(projectName) {
+    if (!map[projectName]) {
+      map[projectName] = {
+        projectName,
+        income: 0,
+        expense: 0,
+        receivableMissing: 0,
+        payableExpected: 0,
+        spendByCategoryMap: {},
+        payeeMap: {},
+        transactions: [],
+      };
+    }
+    return map[projectName];
+  }
+
+  for (const tx of txs) {
+    const spendDescription = normalizeSpendDescription(
+      tx.description,
+      tx.projectName,
+    );
+    const keys = [tx.projectName, "__ALL__"];
+    for (const key of keys) {
+      const panel = ensure(key);
+      panel.income += tx.income;
+      panel.expense += tx.expense;
+
+      if (tx.expense > 0) {
+        const spendLabel = spendDescription || "(no description)";
+        panel.spendByCategoryMap[spendLabel] =
+          (panel.spendByCategoryMap[spendLabel] || 0) + tx.expense;
+        panel.payeeMap[tx.payee] = (panel.payeeMap[tx.payee] || 0) + tx.expense;
+      }
+
+      panel.transactions.push({
+        serialNumber: tx.serialNumber,
+        date: tx.date,
+        description: tx.description,
+        amount: tx.signedAmount,
+        payee: tx.payee,
+      });
+
+      const toAccount = String(tx.toAccount || "");
+      const fromAccount = String(tx.fromAccount || "");
+
+      // Net receivables based on bank-touching AR rows.
+      if (toAccount.includes("應收帳款")) panel.receivableMissing += tx.amountAbs;
+      if (fromAccount.includes("應收帳款")) panel.receivableMissing -= tx.amountAbs;
+
+      // Net payables based on bank-touching AP rows (expected minus paid).
+      if (fromAccount.includes("應付帳款")) panel.payableExpected += tx.amountAbs;
+      if (toAccount.includes("應付帳款") || toAccount.includes("應付帳戶")) {
+        panel.payableExpected -= tx.amountAbs;
+      }
+    }
+  }
+
+  return Object.values(map)
+    .map((panel) => {
+      const net = panel.income - panel.expense;
+      const spendByCategory = Object.entries(panel.spendByCategoryMap)
+        .map(([label, amount]) => ({ label, amount }))
+        .sort((a, b) => b.amount - a.amount);
+      if (net > 0) {
+        spendByCategory.push({
+          label: "公司池",
+          amount: net,
+        });
+      }
+      const payeeBreakdown = Object.entries(panel.payeeMap)
+        .map(([label, amount]) => ({ label, amount }))
+        .sort((a, b) => b.amount - a.amount);
+      if (net > 0) {
+        payeeBreakdown.push({
+          label: "公司池",
+          amount: net,
+        });
+      }
+      return {
+        projectName: panel.projectName,
+        income: panel.income,
+        expense: panel.expense,
+        net,
+        receivableMissing: Math.max(0, panel.receivableMissing),
+        payableExpected: Math.max(0, panel.payableExpected),
+        spendByCategory,
+        payeeBreakdown,
+        transactions: panel.transactions,
+      };
+    })
+    .sort((a, b) => {
+      if (a.projectName === "__ALL__") return -1;
+      if (b.projectName === "__ALL__") return 1;
+      return Math.abs(b.net) - Math.abs(a.net);
+    });
+}
+
+const RING_CHART_COLORS = [
+  "#3b82f6",
+  "#ef4444",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ec4899",
+  "#84cc16",
+];
+
+const RING_LABEL_COLOR_MAP = {
+  "公司池": "#374151",
+  Underpaid: "#b91c1c",
+  Overpaid: "#1d4ed8",
+  Matched: "#15803d",
+};
+
+function ringColorForLabel(label, index) {
+  const fixed = RING_LABEL_COLOR_MAP[String(label || "").trim()];
+  if (fixed) return fixed;
+  return RING_CHART_COLORS[index % RING_CHART_COLORS.length];
+}
+
+function PercentageRows({ rows, max = 8 }) {
+  const top = (rows || []).slice(0, max);
+  const total = top.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  if (!top.length || total <= 0) {
+    return <p className="finance-dashboard-empty">No entries.</p>;
+  }
+
+  let start = 0;
+  const slices = top.map((row, i) => {
+    const amount = Number(row.amount) || 0;
+    const pct = total > 0 ? (amount / total) * 100 : 0;
+    const end = start + pct;
+    const color = ringColorForLabel(row.label, i);
+    const slice = {
+      ...row,
+      amount,
+      pct,
+      start,
+      end,
+      color,
+    };
+    start = end;
+    return slice;
+  });
+
+  const gradient = slices
+    .map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`)
+    .join(", ");
+
+  return (
+    <div className="finance-ring-wrap">
+      <div
+        className="finance-ring-chart"
+        style={{ background: `conic-gradient(${gradient})` }}
+      >
+        <div className="finance-ring-hole">
+          <strong>{formatTWD(total)}</strong>
+          <span>Total</span>
+        </div>
+      </div>
+      <ul className="finance-ring-legend">
+        {slices.map((slice) => (
+          <li key={slice.label} className="finance-ring-legend-row">
+            <span
+              className="finance-ring-dot"
+              style={{ backgroundColor: slice.color }}
+            />
+            <span className="finance-ring-label">{slice.label}</span>
+            <span className="finance-ring-pct">{slice.pct.toFixed(1)}%</span>
+            <span className="finance-ring-amount">{formatTWD(slice.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CommonPoolRingRows({
+  rows,
+  itemizedRows,
+  itemizedKey,
+  totalOverride,
+  max = 8,
+}) {
+  const top = (rows || []).slice(0, max);
+  const totalAbs = top.reduce((s, r) => s + (Math.abs(Number(r.amount)) || 0), 0);
+  if (!top.length || totalAbs <= 0) {
+    return <p className="finance-dashboard-empty">No entries.</p>;
+  }
+
+  let start = 0;
+  const slices = top.map((row, i) => {
+    const amount = Math.abs(Number(row.amount) || 0);
+    const pct = totalAbs > 0 ? (amount / totalAbs) * 100 : 0;
+    const end = start + pct;
+    const color = ringColorForLabel(row.label, i);
+    const slice = {
+      ...row,
+      amount,
+      pct,
+      start,
+      end,
+      color,
+    };
+    start = end;
+    return slice;
+  });
+
+  const gradient = slices
+    .map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`)
+    .join(", ");
+
+  const itemizedTotalAbs = (itemizedRows || []).reduce(
+    (sum, row) => sum + Math.abs(Number(row.amount) || 0),
+    0,
+  );
+
+  const centerTotal =
+    typeof totalOverride === "number" && Number.isFinite(totalOverride)
+      ? totalOverride
+      : totalAbs;
+
+  return (
+    <div className="finance-ring-wrap">
+      <div
+        className="finance-ring-chart"
+        style={{ background: `conic-gradient(${gradient})` }}
+      >
+        <div className="finance-ring-hole">
+          <strong>{formatTWD(centerTotal)}</strong>
+          <span>Total</span>
+        </div>
+      </div>
+      <ul className="finance-ring-legend">
+        {slices.flatMap((slice) => {
+          const baseRow = (
+            <li key={slice.label} className="finance-ring-legend-row">
+              <span
+                className="finance-ring-dot"
+                style={{ backgroundColor: slice.color }}
+              />
+              <span className="finance-ring-label">{slice.label}</span>
+              <span className="finance-ring-pct">{slice.pct.toFixed(1)}%</span>
+              <span
+                className={
+                  Number(slice.displayAmount ?? slice.amount) >= 0
+                    ? "finance-ring-amount finance-plus"
+                    : "finance-ring-amount finance-minus"
+                }
+              >
+                {formatTWD(slice.displayAmount ?? slice.amount)}
+              </span>
+            </li>
+          );
+
+          const subRows =
+            slice.key === itemizedKey
+              ? (itemizedRows || []).map((row) => {
+                  const amount = Number(row.amount) || 0;
+                  const pct =
+                    itemizedTotalAbs > 0
+                      ? (Math.abs(amount) / itemizedTotalAbs) * 100
+                      : 0;
+                  return (
+                    <li
+                      key={`${slice.key || slice.label}--${row.key}`}
+                      className="finance-ring-legend-row finance-ring-legend-row--sub"
+                    >
+                      <span className="finance-ring-dot finance-ring-dot--sub" />
+                      <span className="finance-ring-label">{row.label}</span>
+                      <span className="finance-ring-pct">{pct.toFixed(1)}%</span>
+                      <span
+                        className={
+                          amount >= 0
+                            ? "finance-ring-amount finance-plus"
+                            : "finance-ring-amount finance-minus"
+                        }
+                      >
+                        {formatTWD(amount)}
+                      </span>
+                    </li>
+                  );
+                })
+              : [];
+
+          return [baseRow, ...subRows];
+        })}
+      </ul>
+    </div>
+  );
 }
 
 function attributeMember(description, memberIdByAlias) {
@@ -309,11 +1140,37 @@ function descriptionWithoutMember(description, matchedPart) {
   return filtered.join(" · ") || text;
 }
 
+function resolveMemberIdFromText(text, memberIdByAlias) {
+  if (!memberIdByAlias) return "";
+  const raw = String(text || "").trim().toLowerCase();
+  if (!raw) return "";
+  if (memberIdByAlias[raw]) return memberIdByAlias[raw];
+
+  const parts = raw
+    .split(/[｜|,;/\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (const part of parts) {
+    if (memberIdByAlias[part]) return memberIdByAlias[part];
+  }
+
+  for (const [alias, memberId] of Object.entries(memberIdByAlias)) {
+    if (!alias || alias.length < 2) continue;
+    if (raw.includes(alias)) return memberId;
+  }
+
+  return "";
+}
+
 function computeDashboardData(values, opts = {}) {
   if (!Array.isArray(values) || values.length <= DASHBOARD_FIRST_DATA_ROW) {
     return null;
   }
-  const { memberIdByAlias = null, membersById = {} } = opts;
+  const {
+    memberIdByAlias = null,
+    membersById = {},
+    quarterFilter = "overall",
+  } = opts;
 
   const headerRow = values[DASHBOARD_HEADER_ROW] || [];
   const headerIndex = {};
@@ -327,6 +1184,7 @@ function computeDashboardData(values, opts = {}) {
   const amountIdx = idxOf(DASHBOARD_COLS.amount);
   const categoryIdx = idxOf(DASHBOARD_COLS.category);
   const projectIdx = idxOf(DASHBOARD_COLS.project);
+  const payeeIdx = idxOf(DASHBOARD_COLS.payee);
   const fromIdx = idxOf(DASHBOARD_COLS.fromAccount);
   const toIdx = idxOf(DASHBOARD_COLS.toAccount);
   const noteIdx = idxOf(DASHBOARD_COLS.note);
@@ -371,13 +1229,24 @@ function computeDashboardData(values, opts = {}) {
       bankImpact,
       category: String(row[categoryIdx] || "").trim(),
       project: String(row[projectIdx] || "").trim(),
+      payee: String(row[payeeIdx] || "").trim(),
       from: String(row[fromIdx] || "").trim(),
       to: String(row[toIdx] || "").trim(),
       note: String(row[noteIdx] || "").trim(),
       description: String(row[descIdx] || "").trim(),
       yearMonth: parseYearMonthLabel(row[yearMonthIdx]),
+      quarterKey: parseQuarterKey(dateText, row[yearMonthIdx]),
     });
   }
+
+  const availableQuarterKeys = [...new Set(
+    transactions.map((t) => t.quarterKey).filter(Boolean),
+  )].sort((a, b) => String(b).localeCompare(String(a)));
+
+  const filteredTransactions =
+    quarterFilter && quarterFilter !== "overall"
+      ? transactions.filter((t) => t.quarterKey === quarterFilter)
+      : transactions;
 
   let bankInflowTotal = 0;
   let bankOutflowTotal = 0;
@@ -405,7 +1274,10 @@ function computeDashboardData(values, opts = {}) {
     return byMember[memberId];
   }
 
-  for (const t of transactions) {
+  const projectCategoryMap = {};
+  const projectPayeeExpenseMap = {};
+
+  for (const t of filteredTransactions) {
     bankInflowTotal += t.bankIn;
     bankOutflowTotal += t.bankOut;
 
@@ -460,6 +1332,32 @@ function computeDashboardData(values, opts = {}) {
       if (!byProject[projKey]) byProject[projKey] = { income: 0, expense: 0 };
       byProject[projKey].income += t.bankIn;
       byProject[projKey].expense += t.bankOut;
+
+      const categoryKey = t.category || "Uncategorized";
+      const projectCategoryId = `${projKey}|||${categoryKey}`;
+      if (!projectCategoryMap[projectCategoryId]) {
+        projectCategoryMap[projectCategoryId] = {
+          project: projKey,
+          category: categoryKey,
+          income: 0,
+          expense: 0,
+        };
+      }
+      projectCategoryMap[projectCategoryId].income += t.bankIn;
+      projectCategoryMap[projectCategoryId].expense += t.bankOut;
+
+      if (t.bankOut > 0) {
+        const payeeKey = t.payee || "(unknown payee)";
+        const payeeId = `${projKey}|||${payeeKey}`;
+        if (!projectPayeeExpenseMap[payeeId]) {
+          projectPayeeExpenseMap[payeeId] = {
+            project: projKey,
+            payee: payeeKey,
+            expense: 0,
+          };
+        }
+        projectPayeeExpenseMap[payeeId].expense += t.bankOut;
+      }
     }
   }
 
@@ -533,13 +1431,26 @@ function computeDashboardData(values, opts = {}) {
     accountBalances.find((a) => a.name === DASHBOARD_BANK_NAME)?.balance || 0;
   const netAssetPosition = accountBalances.reduce((s, a) => s + a.balance, 0);
 
-  const recentTransactions = [...transactions]
+  const projectCategoryRows = Object.values(projectCategoryMap)
+    .map((row) => ({
+      ...row,
+      net: row.income - row.expense,
+    }))
+    .sort((a, b) => b.income + b.expense - (a.income + a.expense));
+
+  const projectPayeeRows = Object.values(projectPayeeExpenseMap).sort(
+    (a, b) => b.expense - a.expense,
+  );
+
+  const recentTransactions = [...filteredTransactions]
     .filter((t) => t.bankIn > 0 || t.bankOut > 0)
     .reverse()
     .slice(0, 12);
 
   return {
-    transactionCount: transactions.length,
+    transactionCount: filteredTransactions.length,
+    quarterFilter,
+    availableQuarterKeys,
     bankBalance,
     netAssetPosition,
     capitalInvested,
@@ -553,6 +1464,8 @@ function computeDashboardData(values, opts = {}) {
     expenseDescriptionRows,
     incomeDescriptionRows,
     projectRows,
+    projectCategoryRows,
+    projectPayeeRows,
     accountBalances,
     memberRows,
     recentTransactions,
@@ -591,6 +1504,7 @@ function CategoryBars({ rows, accent, max, formatter, limit = 8 }) {
 function FinanceDashboard({ data }) {
   const {
     transactionCount,
+    quarterFilter,
     bankBalance,
     netAssetPosition,
     capitalInvested,
@@ -603,6 +1517,8 @@ function FinanceDashboard({ data }) {
     expenseDescriptionRows,
     incomeDescriptionRows,
     projectRows,
+    projectCategoryRows,
+    projectPayeeRows,
     accountBalances,
     memberRows,
     recentTransactions,
@@ -619,6 +1535,9 @@ function FinanceDashboard({ data }) {
 
   return (
     <div className="finance-dashboard">
+      <p className="finance-section-note">
+        Scope: {formatQuarterLabel(quarterFilter)}
+      </p>
       <div className="finance-dashboard-kpis">
         <article className="finance-dashboard-kpi finance-dashboard-kpi--positive">
           <span className="finance-dashboard-kpi-label">Bank cash on hand</span>
@@ -905,6 +1824,74 @@ function FinanceDashboard({ data }) {
 
         <section className="finance-dashboard-card finance-dashboard-card--wide">
           <header className="finance-dashboard-card-header">
+            <h4>Project synthesis by 分類</h4>
+            <span>{projectCategoryRows.length} rows</span>
+          </header>
+          {projectCategoryRows.length === 0 ? (
+            <p className="finance-dashboard-empty">No categorized project entries.</p>
+          ) : (
+            <div className="finance-table-wrap">
+              <table className="finance-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>分類</th>
+                    <th>收入</th>
+                    <th>支出</th>
+                    <th>Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectCategoryRows.slice(0, 20).map((row, idx) => (
+                    <tr key={`${row.project}-${row.category}-${idx}`}>
+                      <td>{row.project}</td>
+                      <td>{row.category}</td>
+                      <td>{formatTWD(row.income)}</td>
+                      <td>{formatTWD(row.expense)}</td>
+                      <td className={row.net >= 0 ? "finance-plus" : "finance-minus"}>
+                        {formatTWD(row.net)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="finance-dashboard-card finance-dashboard-card--wide">
+          <header className="finance-dashboard-card-header">
+            <h4>Who got paid (收款人) by project</h4>
+            <span>{projectPayeeRows.length} payee rows</span>
+          </header>
+          {projectPayeeRows.length === 0 ? (
+            <p className="finance-dashboard-empty">No payee data found for expenses.</p>
+          ) : (
+            <div className="finance-table-wrap">
+              <table className="finance-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>收款人</th>
+                    <th>Total 支出</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectPayeeRows.slice(0, 20).map((row, idx) => (
+                    <tr key={`${row.project}-${row.payee}-${idx}`}>
+                      <td>{row.project}</td>
+                      <td>{row.payee}</td>
+                      <td className="finance-minus">{formatTWD(row.expense)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="finance-dashboard-card finance-dashboard-card--wide">
+          <header className="finance-dashboard-card-header">
             <h4>Recent transactions</h4>
             <span>last {recentTransactions.length}</span>
           </header>
@@ -947,11 +1934,21 @@ function FinanceDashboard({ data }) {
 export default function FinancePage() {
   const [members, setMembers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [reimbursements, setReimbursements] = useState([]);
+  const [fxRates, setFxRates] = useState({}); // rates relative to TWD, e.g. { USD: 32.5 }
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [configDraft, setConfigDraft] = useState(DEFAULT_CONFIG);
   const [actualRows, setActualRows] = useState([]);
   const [rawSheetValues, setRawSheetValues] = useState(null);
+  const [categoryProjectMap, setCategoryProjectMap] = useState(() =>
+    readLocalJSON("finance-category-project-map-v1", {}),
+  );
+  const [selectedQuarter, setSelectedQuarter] = useState("overall");
+  const [financeMainView, setFinanceMainView] = useState("project");
+  const [financeCategoryTab, setFinanceCategoryTab] = useState("projects");
   const [selectedYear, setSelectedYear] = useState("overall");
+  const [mappingEditorCategory, setMappingEditorCategory] = useState("");
   const [loadingActual, setLoadingActual] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -961,6 +1958,8 @@ export default function FinancePage() {
 
     const unMembers = subscribeCollection("members", setMembers);
     const unProjects = subscribeCollection("projects", setProjects);
+    const unTasks = subscribeCollection("tasks", setTasks);
+    const unReimbursements = subscribeCollection("reimbursements", setReimbursements);
     const unFinance = subscribeCollection("financeConfig", (items) => {
       const doc = items.find((row) => row.id === CONFIG_DOC_ID) || null;
       const normalized = normalizeConfig(doc?.data || DEFAULT_CONFIG);
@@ -971,6 +1970,8 @@ export default function FinancePage() {
     return () => {
       unMembers();
       unProjects();
+      unTasks();
+      unReimbursements();
       unFinance();
     };
   }, []);
@@ -979,6 +1980,31 @@ export default function FinancePage() {
     loadActualRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Hardcoded fallback rates (TWD per 1 unit) — used if fetch fails
+    const FALLBACK_RATES = { USD: 32, JPY: 0.21, EUR: 35, GBP: 41, CNY: 4.4, HKD: 4.1 };
+    setFxRates(FALLBACK_RATES);
+    // Fetch live rates from open.er-api.com (free, no key required)
+    // rates[X] = X per 1 USD, so TWD per 1 X = rates[TWD] / rates[X]
+    fetch("https://open.er-api.com/v6/latest/USD")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data?.rates?.TWD) return;
+        const twdPerUsd = data.rates.TWD;
+        const rates = { USD: twdPerUsd };
+        for (const [code, unitsPerUsd] of Object.entries(data.rates)) {
+          if (code === "TWD" || !unitsPerUsd) continue;
+          rates[code] = twdPerUsd / unitsPerUsd;
+        }
+        setFxRates(rates);
+      })
+      .catch(() => {}); // fallback rates already set above
+  }, []);
+
+  useEffect(() => {
+    writeLocalJSON("finance-category-project-map-v1", categoryProjectMap || {});
+  }, [categoryProjectMap]);
 
   const workerOwners = useMemo(
     () =>
@@ -1133,6 +2159,14 @@ export default function FinancePage() {
     for (const p of projectProjections) {
       if (p.year > 0) set.add(p.year);
     }
+
+    // Include years from transaction dates so year filter works even when
+    // rows do not have a dedicated year column filled.
+    const txYears = extractFinanceTransactions(rawSheetValues)
+      .map((tx) => parseTransactionYear(tx?.date))
+      .filter((year) => Number.isFinite(year) && year > 0);
+    for (const year of txYears) set.add(year);
+
     for (const c of configDraft.recurringCosts || []) {
       const y = Number(c?.year);
       if (Number.isFinite(y) && y > 0) set.add(y);
@@ -1143,7 +2177,7 @@ export default function FinancePage() {
     }
 
     return [...set].sort((a, b) => b - a);
-  }, [actualRowsNormalized, projectProjections, configDraft]);
+  }, [actualRowsNormalized, projectProjections, configDraft, rawSheetValues]);
 
   useEffect(() => {
     if (selectedYear !== "overall" && !allYears.includes(Number(selectedYear))) {
@@ -1340,14 +2374,779 @@ export default function FinancePage() {
     return rows;
   }, [projectProjections]);
 
+  const dashboardAll = useMemo(
+    () =>
+      computeDashboardData(rawSheetValues, {
+        memberIdByAlias,
+        membersById,
+        quarterFilter: "overall",
+      }),
+    [rawSheetValues, memberIdByAlias, membersById],
+  );
+
+  const quarterOptions = dashboardAll?.availableQuarterKeys || [];
+
+  useEffect(() => {
+    if (
+      selectedQuarter !== "overall" &&
+      !quarterOptions.includes(selectedQuarter)
+    ) {
+      setSelectedQuarter("overall");
+    }
+  }, [quarterOptions, selectedQuarter]);
+
   const dashboard = useMemo(
     () =>
       computeDashboardData(rawSheetValues, {
         memberIdByAlias,
         membersById,
+        quarterFilter: selectedQuarter,
       }),
-    [rawSheetValues, memberIdByAlias, membersById],
+    [rawSheetValues, memberIdByAlias, membersById, selectedQuarter],
   );
+
+  const projectPanels = useMemo(
+    () => computeProjectPanels(rawSheetValues, selectedYear),
+    [rawSheetValues, selectedYear],
+  );
+
+  const allProjectsPanel = useMemo(
+    () => projectPanels.find((panel) => panel.projectName === "__ALL__") || null,
+    [projectPanels],
+  );
+
+  const singleProjectPanels = useMemo(
+    () => projectPanels.filter((panel) => panel.projectName !== "__ALL__"),
+    [projectPanels],
+  );
+
+  const systemProjectsSorted = useMemo(
+    () =>
+      [...projects].sort((a, b) =>
+        String(a?.data?.name || "").localeCompare(String(b?.data?.name || "")),
+      ),
+    [projects],
+  );
+
+  const systemProjectByNormalizedName = useMemo(() => {
+    const map = {};
+    for (const project of systemProjectsSorted) {
+      const key = normalizeProjectNameKey(project?.data?.name || "");
+      if (!key) continue;
+      if (!map[key]) map[key] = project;
+    }
+    return map;
+  }, [systemProjectsSorted]);
+
+  const finishedHoursByProjectMember = useMemo(() => {
+    const out = {};
+    const taskList = Array.isArray(tasks) ? tasks : [];
+    for (const t of taskList) {
+      const d = t?.data || {};
+      const projectId = String(d.projectId || "").trim();
+      const memberId = String(d.memberId || "").trim();
+      if (!projectId || !memberId) continue;
+      if (!d.completed && !d.archived) continue;
+      const hours =
+        ((Number(d.timeUnits) || 0) + (Number(d.overtimeUnits) || 0)) * 0.25;
+      if (hours <= 0) continue;
+      const key = `${projectId}::${memberId}`;
+      out[key] = (out[key] || 0) + hours;
+    }
+    return out;
+  }, [tasks]);
+
+  const actualRequiredExpenseByCategory = useMemo(() => {
+    const out = {};
+    const txs = extractFinanceTransactions(rawSheetValues).filter((tx) =>
+      transactionMatchesYear(tx, selectedYear),
+    );
+    for (const tx of txs) {
+      const expense = Number(tx.expense) || 0;
+      if (expense <= 0) continue;
+
+      const byPayee = resolveMemberIdFromText(tx.payee, memberIdByAlias);
+      const byDescription =
+        attributeMember(tx.description, memberIdByAlias)?.memberId || "";
+      const memberId = byPayee || byDescription;
+      const isGovernmentPayment = isGovernmentOrTaxPayee(tx.payee);
+      if (!memberId && !isGovernmentPayment) continue;
+
+      const category = String(tx.projectName || "").trim();
+      if (!category) continue;
+      out[category] = (out[category] || 0) + expense;
+    }
+    return out;
+  }, [rawSheetValues, memberIdByAlias, selectedYear]);
+
+  const actualMemberExpenseByCategory = useMemo(() => {
+    const out = {};
+    const txs = extractFinanceTransactions(rawSheetValues).filter((tx) =>
+      transactionMatchesYear(tx, selectedYear),
+    );
+    for (const tx of txs) {
+      const expense = Number(tx.expense) || 0;
+      if (expense <= 0) continue;
+
+      const byPayee = resolveMemberIdFromText(tx.payee, memberIdByAlias);
+      const byDescription =
+        attributeMember(tx.description, memberIdByAlias)?.memberId || "";
+      const memberId = byPayee || byDescription;
+      if (!memberId) continue;
+
+      const category = String(tx.projectName || "").trim();
+      if (!category) continue;
+      out[category] = (out[category] || 0) + expense;
+    }
+    return out;
+  }, [rawSheetValues, memberIdByAlias, selectedYear]);
+
+  const projectCategoryViewRows = useMemo(
+    () => {
+      const txRows = singleProjectPanels.map((row) => {
+        const categoryName = row.projectName;
+        const needsProjectMatch = !isNonProjectCategory(categoryName);
+        const autoMatchProject =
+          needsProjectMatch
+            ? systemProjectByNormalizedName[normalizeProjectNameKey(categoryName)] || null
+            : null;
+        const manualMatchProjectId = categoryProjectMap?.[categoryName];
+        const matchedProjectId =
+          needsProjectMatch && manualMatchProjectId !== undefined
+            ? manualMatchProjectId
+            : autoMatchProject?.id || "";
+        const matchedProject =
+          systemProjectsSorted.find((p) => p.id === matchedProjectId) || null;
+        const isMatched = needsProjectMatch ? Boolean(matchedProject) : true;
+        const expectedAmountTwd = matchedProject
+          ? budgetToTWD(
+              Number(matchedProject?.data?.budget) || 0,
+              matchedProject?.data?.budgetCurrency,
+            ) || 0
+          : 0;
+        const projection = matchedProject
+          ? computeProjectProjection(matchedProject)
+          : null;
+        const expectedExpenseTwd = projection
+          ? (Number(projection.projectedMemberPayoutTWD) || 0) +
+            (Number(projection.projectedCompanyTaxTWD) || 0)
+          : 0;
+        const actualExpectedExpenseTwd =
+          Number(actualRequiredExpenseByCategory[categoryName]) || 0;
+        const expectedOutstandingTwd = Math.max(0, expectedAmountTwd - row.income);
+        const receivableDisplayTwd = Math.max(
+          Number(row.receivableMissing) || 0,
+          expectedOutstandingTwd,
+        );
+
+        let hoursEarnedPayableTwd = 0;
+        if (matchedProject) {
+          const projection = computeProjectProjection(matchedProject);
+          const staffing = Array.isArray(matchedProject?.data?.staffing)
+            ? matchedProject.data.staffing
+            : [];
+          for (const entry of staffing) {
+            const memberId = String(entry?.memberId || "").trim();
+            if (!memberId) continue;
+            const maxHours = Number(entry?.maxHours) || 0;
+            if (maxHours <= 0) continue;
+            const atMax = Number(projection.memberPayoutByMemberId?.[memberId]) || 0;
+            if (atMax <= 0) continue;
+            const finishedHours =
+              Number(finishedHoursByProjectMember[`${matchedProject.id}::${memberId}`]) ||
+              0;
+            if (finishedHours <= 0) continue;
+            const ratio = Math.max(0, Math.min(1, finishedHours / maxHours));
+            hoursEarnedPayableTwd += atMax * ratio;
+          }
+        }
+
+        const actualMemberPaidTwd = Number(actualMemberExpenseByCategory[categoryName]) || 0;
+        const hoursOutstandingPayableTwd = Math.max(
+          0,
+          Math.round(hoursEarnedPayableTwd - actualMemberPaidTwd),
+        );
+        const payableDisplayTwd = Math.max(
+          Number(row.payableExpected) || 0,
+          hoursOutstandingPayableTwd,
+        );
+
+        return {
+          ...row,
+          category: categoryName,
+          needsProjectMatch,
+          autoMatchProject,
+          matchedProject,
+          matchedProjectId,
+          isMatched,
+          isManual: manualMatchProjectId !== undefined,
+          expectedAmountTwd,
+          expectedExpenseTwd,
+          actualExpectedExpenseTwd,
+          incomeGapTwd: row.income - expectedAmountTwd,
+          expectedOutstandingTwd,
+          receivableDisplayTwd,
+          hoursEarnedPayableTwd,
+          actualMemberPaidTwd,
+          payableDisplayTwd,
+          noTransactionsYet: false,
+        };
+      });
+
+      const txCategoryNameSet = new Set(
+        txRows.map((row) => normalizeProjectNameKey(row.category)),
+      );
+      const mappedProjectIdSet = new Set(
+        txRows.map((row) => row.matchedProjectId).filter(Boolean),
+      );
+
+      const systemOnlyRows = systemProjectsSorted
+        .filter((project) => {
+          const normalizedProjectName = normalizeProjectNameKey(project?.data?.name || "");
+          if (!normalizedProjectName) return false;
+          if (txCategoryNameSet.has(normalizedProjectName)) return false;
+          if (mappedProjectIdSet.has(project.id)) return false;
+          return true;
+        })
+        .map((project) => {
+          const expectedAmountTwd =
+            budgetToTWD(
+              Number(project?.data?.budget) || 0,
+              project?.data?.budgetCurrency,
+            ) || 0;
+          return {
+            projectName: project?.data?.name || project.id,
+            category: project?.data?.name || project.id,
+            income: 0,
+            expense: 0,
+            net: 0,
+            receivableMissing: 0,
+            payableExpected: 0,
+            spendByCategory: [],
+            payeeBreakdown: [],
+            transactions: [],
+            needsProjectMatch: false,
+            autoMatchProject: project,
+            matchedProject: project,
+            matchedProjectId: project.id,
+            isMatched: true,
+            isManual: false,
+            expectedAmountTwd,
+            expectedExpenseTwd: (() => {
+              const projection = computeProjectProjection(project);
+              return (
+                (Number(projection.projectedMemberPayoutTWD) || 0) +
+                (Number(projection.projectedCompanyTaxTWD) || 0)
+              );
+            })(),
+            actualExpectedExpenseTwd: 0,
+            incomeGapTwd: -expectedAmountTwd,
+            expectedOutstandingTwd: Math.max(0, expectedAmountTwd),
+            receivableDisplayTwd: Math.max(0, expectedAmountTwd),
+            hoursEarnedPayableTwd: 0,
+            actualMemberPaidTwd: 0,
+            payableDisplayTwd: 0,
+            noTransactionsYet: true,
+          };
+        });
+
+      return [...txRows, ...systemOnlyRows];
+    },
+    [
+      singleProjectPanels,
+      categoryProjectMap,
+      systemProjectByNormalizedName,
+      systemProjectsSorted,
+      actualRequiredExpenseByCategory,
+      actualMemberExpenseByCategory,
+      finishedHoursByProjectMember,
+    ],
+  );
+
+  const unmatchedProjectCategoryRows = useMemo(
+    () =>
+      projectCategoryViewRows.filter(
+        (row) => row.needsProjectMatch && !row.isMatched,
+      ),
+    [projectCategoryViewRows],
+  );
+
+  const matchRequiredCount = useMemo(
+    () => projectCategoryViewRows.filter((row) => row.needsProjectMatch).length,
+    [projectCategoryViewRows],
+  );
+
+  const projectOnlyRows = useMemo(
+    () =>
+      projectCategoryViewRows.filter(
+        (row) => row.needsProjectMatch || row.noTransactionsYet,
+      ),
+    [projectCategoryViewRows],
+  );
+
+  const nonProjectRows = useMemo(
+    () =>
+      projectCategoryViewRows.filter(
+        (row) => !row.needsProjectMatch && !row.noTransactionsYet,
+      ),
+    [projectCategoryViewRows],
+  );
+
+  const allProjectsCompanyCostRows = useMemo(
+    () =>
+      nonProjectRows
+        .map((row) => ({
+          label: row.category || "Uncategorized",
+          amount: Math.max(0, Number(row.expense) || 0),
+        }))
+        .filter((row) => row.amount > 0)
+        .sort((a, b) => b.amount - a.amount),
+    [nonProjectRows],
+  );
+
+  // pending = submitted or approved (not yet paid/rejected)
+  const reimbursementsByMember = useMemo(() => {
+    const map = {};
+    for (const row of reimbursements) {
+      const mid = row?.data?.memberId;
+      const status = row?.data?.status;
+      const dir = row?.data?.direction || "owed_to_me";
+      if (!mid || status === "rejected" || status === "paid") continue;
+      if (!map[mid]) map[mid] = { netTWD: 0, unconverted: [], items: [] };
+      const amt = Number(row?.data?.amount) || 0;
+      const currency = String(row?.data?.currency || "TWD").toUpperCase();
+      let amtTWD = 0;
+      if (currency === "TWD") {
+        amtTWD = amt;
+      } else if (fxRates[currency]) {
+        // fxRates[currency] = TWD per 1 unit of that currency
+        amtTWD = amt * fxRates[currency];
+      } else {
+        // Rate not available — track raw amount separately so we can still show it
+        const sign = dir === "owed_to_me" ? 1 : -1;
+        map[mid].unconverted.push({ amt: sign * amt, currency });
+      }
+      // owed_to_me = company owes member → positive net; owe_company = member owes company → negative net
+      map[mid].netTWD += dir === "owed_to_me" ? amtTWD : -amtTWD;
+      map[mid].items.push({ ...row.data, id: row.id, amtTWD, dir });
+    }
+    return map;
+  }, [reimbursements, fxRates]);
+
+  const memberPayoutReconciliationRows = useMemo(() => {
+    const expectedByMember = {};
+    const expectedByMemberProject = {};
+    for (const project of projects) {
+      const projection = computeProjectProjection(project);
+      if (
+        selectedYear !== "overall" &&
+        Number(projection.year || 0) !== Number(selectedYear)
+      ) {
+        continue;
+      }
+      const projectLabel =
+        projection.projectName || project?.data?.name || project?.id || "(unknown project)";
+      for (const [memberId, amount] of Object.entries(
+        projection.memberPayoutByMemberId || {},
+      )) {
+        expectedByMember[memberId] =
+          (expectedByMember[memberId] || 0) + (Number(amount) || 0);
+        if (!expectedByMemberProject[memberId]) expectedByMemberProject[memberId] = {};
+        expectedByMemberProject[memberId][projectLabel] =
+          (expectedByMemberProject[memberId][projectLabel] || 0) + (Number(amount) || 0);
+      }
+
+      // Self-funded contributions are money members need to pay back to company,
+      // so they reduce expected payout in Finance by Member.
+      if (project?.data?.kind === "Self-funded") {
+        const selfFundingRows = Array.isArray(project?.data?.selfFunding)
+          ? project.data.selfFunding
+          : [];
+        for (const funding of selfFundingRows) {
+          const memberId = String(funding?.memberId || "").trim();
+          if (!memberId) continue;
+          const amount = Number(funding?.amount) || 0;
+          if (amount <= 0) continue;
+
+          expectedByMember[memberId] =
+            (expectedByMember[memberId] || 0) - amount;
+          if (!expectedByMemberProject[memberId]) expectedByMemberProject[memberId] = {};
+          const paybackLabel = `${projectLabel} · Self-funding payback`;
+          expectedByMemberProject[memberId][paybackLabel] =
+            (expectedByMemberProject[memberId][paybackLabel] || 0) - amount;
+        }
+      }
+    }
+
+    const paidByMember = {};
+    const paidByMemberProject = {};
+    const txs = extractFinanceTransactions(rawSheetValues).filter((tx) =>
+      transactionMatchesYear(tx, selectedYear),
+    );
+    for (const tx of txs) {
+      if (DASHBOARD_CAPITAL_PATTERN.test(tx.rawCategory)) continue;
+      if ((Number(tx.expense) || 0) <= 0) continue;
+
+      const byPayee = resolveMemberIdFromText(tx.payee, memberIdByAlias);
+      const byDescription = attributeMember(tx.description, memberIdByAlias)?.memberId || "";
+      const memberId = byPayee || byDescription;
+      if (!memberId) continue;
+
+      paidByMember[memberId] =
+        (paidByMember[memberId] || 0) + (Number(tx.expense) || 0);
+
+      const projectLabel = String(tx.projectName || "(unknown project)").trim() || "(unknown project)";
+      if (!paidByMemberProject[memberId]) paidByMemberProject[memberId] = {};
+      paidByMemberProject[memberId][projectLabel] =
+        (paidByMemberProject[memberId][projectLabel] || 0) + (Number(tx.expense) || 0);
+    }
+
+    const memberIds = new Set([
+      ...Object.keys(expectedByMember),
+      ...Object.keys(paidByMember),
+      ...Object.keys(reimbursementsByMember),
+    ]);
+
+    return [...memberIds]
+      .map((memberId) => {
+        const expectedProjects = expectedByMemberProject[memberId] || {};
+        const paidProjects = paidByMemberProject[memberId] || {};
+        const projectNames = new Set([
+          ...Object.keys(expectedProjects),
+          ...Object.keys(paidProjects),
+        ]);
+        const projectBreakdown = [...projectNames]
+          .map((projectName) => {
+            const rawExpected = Number(expectedProjects[projectName] || 0);
+            const projectPaid = Number(paidProjects[projectName] || 0);
+            const projectExpected = isExpectedActualAlwaysMatchProject(projectName)
+              ? projectPaid
+              : rawExpected;
+            const projectGap = projectPaid - projectExpected;
+            let projectStatus = "Match";
+            if (projectGap > 0) projectStatus = "Overpaid";
+            if (projectGap < 0) projectStatus = "Underpaid";
+            return {
+              projectName,
+              expected: projectExpected,
+              hasPaid: projectPaid,
+              gap: projectGap,
+              status: projectStatus,
+            };
+          })
+          .filter(
+            (row) =>
+              Math.abs(Number(row.expected) || 0) > 0 ||
+              Math.abs(Number(row.hasPaid) || 0) > 0,
+          )
+          .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+
+        const expected = projectBreakdown.reduce(
+          (sum, item) => sum + (Number(item.expected) || 0),
+          0,
+        );
+        const hasPaid = projectBreakdown.reduce(
+          (sum, item) => sum + (Number(item.hasPaid) || 0),
+          0,
+        );
+        const gap = hasPaid - expected;
+
+        let status = "Match";
+        if (gap > 0) status = "Overpaid";
+        if (gap < 0) status = "Underpaid";
+        return {
+          memberId,
+          memberName: membersById[memberId]?.data?.name || memberId,
+          expected,
+          hasPaid,
+          gap,
+          status,
+          projectBreakdown,
+        };
+      })
+      .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+  }, [projects, rawSheetValues, memberIdByAlias, membersById, selectedYear, reimbursementsByMember]);
+
+  const payoutMismatchChartRows = useMemo(() => {
+    let underpaid = 0;
+    let overpaid = 0;
+    let matched = 0;
+
+    for (const row of memberPayoutReconciliationRows) {
+      const gap = Number(row.gap) || 0;
+      if (gap < 0) underpaid += Math.abs(gap);
+      else if (gap > 0) overpaid += gap;
+      else matched += Number(row.hasPaid) || 0;
+    }
+
+    const out = [];
+    if (underpaid > 0) out.push({ label: "Underpaid", amount: underpaid });
+    if (overpaid > 0) out.push({ label: "Overpaid", amount: overpaid });
+    if (matched > 0) out.push({ label: "Matched", amount: matched });
+    return out;
+  }, [memberPayoutReconciliationRows]);
+
+  const allProjectsReceivableDisplay = useMemo(() => {
+    const fromExpected = projectCategoryViewRows.reduce(
+      (sum, row) => sum + (Number(row.expectedOutstandingTwd) || 0),
+      0,
+    );
+    const fromLedger = Number(allProjectsPanel?.receivableMissing || 0);
+    return Math.max(fromExpected, fromLedger);
+  }, [projectCategoryViewRows, allProjectsPanel]);
+
+  const allProjectsPayableDisplay = useMemo(() => {
+    const fromRows = projectCategoryViewRows.reduce(
+      (sum, row) => sum + (Number(row.payableDisplayTwd) || 0),
+      0,
+    );
+    const fromLedger = Number(allProjectsPanel?.payableExpected || 0);
+    return Math.max(fromRows, fromLedger);
+  }, [projectCategoryViewRows, allProjectsPanel]);
+
+  const allProjectsExpectedPayeeRows = useMemo(() => {
+    const byLabel = {};
+    const seenProjectIds = new Set();
+
+    for (const row of projectOnlyRows) {
+      const project = row?.matchedProject;
+      const projectId = project?.id;
+      if (!project || !projectId || seenProjectIds.has(projectId)) continue;
+      seenProjectIds.add(projectId);
+      const expectedRows = expectedPayeeRowsFromProject(project, membersById);
+      for (const item of expectedRows) {
+        byLabel[item.label] = (byLabel[item.label] || 0) + (Number(item.amount) || 0);
+      }
+    }
+
+    return Object.entries(byLabel)
+      .map(([label, amount]) => ({ label, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [projectOnlyRows, membersById]);
+
+  const companyCommonPoolCapital = useMemo(
+    () =>
+      nonProjectRows.reduce((sum, row) => {
+        if (!isCapitalCategory(row.category)) return sum;
+        const income = Math.max(0, Number(row.income) || 0);
+        const expense = Math.max(0, Number(row.expense) || 0);
+        const net = Math.abs(Number(row.net) || 0);
+        const amount = net > 0 ? net : Math.max(income, expense);
+        return sum + amount;
+      }, 0),
+    [nonProjectRows],
+  );
+
+  const companyCommonPoolNetAll = useMemo(() => {
+    const allNet = Number(allProjectsPanel?.net || 0);
+    const capitalNetInNonProject = nonProjectRows.reduce((sum, row) => {
+      if (!isCapitalCategory(row.category)) return sum;
+      return sum + (Number(row.net) || 0);
+    }, 0);
+    return allNet - capitalNetInNonProject;
+  }, [allProjectsPanel, nonProjectRows]);
+
+  const companyCommonPoolRows = useMemo(() => {
+    const rows = [];
+    if (companyCommonPoolCapital > 0) {
+      rows.push({
+        key: "capital",
+        label: "Capital",
+        amount: companyCommonPoolCapital,
+        displayAmount: companyCommonPoolCapital,
+      });
+    }
+    if (Math.abs(companyCommonPoolNetAll) > 0) {
+      rows.push({
+        key: "all-net",
+        label: "All net (ex-capital)",
+        amount: Math.abs(companyCommonPoolNetAll),
+        displayAmount: companyCommonPoolNetAll,
+      });
+    }
+    return rows;
+  }, [companyCommonPoolCapital, companyCommonPoolNetAll]);
+
+  const companyCommonPoolTotal = useMemo(
+    () => (Number(companyCommonPoolCapital) || 0) + (Number(companyCommonPoolNetAll) || 0),
+    [companyCommonPoolCapital, companyCommonPoolNetAll],
+  );
+
+  const companyCommonPoolNetItemizedRows = useMemo(() => {
+    const projectItems = projectOnlyRows
+      .filter((row) => !row.noTransactionsYet)
+      .map((row) => ({
+        key: `project-${row.category}`,
+        label: `Project · ${row.category}`,
+        amount: Number(row.net) || 0,
+      }));
+
+    const nonProjectItems = nonProjectRows
+      .filter((row) => !isCapitalCategory(row.category))
+      .map((row) => ({
+        key: `non-project-${row.category}`,
+        label: `Non-project · ${row.category}`,
+        amount: Number(row.net) || 0,
+      }));
+
+    return [...projectItems, ...nonProjectItems].sort(
+      (a, b) => Math.abs(b.amount) - Math.abs(a.amount),
+    );
+  }, [projectOnlyRows, nonProjectRows]);
+
+  const netContributionSourceRows = useMemo(() => {
+    const projectSources = projectOnlyRows
+      .filter((row) => !row.noTransactionsYet)
+      .map((row) => ({
+        label: `Project · ${row.category}`,
+        amount: Math.max(0, Number(row.net) || 0),
+      }))
+      .filter((row) => row.amount > 0);
+
+    const nonProjectSources = nonProjectRows
+      .filter((row) => !isCapitalCategory(row.category))
+      .map((row) => ({
+        label: `Non-project · ${row.category}`,
+        amount: Math.max(0, Number(row.net) || 0),
+      }))
+      .filter((row) => row.amount > 0);
+
+    return [...projectSources, ...nonProjectSources]
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+  }, [projectOnlyRows, nonProjectRows]);
+
+  const commonPoolExpectedByProjectRows = useMemo(() => {
+    const seenProjectIds = new Set();
+    const projectedByLabel = {};
+    const existingPositiveByLabel = {};
+
+    for (const row of projectOnlyRows) {
+      if (row.noTransactionsYet) continue;
+      const label = String(row.category || "").trim();
+      if (!label) continue;
+      const existingPositive = Math.max(0, Number(row.net) || 0);
+      if (existingPositive <= 0) continue;
+      existingPositiveByLabel[label] =
+        (existingPositiveByLabel[label] || 0) + existingPositive;
+    }
+
+    for (const row of projectOnlyRows) {
+      const project = row?.matchedProject;
+      const projectId = project?.id;
+      if (!project || !projectId || seenProjectIds.has(projectId)) continue;
+      seenProjectIds.add(projectId);
+
+      const projection = computeProjectProjection(project);
+      if (
+        selectedYear !== "overall" &&
+        Number(projection.year || 0) !== Number(selectedYear)
+      ) {
+        continue;
+      }
+      const amount = Number(projection.projectedCommonPoolTWD) || 0;
+      if (amount <= 0) continue;
+
+      const label = projection.projectName || project?.data?.name || projectId;
+      projectedByLabel[label] = (projectedByLabel[label] || 0) + amount;
+    }
+
+    return Object.entries(projectedByLabel)
+      .map(([label, projected]) => {
+        const existing = Number(existingPositiveByLabel[label] || 0);
+        // Expected should represent projects that have not yet contributed net-positive cash.
+        // If a project already contributes positively in current data, do not add extra expected amount.
+        const additionalExpected = existing > 0 ? 0 : Math.max(0, Number(projected || 0));
+        return { label, amount: additionalExpected };
+      })
+      .filter((row) => row.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [projectOnlyRows, selectedYear]);
+
+  const companyCommonPoolExpectedNetAll = useMemo(
+    () =>
+      (Number(companyCommonPoolNetAll) || 0) +
+      commonPoolExpectedByProjectRows.reduce(
+        (sum, row) => sum + (Number(row.amount) || 0),
+        0,
+      ),
+    [companyCommonPoolNetAll, commonPoolExpectedByProjectRows],
+  );
+
+  const companyCommonPoolExpectedRows = useMemo(() => {
+    const rows = [];
+    if (companyCommonPoolCapital > 0) {
+      rows.push({
+        key: "capital",
+        label: "Capital",
+        amount: companyCommonPoolCapital,
+        displayAmount: companyCommonPoolCapital,
+      });
+    }
+    if (Math.abs(companyCommonPoolExpectedNetAll) > 0) {
+      rows.push({
+        key: "all-net",
+        label: "All net (ex-capital)",
+        amount: Math.abs(companyCommonPoolExpectedNetAll),
+        displayAmount: companyCommonPoolExpectedNetAll,
+      });
+    }
+    return rows;
+  }, [companyCommonPoolCapital, companyCommonPoolExpectedNetAll]);
+
+  const companyCommonPoolExpectedTotal = useMemo(
+    () =>
+      (Number(companyCommonPoolCapital) || 0) +
+      (Number(companyCommonPoolExpectedNetAll) || 0),
+    [companyCommonPoolCapital, companyCommonPoolExpectedNetAll],
+  );
+
+  const companyCommonPoolExpectedNetItemizedRows = useMemo(() => {
+    const amountByLabel = {};
+    const keyByLabel = {};
+
+    for (const row of companyCommonPoolNetItemizedRows) {
+      const label = String(row?.label || "").trim();
+      if (!label) continue;
+      amountByLabel[label] = (amountByLabel[label] || 0) + (Number(row.amount) || 0);
+      if (!keyByLabel[label]) keyByLabel[label] = row.key || `merged-${label}`;
+    }
+
+    for (const row of commonPoolExpectedByProjectRows) {
+      const label = `Project · ${row.label}`;
+      amountByLabel[label] = (amountByLabel[label] || 0) + (Number(row.amount) || 0);
+      if (!keyByLabel[label]) keyByLabel[label] = `expected-project-${row.label}`;
+    }
+
+    return Object.entries(amountByLabel)
+      .map(([label, amount]) => ({
+        key: keyByLabel[label] || `merged-${label}`,
+        label,
+        amount,
+      }))
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  }, [companyCommonPoolNetItemizedRows, commonPoolExpectedByProjectRows]);
+
+  const allProjectsPayeeRowsForChart = useMemo(
+    () =>
+      upsertCompanyPoolRow(
+        allProjectsPanel?.payeeBreakdown || [],
+        companyCommonPoolNetAll,
+      ),
+    [allProjectsPanel, companyCommonPoolNetAll],
+  );
+
+  function handleMatchCategoryProject(categoryName, projectId) {
+    setCategoryProjectMap((prev) => {
+      const next = { ...(prev || {}) };
+      if (!projectId) {
+        next[categoryName] = "";
+      } else {
+        next[categoryName] = projectId;
+      }
+      return next;
+    });
+  }
 
   return (
     <TabPage
@@ -1360,253 +3159,553 @@ export default function FinancePage() {
         <SectionBlock
           className="finance-section"
           texture={SURFACE_TEXTURES.projectLedger}
-          title="Cash flow dashboard"
+          title="Finance By Project Or Person"
           titleTag="h3"
           actions={
             <div className="finance-actions">
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  window.open(
+                    FINANCE_SPREADSHEET_URL,
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
+                }
+              >
+                Open spreadsheet
+              </Button>
               <Button variant="ghost" onClick={loadActualRows} disabled={loadingActual}>
                 {loadingActual ? "Refreshing..." : "Refresh from sheet"}
               </Button>
             </div>
           }
         >
-          {dashboard ? (
-            <FinanceDashboard data={dashboard} />
-          ) : loadingActual ? (
-            <EmptyState>Loading accountant sheet…</EmptyState>
-          ) : (
+          {projectCategoryViewRows.length === 0 ? (
             <EmptyState>
-              No data yet. Make sure the sheet range is set in Finance setup
-              below, then click Refresh.
+              No categorized transactions found yet. Refresh the sheet to load rows.
             </EmptyState>
-          )}
-        </SectionBlock>
-
-
-        <SectionBlock
-          className="finance-section"
-          texture={SURFACE_TEXTURES.projectLedger}
-          title="Yearly recurring company cost"
-          titleTag="h3"
-          actions={<Button variant="ghost" onClick={addRecurringCost}>+ Add cost row</Button>}
-        >
-          {(configDraft.recurringCosts || []).length === 0 ? (
-            <EmptyState>No recurring costs configured.</EmptyState>
           ) : (
-            <div className="finance-table-wrap">
-              <table className="finance-table">
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    <th>Amount (TWD)</th>
-                    <th>Note</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(configDraft.recurringCosts || []).map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <InputField
-                          type="number"
-                          min="2000"
-                          max="3000"
-                          step="1"
-                          value={row.year ?? ""}
-                          onChange={(e) =>
-                            updateRecurringCost(row.id, {
-                              year: Number(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <InputField
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={row.amountTwd ?? ""}
-                          onChange={(e) =>
-                            updateRecurringCost(row.id, {
-                              amountTwd: Number(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <InputField
-                          value={row.note || ""}
-                          onChange={(e) =>
-                            updateRecurringCost(row.id, { note: e.target.value })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Button variant="ghost" onClick={() => removeRecurringCost(row.id)}>
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionBlock>
-
-        <SectionBlock
-          className="finance-section"
-          texture={SURFACE_TEXTURES.projectLedger}
-          title="Actual vs projected cash flow"
-          titleTag="h3"
-          actions={
-            <label className="finance-year-picker">
-              <span>Year scope</span>
-              <SelectField
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-              >
-                <option value="overall">Overall</option>
-                {allYears.map((year) => (
-                  <option key={year} value={String(year)}>
-                    {year}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-          }
-        >
-          {selectedYear !== "overall" && yearSummary && (
-            <div className="finance-summary-grid">
-              <article className="finance-kpi">
-                <h4>Year {selectedYear}</h4>
-                <p>Company paid us (actual): {formatTWD(yearSummary.actualPaid)}</p>
-                <p>Common pool (actual): {formatTWD(yearSummary.actualCommonPool)}</p>
-                <p>Recurring cost: {formatTWD(yearSummary.recurringCost)}</p>
-                <p>Projected budget: {formatTWD(yearSummary.projectedBudget)}</p>
-                <p>Projected member payout: {formatTWD(yearSummary.projectedPayout)}</p>
-                <p>Projected pool from projects: {formatTWD(yearSummary.projectedCommonPool)}</p>
-                <p>Net cash after recurring: {formatTWD(yearSummary.netCashAfterRecurring)}</p>
-              </article>
-              <article className="finance-kpi">
-                <h4>Overall</h4>
-                <p>Company paid us (actual): {formatTWD(overallSummary.actualPaid)}</p>
-                <p>Common pool (actual): {formatTWD(overallSummary.actualCommonPool)}</p>
-                <p>Recurring cost: {formatTWD(overallSummary.recurringCost)}</p>
-                <p>Projected budget: {formatTWD(overallSummary.projectedBudget)}</p>
-                <p>Projected member payout: {formatTWD(overallSummary.projectedPayout)}</p>
-                <p>Projected pool from projects: {formatTWD(overallSummary.projectedCommonPool)}</p>
-                <p>Net cash after recurring: {formatTWD(overallSummary.netCashAfterRecurring)}</p>
-              </article>
-            </div>
-          )}
-
-          {selectedYear !== "overall" && (
             <>
-              <h4 className="finance-subtitle">Per-member balance (Year {selectedYear})</h4>
-              {yearRows.length === 0 ? (
-                <EmptyState>No member rows for selected year.</EmptyState>
-              ) : (
+              <div className="finance-category-tabs" role="tablist" aria-label="Finance main view tabs">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={financeMainView === "project"}
+                  className={`finance-category-tab ${financeMainView === "project" ? "is-active" : ""}`}
+                  onClick={() => setFinanceMainView("project")}
+                >
+                  <IconFolder size={14} />
+                  <span>By project</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={financeMainView === "person"}
+                  className={`finance-category-tab ${financeMainView === "person" ? "is-active" : ""}`}
+                  onClick={() => setFinanceMainView("person")}
+                >
+                  <IconUsers size={14} />
+                  <span>By person</span>
+                </button>
+              </div>
+
+              {financeMainView === "project" ? (
+                <>
+                  <div className="finance-controls-inline">
+                    <label className="finance-field-label" htmlFor="finance-year-filter">
+                      Year
+                    </label>
+                    <SelectField
+                      id="finance-year-filter"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                    >
+                      <option value="overall">All years</option>
+                      {allYears.map((year) => (
+                        <option key={year} value={String(year)}>
+                          {year}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <p className="finance-section-note">
+                    Unmatched categories: {unmatchedProjectCategoryRows.length} / {matchRequiredCount}
+                  </p>
+
+                  <div className="finance-project-list">
+                {allProjectsPanel ? (
+                  <details className="project-row finance-project-row" open>
+                    <summary className="project-row-summary finance-project-summary">
+                      <div className="project-row-main">
+                        <span className="project-row-name">ALL projects combined</span>
+                        <div className="project-row-badges">
+                          <span className="project-row-kind">Finance rollup</span>
+                        </div>
+                      </div>
+                      <div className="project-row-budget-cell">
+                        <span className="project-row-budget-twd">{formatTWD(allProjectsPanel.net)}</span>
+                        <span className="project-row-budget-orig">net</span>
+                      </div>
+                      <div className="project-row-hours-cell">
+                        <span className="project-row-hours-assigned">{formatTWD(allProjectsReceivableDisplay)}</span>
+                        <span className="project-row-hours-max">應收</span>
+                      </div>
+                      <div className="project-row-wage">
+                        {formatTWD(allProjectsPayableDisplay)}
+                        <span className="project-row-wage-unit"> 應付</span>
+                      </div>
+                      <div className="project-row-actions">
+                        <span className="project-row-chevron">▾</span>
+                      </div>
+                    </summary>
+                    <div className="project-detail finance-project-detail">
+                      <div className="finance-project-charts">
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Company cost (non-project expenses)</h5>
+                          <PercentageRows rows={allProjectsCompanyCostRows} />
+                          <h5 className="finance-split-title finance-split-title--spaced">Net income contribution sources</h5>
+                          <PercentageRows rows={netContributionSourceRows} />
+                        </div>
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Common pool (Expected vs Actual)</h5>
+                          <h5 className="finance-split-title">Expected</h5>
+                          <CommonPoolRingRows
+                            rows={companyCommonPoolExpectedRows}
+                            itemizedRows={companyCommonPoolExpectedNetItemizedRows}
+                            itemizedKey="all-net"
+                            totalOverride={companyCommonPoolExpectedTotal}
+                          />
+                          <h5 className="finance-split-title finance-split-title--spaced">Actual (transaction history)</h5>
+                          <CommonPoolRingRows
+                            rows={companyCommonPoolRows}
+                            itemizedRows={companyCommonPoolNetItemizedRows}
+                            itemizedKey="all-net"
+                            totalOverride={companyCommonPoolTotal}
+                          />
+                        </div>
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Who is getting paid (Expected vs Actual)</h5>
+                          <div className="finance-split-cols">
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Expected</h5>
+                              <PercentageRows rows={allProjectsExpectedPayeeRows} />
+                            </div>
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Actual (transaction history)</h5>
+                              <PercentageRows rows={allProjectsPayeeRowsForChart} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="finance-table-wrap">
+                        <table className="finance-table">
+                          <thead>
+                            <tr>
+                              <th>日期</th>
+                              <th>敘述</th>
+                              <th>金額</th>
+                              <th>收款人</th>
+                              <th>流水號</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(allProjectsPanel.transactions || []).length === 0 ? (
+                              <tr>
+                                <td colSpan={5}>No transactions.</td>
+                              </tr>
+                            ) : (
+                              [...(allProjectsPanel.transactions || [])]
+                                .slice(-10)
+                                .reverse()
+                                .map((tx, idx) => (
+                                <tr key={`all-project-tx-${tx.serialNumber || "na"}-${idx}`}>
+                                  <td>{tx.date || "—"}</td>
+                                  <td>{tx.description || "—"}</td>
+                                  <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
+                                    {formatTWD(tx.amount)}
+                                  </td>
+                                  <td>{tx.payee || "—"}</td>
+                                  <td>{tx.serialNumber || "—"}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </details>
+                ) : null}
+                  </div>
+
+                  <div className="finance-category-tabs" role="tablist" aria-label="Finance category tabs">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={financeCategoryTab === "projects"}
+                  className={`finance-category-tab ${financeCategoryTab === "projects" ? "is-active" : ""}`}
+                  onClick={() => setFinanceCategoryTab("projects")}
+                >
+                  <IconFolder size={14} />
+                  <span>Projects ({projectOnlyRows.length})</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={financeCategoryTab === "non-projects"}
+                  className={`finance-category-tab ${financeCategoryTab === "non-projects" ? "is-active" : ""}`}
+                  onClick={() => setFinanceCategoryTab("non-projects")}
+                >
+                  <IconDocument size={14} />
+                  <span>Non-projects ({nonProjectRows.length})</span>
+                </button>
+                  </div>
+
+                  <div className="finance-project-list">
+
+                {financeCategoryTab === "projects"
+                  ? projectOnlyRows.map((row) => (
+                  <details
+                    key={`project-category-${row.category}`}
+                    className="project-row finance-project-row"
+                  >
+                    <summary className="project-row-summary finance-project-summary">
+                      <div className="project-row-main">
+                        <span className="project-row-name">{row.category}</span>
+                        <div className="project-row-badges">
+                          <span className="project-row-kind">
+                            {row.noTransactionsYet
+                              ? "No transactions yet"
+                              : row.needsProjectMatch
+                              ? row.isMatched
+                                ? "Matched"
+                                : "Unmatched"
+                              : "No project mapping needed"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="project-row-budget-cell">
+                        <span className={row.net >= 0 ? "project-row-budget-twd finance-plus" : "project-row-budget-twd finance-minus"}>
+                          {formatTWD(row.net)}
+                        </span>
+                        <span className="project-row-budget-orig">net</span>
+                      </div>
+                      <div className="project-row-hours-cell">
+                        <span className="project-row-hours-assigned">{formatTWD(row.receivableDisplayTwd)}</span>
+                        <span className="project-row-hours-max">應收</span>
+                      </div>
+                      <div className="project-row-wage">
+                        {formatTWD(row.payableDisplayTwd)}
+                        <span className="project-row-wage-unit"> 應付</span>
+                      </div>
+                      <div className="project-row-actions">
+                        <span className="project-row-chevron">▾</span>
+                      </div>
+                    </summary>
+                    <div className="project-detail finance-project-detail">
+                      <div className="finance-project-metrics">
+                        {row.needsProjectMatch ? (
+                          <div className="finance-map-editor-wrap">
+                            <span className="finance-map-editor-current">
+                              {row.matchedProject?.data?.name || "Unmatched"}
+                            </span>
+                            {mappingEditorCategory === row.category ? (
+                              <div className="finance-map-editor-panel">
+                                <SelectField
+                                  value={row.matchedProjectId || ""}
+                                  onChange={(e) => {
+                                    handleMatchCategoryProject(row.category, e.target.value);
+                                    setMappingEditorCategory("");
+                                  }}
+                                >
+                                  <option value="">Unmatched</option>
+                                  {systemProjectsSorted.map((project) => (
+                                    <option key={project.id} value={project.id}>
+                                      {project?.data?.name || project.id}
+                                    </option>
+                                  ))}
+                                </SelectField>
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => setMappingEditorCategory("")}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                onClick={() => setMappingEditorCategory(row.category)}
+                              >
+                                Change mapping
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <p>No project mapping needed</p>
+                        )}
+                      </div>
+
+                      <div className="finance-project-charts">
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Expected vs Actual (Income + Expense)</h5>
+                          <div className="finance-split-cols">
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Income</h5>
+                              <MismatchBars
+                                expected={row.expectedAmountTwd}
+                                actual={row.income}
+                              />
+                            </div>
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Expense</h5>
+                              <MismatchBars
+                                expected={row.expectedExpenseTwd}
+                                actual={row.actualExpectedExpenseTwd}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Spend breakdown (%)</h5>
+                          <PercentageRows rows={row.spendByCategory} />
+                        </div>
+                        <div className="finance-project-chart-block">
+                          <h5 className="finance-split-title">Who is getting paid (Expected vs Actual)</h5>
+                          <div className="finance-split-cols">
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Expected</h5>
+                              <PercentageRows rows={expectedPayeeRowsFromProject(row.matchedProject, membersById)} />
+                            </div>
+                            <div className="finance-split-col">
+                              <h5 className="finance-split-title">Actual (transaction history)</h5>
+                              <PercentageRows rows={row.payeeBreakdown} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="finance-table-wrap">
+                        <table className="finance-table">
+                          <thead>
+                            <tr>
+                              <th>日期</th>
+                              <th>敘述</th>
+                              <th>金額</th>
+                              <th>收款人</th>
+                              <th>流水號</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(row.transactions || []).length === 0 ? (
+                              <tr>
+                                <td colSpan={5}>No transactions.</td>
+                              </tr>
+                            ) : (
+                              (row.transactions || []).map((tx, idx) => (
+                                <tr key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}>
+                                  <td>{tx.date || "—"}</td>
+                                  <td>{tx.description || "—"}</td>
+                                  <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
+                                    {formatTWD(tx.amount)}
+                                  </td>
+                                  <td>{tx.payee || "—"}</td>
+                                  <td>{tx.serialNumber || "—"}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                    </div>
+                  </details>
+                ))
+                  : null}
+                  </div>
+
+                  {financeCategoryTab === "non-projects" && nonProjectRows.length > 0 ? (
+                <>
+                  <p className="finance-section-note">
+                    Non-project categories (included in ALL projects combined): {nonProjectRows.length}
+                  </p>
+                  <div className="finance-project-list">
+                    {nonProjectRows.map((row) => (
+                      <details
+                        key={`non-project-category-${row.category}`}
+                        className="project-row finance-project-row"
+                      >
+                        <summary className="project-row-summary finance-project-summary">
+                          <div className="project-row-main">
+                            <span className="project-row-name">{row.category}</span>
+                            <div className="project-row-badges">
+                              <span className="project-row-kind">Non-project</span>
+                            </div>
+                          </div>
+                          <div className="project-row-budget-cell">
+                            <span className={row.net >= 0 ? "project-row-budget-twd finance-plus" : "project-row-budget-twd finance-minus"}>
+                              {formatTWD(row.net)}
+                            </span>
+                            <span className="project-row-budget-orig">net</span>
+                          </div>
+                          <div className="project-row-hours-cell">
+                            <span className="project-row-hours-assigned">{formatTWD(row.receivableMissing)}</span>
+                            <span className="project-row-hours-max">應收</span>
+                          </div>
+                          <div className="project-row-wage">
+                            {formatTWD(row.payableExpected)}
+                            <span className="project-row-wage-unit"> 應付</span>
+                          </div>
+                          <div className="project-row-actions">
+                            <span className="project-row-chevron">▾</span>
+                          </div>
+                        </summary>
+                        <div className="project-detail finance-project-detail">
+                          <div className="finance-project-charts">
+                            <div className="finance-project-chart-block">
+                              <h5 className="finance-split-title">Spend breakdown (%)</h5>
+                              <PercentageRows rows={row.spendByCategory} />
+                            </div>
+                            <div className="finance-project-chart-block">
+                              <h5 className="finance-split-title">Who is getting paid (收款人 %)</h5>
+                              <PercentageRows rows={row.payeeBreakdown} />
+                            </div>
+                          </div>
+
+                          <div className="finance-table-wrap">
+                            <table className="finance-table">
+                              <thead>
+                                <tr>
+                                  <th>日期</th>
+                                  <th>敘述</th>
+                                  <th>金額</th>
+                                  <th>收款人</th>
+                                  <th>流水號</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(row.transactions || []).length === 0 ? (
+                                  <tr>
+                                    <td colSpan={5}>No transactions.</td>
+                                  </tr>
+                                ) : (
+                                  (row.transactions || []).map((tx, idx) => (
+                                    <tr key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}>
+                                      <td>{tx.date || "—"}</td>
+                                      <td>{tx.description || "—"}</td>
+                                      <td className={Number(tx.amount) >= 0 ? "finance-plus" : "finance-minus"}>
+                                        {formatTWD(tx.amount)}
+                                      </td>
+                                      <td>{tx.payee || "—"}</td>
+                                      <td>{tx.serialNumber || "—"}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </>
+                  ) : null}
+                </>
+              ) : null}
+
+              {financeMainView === "person" ? (
                 <div className="finance-table-wrap">
-                  <table className="finance-table">
-                    <thead>
+                <div className="finance-project-chart-block">
+                  <h5 className="finance-split-title">Payout mismatch (%)</h5>
+                  <PercentageRows rows={payoutMismatchChartRows} />
+                </div>
+                <table className="finance-table">
+                  <thead>
+                    <tr>
+                      <th>Member</th>
+                      <th>Expected (system)</th>
+                      <th>Has paid (actual)</th>
+                      <th>Gap</th>
+                      <th>Net requests</th>
+                      <th>Adjusted gap</th>
+                      <th>Status</th>
+                      <th>Why (by project)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memberPayoutReconciliationRows.length === 0 ? (
                       <tr>
-                        <th>Member</th>
-                        <th>Paid by company (actual)</th>
-                        <th>Contributed to common pool (actual)</th>
-                        <th>Capital contribution</th>
-                        <th>Total contribution</th>
-                        <th>Balance (+ owed by company / - member owes)</th>
+                        <td colSpan={8}>No member payout data.</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {yearRows.map((row) => (
-                        <tr key={row.memberId}>
+                    ) : (
+                      memberPayoutReconciliationRows.map((row) => {
+                        const reqSummary = reimbursementsByMember[row.memberId];
+                        // netTWD > 0 → company owes member; < 0 → member owes company
+                        const netTWD = reqSummary?.netTWD || 0;
+                        const unconverted = reqSummary?.unconverted || [];
+                        const hasAnyRequest = netTWD !== 0 || unconverted.length > 0;
+                        // adjustedGap: subtract what company owes member (netTWD) from gap
+                        const adjustedGap = row.gap - netTWD;
+                        return (
+                        <tr key={`member-payout-${row.memberId}`}>
                           <td>{row.memberName}</td>
-                          <td>{formatTWD(row.paidActual)}</td>
-                          <td>{formatTWD(row.contributedPoolActual)}</td>
-                          <td>{formatTWD(row.contributedCapital)}</td>
-                          <td>{formatTWD(row.contributedTotal)}</td>
-                          <td className={row.netBalance >= 0 ? "finance-plus" : "finance-minus"}>
-                            {formatTWD(row.netBalance)}
+                          <td>{formatTWD(row.expected)}</td>
+                          <td>{formatTWD(row.hasPaid)}</td>
+                          <td className={row.gap >= 0 ? "finance-plus" : "finance-minus"}>
+                            {formatTWD(row.gap)}
+                          </td>
+                          <td className={!hasAnyRequest ? "" : (netTWD > 0 || (netTWD === 0 && unconverted.some(u => u.amt > 0))) ? "finance-minus" : "finance-plus"}>
+                            {hasAnyRequest ? (
+                              <>
+                                {netTWD !== 0 && (
+                                  <span>{netTWD > 0 ? "co. owes " : "member owes "}{formatTWD(Math.abs(netTWD))}</span>
+                                )}
+                                {unconverted.map((u, i) => (
+                                  <em key={i} className="finance-balance-meta" style={{ display: "block" }}>
+                                    {u.amt > 0 ? "co. owes " : "member owes "}{Math.abs(u.amt).toFixed(2)} {u.currency}
+                                  </em>
+                                ))}
+                              </>
+                            ) : "—"}
+                          </td>
+                          <td className={adjustedGap >= 0 ? "finance-plus" : "finance-minus"}>
+                            {formatTWD(adjustedGap)}
+                          </td>
+                          <td>{row.status}</td>
+                          <td>
+                            {row.projectBreakdown?.length ? (
+                              <ul className="finance-balance-list">
+                                {row.projectBreakdown.map((item) => (
+                                  <li
+                                    key={`${row.memberId}-${item.projectName}`}
+                                    className="finance-balance-row"
+                                  >
+                                    <span className="finance-balance-name">
+                                      {item.projectName}
+                                      <em className="finance-balance-meta">
+                                        {` expected ${formatTWD(item.expected)} · actual ${formatTWD(item.hasPaid)}`}
+                                      </em>
+                                    </span>
+                                    <span className={item.gap >= 0 ? "finance-plus" : "finance-minus"}>
+                                      {formatTWD(item.gap)}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
                 </div>
-              )}
+              ) : null}
             </>
-          )}
-
-          <h4 className="finance-subtitle">Per-member balance (Overall)</h4>
-          {overallRows.length === 0 ? (
-            <EmptyState>No worker-owner rows found.</EmptyState>
-          ) : (
-            <div className="finance-table-wrap">
-              <table className="finance-table">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Paid by company (actual)</th>
-                    <th>Contributed to common pool (actual)</th>
-                    <th>Capital contribution</th>
-                    <th>Total contribution</th>
-                    <th>Balance (+ owed by company / - member owes)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overallRows.map((row) => (
-                    <tr key={row.memberId}>
-                      <td>{row.memberName}</td>
-                      <td>{formatTWD(row.paidActual)}</td>
-                      <td>{formatTWD(row.contributedPoolActual)}</td>
-                      <td>{formatTWD(row.contributedCapital)}</td>
-                      <td>{formatTWD(row.contributedTotal)}</td>
-                      <td className={row.netBalance >= 0 ? "finance-plus" : "finance-minus"}>
-                        {formatTWD(row.netBalance)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionBlock>
-
-        <SectionBlock
-          className="finance-section"
-          texture={SURFACE_TEXTURES.projectKanban}
-          title="Projected cash flow / budget by project"
-          titleTag="h3"
-        >
-          {projectedByProjectRows.length === 0 ? (
-            <EmptyState>No projects found.</EmptyState>
-          ) : (
-            <div className="finance-table-wrap">
-              <table className="finance-table">
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    <th>Project</th>
-                    <th>Budget (projected)</th>
-                    <th>Projected common pool</th>
-                    <th>Projected payout to members</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projectedByProjectRows.map((row) => (
-                    <tr key={row.projectId}>
-                      <td>{row.year || "-"}</td>
-                      <td>{row.projectName}</td>
-                      <td>{formatTWD(row.budgetTWD)}</td>
-                      <td>{formatTWD(row.projectedCommonPoolTWD)}</td>
-                      <td>{formatTWD(row.projectedMemberPayoutTWD)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </SectionBlock>
 

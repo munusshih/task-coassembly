@@ -12,6 +12,7 @@ export {
   IconChartLine,
   IconChecklist,
   IconDocument,
+  IconReceipt,
   IconFolder,
   IconLink,
   IconUsers,

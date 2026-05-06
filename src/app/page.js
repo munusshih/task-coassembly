@@ -35,6 +35,7 @@ import ProjectsPage from "./components/ProjectsPage";
 import FinancePage from "./components/FinancePage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
+import PayoutsPage from "./components/PayoutsPage";
 import ResourcesPage from "./components/ResourcesPage";
 import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
@@ -51,6 +52,7 @@ const TAB_ORDER = [
   "projects",
   "backlog",
   "finance",
+  "payouts",
   "meetingNotes",
   "resources",
 ];
@@ -290,7 +292,7 @@ export default function Home() {
   );
   const allowedTabs = useMemo(() => {
     if (hasLimitedAccess) {
-      return ["members", "projects"];
+      return ["members", "projects", "payouts"];
     }
     return TAB_ORDER;
   }, [hasLimitedAccess]);
@@ -626,22 +628,25 @@ export default function Home() {
 
   if (!authReady) {
     return (
-      <main className="page-shell page-shell--single">
-        <section className="panel">
-          <h1>Checking access</h1>
-          <p>Verifying your account permissions.</p>
-        </section>
+      <main className="page-shell page-shell--single splash-screen">
+        <div className="splash-card">
+          <div className="splash-brand">CoA</div>
+          <div className="splash-dots" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+          <p className="splash-label">Checking access…</p>
+        </div>
       </main>
     );
   }
 
   if (!currentMember) {
     return (
-      <main className="page-shell page-shell--single">
-        <section className="panel">
-          <h1>Access required</h1>
-          <p>Use your approved Google account to sign in.</p>
-        </section>
+      <main className="page-shell page-shell--single splash-screen">
+        <div className="splash-card">
+          <div className="splash-brand">CoA</div>
+          <p className="splash-label">Sign in with your approved Google account to continue.</p>
+        </div>
       </main>
     );
   }
@@ -688,6 +693,15 @@ export default function Home() {
     }
     if (activeTab === "finance") {
       return <FinancePage />;
+    }
+    if (activeTab === "payouts") {
+      return (
+        <PayoutsPage
+          viewerMemberId={currentMember.id}
+          viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          sharedMembers={sharedMembers}
+        />
+      );
     }
     if (activeTab === "meetingNotes") {
       return <MeetingNotesPage viewerName={currentMember.name || ""} />;

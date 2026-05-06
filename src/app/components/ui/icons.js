@@ -83,6 +83,22 @@ export function IconDocument(props) {
   );
 }
 
+export function IconReceipt(props) {
+  return (
+    <IconBase {...props}>
+      {/* receipt body */}
+      <rect x="2" y="1" width="10" height="12" rx="1" />
+      {/* torn bottom edge teeth */}
+      <polyline points="2,13 3,12 4,13 5,12 6,13 7,12 8,13 9,12 10,13 11,12 12,13" />
+      {/* lines inside */}
+      <line x1="4" y1="4.5" x2="10" y2="4.5" />
+      <line x1="4" y1="6.5" x2="10" y2="6.5" />
+      <line x1="4" y1="8.5" x2="7" y2="8.5" />
+      <line x1="8" y1="8.5" x2="10" y2="8.5" strokeWidth="2" />
+    </IconBase>
+  );
+}
+
 export function IconLink(props) {
   return (
     <IconBase {...props}>

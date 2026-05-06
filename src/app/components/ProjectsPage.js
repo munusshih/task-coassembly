@@ -95,6 +95,8 @@ const EMPTY_FORM = {
   stagePlans: [],
   // staffing: [{id, memberId, roles: string[], maxHours, allocatedAmount}]
   staffing: [],
+  // selfFunding: [{id, memberId, amount}]
+  selfFunding: [],
 };
 
 // ─ Helpers ──────────────────────────────────────────────────────────────────────────────────────
@@ -133,6 +135,10 @@ function isInternalOrAdminKind(kind) {
 
 function isPassThroughKind(kind) {
   return kind === "Pass-through";
+}
+
+function isSelfFundedKind(kind) {
+  return kind === "Self-funded";
 }
 
 function fmtH(h) {
@@ -451,7 +457,7 @@ function StaffingEdit({
     <div className="staffing-list">
       <div className="staffing-grid-head">
         <span>Name</span>
-        {!legacyMode && <span>Role</span>}
+        <span>Role</span>
         {legacyMode ? <span>Allocated (TWD)</span> : <span>Max hrs</span>}
         {!legacyMode && <span>Pay est.</span>}
       </div>
@@ -486,29 +492,27 @@ function StaffingEdit({
                 {m.data.name || m.id}
               </span>
             </label>
-            {!legacyMode && (
-              <div
-                className="staffing-col staffing-col--roles"
-                aria-label="Primary role"
-              >
-                {STAFFING_ROLES.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    disabled={!active}
-                    className={
-                      "role-chip" +
-                      (active && entry.roles.includes(r.value)
-                        ? " role-chip--on"
-                        : "")
-                    }
-                    onClick={() => setPrimaryRole(m.id, r.value)}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div
+              className="staffing-col staffing-col--roles"
+              aria-label="Primary role"
+            >
+              {STAFFING_ROLES.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  disabled={!active}
+                  className={
+                    "role-chip" +
+                    (active && entry.roles.includes(r.value)
+                      ? " role-chip--on"
+                      : "")
+                  }
+                  onClick={() => setPrimaryRole(m.id, r.value)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
             {legacyMode ? (
               <label className="staffing-col staffing-col--hours">
                 <InputField
@@ -552,6 +556,72 @@ function StaffingEdit({
   );
 }
 
+function SelfFundingEdit({ selfFunding, members, onChange }) {
+  function toggleMember(memberId) {
+    const exists = selfFunding.find((s) => s.memberId === memberId);
+    if (exists) {
+      onChange(selfFunding.filter((s) => s.memberId !== memberId));
+    } else {
+      onChange([
+        ...selfFunding,
+        {
+          id: newUUID(),
+          memberId,
+          amount: "",
+        },
+      ]);
+    }
+  }
+
+  function setAmount(memberId, amount) {
+    onChange(
+      selfFunding.map((s) => (s.memberId === memberId ? { ...s, amount } : s)),
+    );
+  }
+
+  return (
+    <div className="staffing-list">
+      <div className="staffing-grid-head">
+        <span>Name</span>
+        <span>Funding amount (TWD)</span>
+      </div>
+      {members.map((m) => {
+        const entry = selfFunding.find((s) => s.memberId === m.id);
+        const active = !!entry;
+        return (
+          <div
+            key={m.id}
+            className={
+              "staffing-member" + (active ? " staffing-member--on" : "")
+            }
+          >
+            <label className="staffing-col staffing-col--name">
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={() => toggleMember(m.id)}
+              />
+              <span className="staffing-member-name">{m.data.name || m.id}</span>
+            </label>
+            <label className="staffing-col staffing-col--hours">
+              <InputField
+                className="project-field staffing-field--hours"
+                type="number"
+                placeholder="0"
+                min="0"
+                step="1"
+                disabled={!active}
+                value={active ? entry.amount : ""}
+                onChange={(e) => setAmount(m.id, e.target.value)}
+              />
+            </label>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─ ProjectRow ──────────────────────────────────────────────────────────────────────────────────
 
 function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
@@ -585,26 +655,59 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     }));
   }
 
-  const [form, setForm] = useState({
-    name: d.name || "",
-    kind: d.kind || "",
-    status: d.status || "",
-    budget: d.budget != null ? String(d.budget) : "",
-    budgetCurrency: d.budgetCurrency || "TWD",
-    donationPercent:
-      d.donationPercent != null ? String(d.donationPercent) : "20",
-    companyTax: Boolean(d.companyTax),
-    legacyMode: Boolean(d.legacyMode),
-    projectedHourlyWage:
-      d.projectedHourlyWage != null ? String(d.projectedHourlyWage) : "",
-    maxHours: d.maxHours != null ? String(d.maxHours) : "",
-    startDate: d.startDate || "",
-    endDate: d.endDate || "",
-    stagePlans: normalizeStagePlans(d.stagePlans),
-    staffing: isPassThroughKind(d.kind)
-      ? normalizeStaffing(d.staffing).slice(0, 1)
-      : normalizeStaffing(d.staffing),
-  });
+  function normalizeSelfFunding(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((s) => ({
+      id: s.id || newUUID(),
+      memberId: s.memberId || "",
+      amount: s.amount != null ? String(s.amount) : "",
+    }));
+  }
+
+  function buildFormFromProjectData(data) {
+    return {
+      name: data?.name || "",
+      kind: data?.kind || "",
+      status: data?.status || "",
+      budget: data?.budget != null ? String(data.budget) : "",
+      budgetCurrency: data?.budgetCurrency || "TWD",
+      donationPercent:
+        data?.donationPercent != null ? String(data.donationPercent) : "20",
+      companyTax: Boolean(data?.companyTax),
+      legacyMode: Boolean(data?.legacyMode),
+      projectedHourlyWage:
+        data?.projectedHourlyWage != null ? String(data.projectedHourlyWage) : "",
+      maxHours: data?.maxHours != null ? String(data.maxHours) : "",
+      startDate: data?.startDate || "",
+      endDate: data?.endDate || "",
+      stagePlans: normalizeStagePlans(data?.stagePlans),
+      staffing: isPassThroughKind(data?.kind)
+        ? normalizeStaffing(data?.staffing).slice(0, 1)
+        : normalizeStaffing(data?.staffing),
+      selfFunding: normalizeSelfFunding(data?.selfFunding),
+    };
+  }
+
+  const initialForm = useMemo(() => buildFormFromProjectData(d), [d]);
+  const [form, setForm] = useState(() => buildFormFromProjectData(d));
+
+  useEffect(() => {
+    if (!editing) setForm(buildFormFromProjectData(d));
+  }, [d, editing]);
+
+  const isFormDirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(initialForm),
+    [form, initialForm],
+  );
+
+  function resetEditForm() {
+    setForm(buildFormFromProjectData(d));
+  }
+
+  function handleCancelEdit() {
+    resetEditForm();
+    setEditing(false);
+  }
 
   function setField(k, v) {
     setForm((p) => {
@@ -624,6 +727,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     e.preventDefault();
     if (!form.name.trim()) return;
     const internalOrAdmin = isInternalOrAdminKind(form.kind);
+    const selfFunded = isSelfFundedKind(form.kind);
     const projectedHourlyWage = form.projectedHourlyWage
       ? Number(form.projectedHourlyWage)
       : null;
@@ -663,14 +767,26 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     const normalizedStaffing = isPassThroughKind(form.kind)
       ? staffing.slice(0, 1)
       : staffing;
+    const normalizedSelfFunding = form.selfFunding
+      .filter((s) => s.memberId)
+      .map((s) => ({
+        id: s.id,
+        memberId: s.memberId,
+        amount: Number(s.amount) || 0,
+      }))
+      .filter((s) => s.amount > 0);
+    const selfFundingTotal = normalizedSelfFunding.reduce(
+      (sum, entry) => sum + (Number(entry.amount) || 0),
+      0,
+    );
 
     onSave(project, {
       name: form.name.trim(),
       kind: form.kind || null,
       status: form.status || null,
-      budget: form.budget ? Number(form.budget) : null,
-      budgetCurrency: form.budgetCurrency,
-      donationPercent: Number(form.donationPercent) || 0,
+      budget: selfFunded ? selfFundingTotal : form.budget ? Number(form.budget) : null,
+      budgetCurrency: selfFunded ? "TWD" : form.budgetCurrency,
+      donationPercent: selfFunded ? 0 : Number(form.donationPercent) || 0,
       companyTax: Boolean(form.companyTax),
       legacyMode: Boolean(form.legacyMode),
       projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
@@ -680,13 +796,22 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       stagePlans,
       stages,
       staffing: normalizedStaffing,
+      selfFunding: normalizedSelfFunding,
     });
     setEditing(false);
   }
 
   const hours = assignedHours(allTasks, project.id);
   const maxH = d.maxHours ? Number(d.maxHours) : null;
-  const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
+  const selfFunded = isSelfFundedKind(d.kind);
+  const selfFundingRaw = Array.isArray(d.selfFunding) ? d.selfFunding : [];
+  const selfFundingTotalRaw = selfFundingRaw.reduce(
+    (sum, entry) => sum + (Number(entry?.amount) || 0),
+    0,
+  );
+  const budgTWD = selfFunded
+    ? selfFundingTotalRaw
+    : budgetToTWD(d.budget, d.budgetCurrency);
   const internalOrAdmin = isInternalOrAdminKind(d.kind);
   const passThrough = isPassThroughKind(d.kind);
   const projectedHourlyWage =
@@ -696,8 +821,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     projectedHourlyWage >= MIN_INTERNAL_ADMIN_HOURLY_TWD
       ? projectedHourlyWage
       : null;
-  const donationPct = Number(d.donationPercent) || 0;
-  const donationTWD = donationAmount(budgTWD, donationPct);
+  const donationPct = selfFunded ? 0 : Number(d.donationPercent) || 0;
+  const donationTWD = selfFunded ? 0 : donationAmount(budgTWD, donationPct);
   const companyTaxRate = d.companyTax ? 0.05 : 0;
   const companyTaxTWD =
     budgTWD != null ? Math.round(budgTWD * companyTaxRate) : null;
@@ -742,6 +867,26 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       member: members.find((m) => m.id === s.memberId),
     }));
   }, [d.staffing, members]);
+
+  const selfFundingResolved = useMemo(() => {
+    const raw = Array.isArray(d.selfFunding) ? d.selfFunding : [];
+    return raw
+      .map((entry) => ({
+        ...entry,
+        member: members.find((m) => m.id === entry.memberId),
+        amount: Number(entry.amount) || 0,
+      }))
+      .filter((entry) => entry.amount > 0);
+  }, [d.selfFunding, members]);
+
+  const selfFundingTotal = useMemo(
+    () =>
+      selfFundingResolved.reduce(
+        (sum, entry) => sum + (Number(entry.amount) || 0),
+        0,
+      ),
+    [selfFundingResolved],
+  );
 
   const sortedStagePlans = useMemo(() => {
     if (!Array.isArray(d.stagePlans)) return [];
@@ -802,8 +947,17 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       formProjectedHourly >= MIN_INTERNAL_ADMIN_HOURLY_TWD
         ? formProjectedHourly
         : null;
-    const formBudgetTWD = budgetToTWD(form.budget, form.budgetCurrency);
-    const formDonationTWD = donationAmount(formBudgetTWD, form.donationPercent);
+    const formSelfFunded = isSelfFundedKind(form.kind);
+    const formSelfFundingTotal = form.selfFunding.reduce(
+      (sum, entry) => sum + (Number(entry.amount) || 0),
+      0,
+    );
+    const formBudgetTWD = formSelfFunded
+      ? formSelfFundingTotal
+      : budgetToTWD(form.budget, form.budgetCurrency);
+    const formDonationTWD = formSelfFunded
+      ? 0
+      : donationAmount(formBudgetTWD, form.donationPercent);
     const formCompanyTaxTWD =
       form.companyTax && formBudgetTWD != null
         ? Math.round(formBudgetTWD * 0.05)
@@ -854,9 +1008,16 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       <li className="project-row">
         <ModalShell
           title={form.name || "Edit project"}
-          onClose={() => setEditing(false)}
+          onClose={handleCancelEdit}
+          hasUnsavedChanges={isFormDirty}
+          unsavedWarning="You have unsaved project changes. Closing now will discard them."
+          onDiscardChanges={resetEditForm}
+          size="lg"
           bodyClassName="project-edit-modal-body"
         >
+          {isFormDirty ? (
+            <p className="finance-section-note">Unsaved changes</p>
+          ) : null}
           <form className="project-edit-form" onSubmit={handleSave}>
             {/* Section 1: Core info */}
             <div className="edit-field-grid">
@@ -920,42 +1081,51 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   onChange={(e) => setField("endDate", e.target.value)}
                 />
               </label>
-              <div className="edit-field-group">
-                <span className="edit-field-label">Budget</span>
-                <div className="project-budget-group">
-                  <InputField
-                    className="project-field project-field--budget"
-                    type="number"
-                    placeholder="Amount"
-                    min="0"
-                    step="1"
-                    value={form.budget}
-                    onChange={(e) => setField("budget", e.target.value)}
-                  />
-                  <SelectField
-                    className="project-field project-field--currency"
-                    value={form.budgetCurrency}
-                    onChange={(e) => setField("budgetCurrency", e.target.value)}
-                  >
-                    <option value="TWD">TWD</option>
-                    <option value="USD">USD</option>
-                  </SelectField>
+              {form.kind === "Self-funded" ? (
+                <div className="edit-field-group">
+                  <span className="edit-field-label">Budget (from self funding)</span>
+                  <p className="finance-section-note">{fmtTWD(formSelfFundingTotal)}</p>
                 </div>
-              </div>
-              <label className="edit-field-group">
-                <span className="edit-field-label">Donation %</span>
-                <SelectField
-                  className="project-field"
-                  value={form.donationPercent}
-                  onChange={(e) => setField("donationPercent", e.target.value)}
-                >
-                  {DONATION_OPTIONS.map((pct) => (
-                    <option key={pct} value={pct}>
-                      {pct}%
-                    </option>
-                  ))}
-                </SelectField>
-              </label>
+              ) : (
+                <>
+                  <div className="edit-field-group">
+                    <span className="edit-field-label">Budget</span>
+                    <div className="project-budget-group">
+                      <InputField
+                        className="project-field project-field--budget"
+                        type="number"
+                        placeholder="Amount"
+                        min="0"
+                        step="1"
+                        value={form.budget}
+                        onChange={(e) => setField("budget", e.target.value)}
+                      />
+                      <SelectField
+                        className="project-field project-field--currency"
+                        value={form.budgetCurrency}
+                        onChange={(e) => setField("budgetCurrency", e.target.value)}
+                      >
+                        <option value="TWD">TWD</option>
+                        <option value="USD">USD</option>
+                      </SelectField>
+                    </div>
+                  </div>
+                  <label className="edit-field-group">
+                    <span className="edit-field-label">Donation %</span>
+                    <SelectField
+                      className="project-field"
+                      value={form.donationPercent}
+                      onChange={(e) => setField("donationPercent", e.target.value)}
+                    >
+                      {DONATION_OPTIONS.map((pct) => (
+                        <option key={pct} value={pct}>
+                          {pct}%
+                        </option>
+                      ))}
+                    </SelectField>
+                  </label>
+                </>
+              )}
               <div className="edit-field-group edit-field-group--checkbox-row">
                 <label className="edit-checkbox-label">
                   <input
@@ -1055,6 +1225,24 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               </details>
             )}
 
+            {members.length > 0 && form.kind === "Self-funded" && (
+              <details className="project-edit-section edit-disclosure">
+                <summary className="edit-disclosure-summary">
+                  <span className="project-edit-label">Self funding</span>
+                  <span className="project-edit-metric">
+                    Total funded: {fmtTWD(formSelfFundingTotal)}
+                  </span>
+                </summary>
+                <div className="edit-disclosure-body">
+                  <SelfFundingEdit
+                    selfFunding={form.selfFunding}
+                    members={members}
+                    onChange={(v) => setField("selfFunding", v)}
+                  />
+                </div>
+              </details>
+            )}
+
             <div className="edit-modal-footer">
               <Button type="submit" size="small" disabled={!form.name.trim()}>
                 Save
@@ -1063,7 +1251,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                 type="button"
                 variant="ghost"
                 size="small"
-                onClick={() => setEditing(false)}
+                onClick={handleCancelEdit}
               >
                 Cancel
               </Button>
@@ -1126,10 +1314,14 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           ) : budgTWD != null ? (
             <>
               <span className="project-row-budget-twd">{fmtTWD(budgTWD)}</span>
-              <span className="project-row-budget-orig">
-                Donation {donationPct}%
-                {donationTWD != null ? ` · ${fmtTWD(donationTWD)}` : ""}
-              </span>
+              {selfFunded ? (
+                <span className="project-row-budget-orig">From self funding</span>
+              ) : (
+                <span className="project-row-budget-orig">
+                  Donation {donationPct}%
+                  {donationTWD != null ? ` · ${fmtTWD(donationTWD)}` : ""}
+                </span>
+              )}
               {d.budgetCurrency === "USD" && d.budget && (
                 <span className="project-row-budget-orig">
                   {fmtUSD(d.budget)} USD
@@ -1347,14 +1539,16 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     ) : null}
                   </span>
                 </div>
-                <div className="detail-ledger-row detail-ledger-row--deduct">
-                  <span className="detail-ledger-label">
-                    Donation {donationPct}%
-                  </span>
-                  <span className="detail-ledger-val detail-ledger-val--deduct">
-                    −{fmtTWD(donationTWD)}
-                  </span>
-                </div>
+                {!selfFunded && (
+                  <div className="detail-ledger-row detail-ledger-row--deduct">
+                    <span className="detail-ledger-label">
+                      Donation {donationPct}%
+                    </span>
+                    <span className="detail-ledger-val detail-ledger-val--deduct">
+                      −{fmtTWD(donationTWD)}
+                    </span>
+                  </div>
+                )}
                 {companyTaxTWD != null && companyTaxTWD > 0 && (
                   <div className="detail-ledger-row detail-ledger-row--deduct">
                     <span className="detail-ledger-label">Company tax 5%</span>
@@ -1509,7 +1703,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   const totalPay =
                     passThrough && staffingResolved.length === 1
                       ? teamDistributableTWD
-                      : !isLegacyMode && isLead && leadBonusTWD != null && payEst != null
+                      : isLead && leadBonusTWD != null && payEst != null
                         ? payEst + leadBonusTWD
                         : payEst;
                   const workedPay =
@@ -1563,7 +1757,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       )}
                       <span className="detail-team-pay">
                         {totalPay != null ? fmtTWD(totalPay) : "—"}
-                        {!passThrough && !isLegacyMode && isLead && leadBonusTWD != null && (
+                        {!passThrough && isLead && leadBonusTWD != null && (
                           <span className="detail-team-pay-note"> +bonus</span>
                         )}
                       </span>
@@ -1573,6 +1767,36 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               </div>
             )}
           </div>
+
+          {d.kind === "Self-funded" && (
+            <div className="detail-team">
+              <div className="detail-section-head">
+                <span className="detail-section-label">Self funding</span>
+                <span className="detail-section-meta">{fmtTWD(selfFundingTotal)} total</span>
+              </div>
+              {selfFundingResolved.length === 0 ? (
+                <p className="snapshot-empty">No self-funding entries yet.</p>
+              ) : (
+                <div className="detail-team-table">
+                  <div className="detail-team-thead">
+                    <span>Name</span>
+                    <span>Funding amount</span>
+                  </div>
+                  {selfFundingResolved.map((entry) => (
+                    <div
+                      key={entry.id || entry.memberId}
+                      className="detail-team-row"
+                    >
+                      <span className="detail-team-name">
+                        {entry.member?.data?.name || entry.memberId}
+                      </span>
+                      <span className="detail-team-pay">{fmtTWD(entry.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </li>
@@ -1759,6 +1983,10 @@ export default function ProjectsPage({
       ) {
         next.projectedHourlyWage = String(MIN_INTERNAL_ADMIN_HOURLY_TWD);
       }
+      if (field === "kind" && isSelfFundedKind(value)) {
+        next.donationPercent = "0";
+        next.budgetCurrency = "TWD";
+      }
       return next;
     });
   }
@@ -1772,6 +2000,7 @@ export default function ProjectsPage({
     const name = form.name.trim();
     if (!name) return;
     const internalOrAdmin = isInternalOrAdminKind(form.kind);
+    const selfFunded = isSelfFundedKind(form.kind);
     const projectedHourlyWage = form.projectedHourlyWage
       ? Number(form.projectedHourlyWage)
       : null;
@@ -1792,9 +2021,9 @@ export default function ProjectsPage({
         name,
         kind: form.kind || null,
         status: form.status || null,
-        budget: form.budget ? Number(form.budget) : null,
-        budgetCurrency: form.budgetCurrency,
-        donationPercent: Number(form.donationPercent) || 0,
+        budget: selfFunded ? 0 : form.budget ? Number(form.budget) : null,
+        budgetCurrency: selfFunded ? "TWD" : form.budgetCurrency,
+        donationPercent: selfFunded ? 0 : Number(form.donationPercent) || 0,
         companyTax: Boolean(form.companyTax),
         legacyMode: Boolean(form.legacyMode),
         projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
@@ -1804,6 +2033,7 @@ export default function ProjectsPage({
         stagePlans: [],
         stages: [],
         staffing: [],
+        selfFunding: [],
         createdAt: Date.now(),
       };
       const id = await createDocument("projects", created);
@@ -1894,6 +2124,7 @@ export default function ProjectsPage({
     () =>
       visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
+        if (isSelfFundedKind(p.data.kind)) return s;
         return s + (donationAmount(budget, p.data.donationPercent) || 0);
       }, 0),
     [visibleProjects],
@@ -1903,6 +2134,9 @@ export default function ProjectsPage({
     () =>
       visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
+        if (isSelfFundedKind(p.data.kind)) {
+          return s + (budget || 0);
+        }
         const donation = donationAmount(budget, p.data.donationPercent) || 0;
         if (budget == null) return s;
         return s + Math.max(0, budget - donation);
@@ -1998,28 +2232,36 @@ export default function ProjectsPage({
               step="1"
               value={form.budget}
               onChange={(e) => setField("budget", e.target.value)}
+              disabled={form.kind === "Self-funded"}
             />
             <SelectField
               className="project-field project-field--currency"
               value={form.budgetCurrency}
               onChange={(e) => setField("budgetCurrency", e.target.value)}
+              disabled={form.kind === "Self-funded"}
             >
               <option value="TWD">TWD</option>
               <option value="USD">USD</option>
             </SelectField>
           </div>
-          <SelectField
-            className="project-field project-field--donation"
-            value={form.donationPercent}
-            onChange={(e) => setField("donationPercent", e.target.value)}
-            title="Company donation percentage"
-          >
-            {DONATION_OPTIONS.map((pct) => (
-              <option key={pct} value={pct}>
-                {pct}% donation
-              </option>
-            ))}
-          </SelectField>
+          {form.kind !== "Self-funded" ? (
+            <SelectField
+              className="project-field project-field--donation"
+              value={form.donationPercent}
+              onChange={(e) => setField("donationPercent", e.target.value)}
+              title="Company donation percentage"
+            >
+              {DONATION_OPTIONS.map((pct) => (
+                <option key={pct} value={pct}>
+                  {pct}% donation
+                </option>
+              ))}
+            </SelectField>
+          ) : (
+            <span className="finance-section-note">
+              Budget comes from self funding. Donation is disabled.
+            </span>
+          )}
           <InputField
             className="project-field"
             type="date"
