@@ -1,20 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { firebaseReady } from "../firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
-  createDocument,
-  deleteDocument,
-  deleteDocumentsWhereBefore,
-  replaceDocument,
+  onDisconnect,
+  limitToLast,
+  onValue,
+  orderByChild,
+  push,
+  query,
+  ref as rtdbRef,
+  remove,
+  serverTimestamp,
+  set,
+  update,
+} from "firebase/database";
+import { auth, firebaseReady, realtimeDb } from "../firebase";
+import {
   subscribeCollection,
-  subscribeCollectionQuery,
   updateDocument,
 } from "../firestore";
+import {
+  findMemberForAuth,
+  hasLimitedWorkspaceAccess,
+  isMemberEnabled,
+  isWorkerOwner,
+  normalizeMemberRoleValue,
+  normalizeEmailValue,
+} from "../authAccess";
 import Navigation from "./components/Navigation";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
 import ProjectsPage from "./components/ProjectsPage";
+import FinancePage from "./components/FinancePage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
 import ResourcesPage from "./components/ResourcesPage";
@@ -25,7 +43,7 @@ const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
 const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
-const TBD_TABS = ["finance"];
+const TBD_TABS = [];
 
 const TAB_ORDER = [
   "members",
@@ -116,8 +134,25 @@ function toCursorCoord(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function lerp(from, to, factor) {
-  return from + (to - from) * factor;
+function normalizePresenceRows(snapshotValue) {
+  if (!snapshotValue || typeof snapshotValue !== "object") return [];
+  return Object.entries(snapshotValue).map(([id, row]) => ({
+    id,
+    data: row || {},
+  }));
+}
+
+function normalizeRealtimeRows(snapshotValue) {
+  if (!snapshotValue || typeof snapshotValue !== "object") return [];
+  return Object.entries(snapshotValue).map(([id, row]) => ({
+    id,
+    data: row || {},
+  }));
+}
+
+function isPermissionDeniedError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("permission_denied") || message.includes("permission denied");
 }
 
 function loadStylePrefsFromStorage() {
@@ -159,50 +194,134 @@ function loadStylePrefsFromStorage() {
 export default function Home() {
   const [activeTab, setActiveTab] = useState("members");
   const [slideDir, setSlideDir] = useState("right");
-  const [sessionUser, setSessionUser] = useState(null);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [currentMember, setCurrentMember] = useState(null);
   const [identity, setIdentity] = useState(null);
+  const [sharedMembers, setSharedMembers] = useState([]);
+  const [sharedProjects, setSharedProjects] = useState([]);
+  const [sharedTasks, setSharedTasks] = useState([]);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [presenceRows, setPresenceRows] = useState([]);
-  const [smoothedPeerCursors, setSmoothedPeerCursors] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
   const [stylePrefs, setStylePrefs] = useState(DEFAULT_STYLE_PREFS);
   const [stylePrefsLoaded, setStylePrefsLoaded] = useState(false);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const cursorRef = useRef({ x: 120, y: 120 });
-  const peerTargetsRef = useRef(new Map());
-  const lastCursorActivityAtRef = useRef(Date.now());
-  const isPageVisibleRef = useRef(true);
+  const lastCursorWriteAtRef = useRef(0);
+  const lastCursorPointRef = useRef({ x: 0, y: 0 });
+  const presenceWriteAllowedRef = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSession() {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = await res.json();
-        if (!cancelled && typeof payload?.username === "string") {
-          setSessionUser(payload.username);
-        }
-      } catch {
-        // Ignore and fall back to generic viewer name.
-      } finally {
-        if (!cancelled) setSessionReady(true);
-      }
+    if (!firebaseReady || !auth) {
+      setAuthReady(true);
+      return undefined;
     }
 
-    loadSession();
+    let cancelled = false;
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (cancelled) return;
+
+      if (!user) {
+        setCurrentMember(null);
+        setAuthReady(true);
+        if (typeof window !== "undefined") {
+          window.location.assign("/login");
+        }
+        return;
+      }
+
+      try {
+        const member = await findMemberForAuth({ uid: user.uid, email: user.email });
+        if (!member || !isMemberEnabled(member.data)) {
+          await signOut(auth);
+          if (!cancelled && typeof window !== "undefined") {
+            window.location.assign("/login?error=not-authorized");
+          }
+          return;
+        }
+
+        const normalizedGoogleEmail = normalizeEmailValue(user.email);
+        const normalizedMemberEmail = normalizeEmailValue(member?.data?.email);
+        const shouldPatchMember =
+          member.data.authUid !== user.uid ||
+          normalizedMemberEmail !== normalizedGoogleEmail;
+
+        if (shouldPatchMember) {
+          await updateDocument("members", member.id, {
+            authUid: user.uid,
+            email: normalizedGoogleEmail,
+            emailLower: normalizedGoogleEmail,
+            updatedAt: Date.now(),
+          });
+        }
+
+        if (!cancelled) {
+          setCurrentMember({
+            id: member.id,
+            ...member.data,
+            authUid: user.uid,
+            email: normalizedGoogleEmail,
+            emailLower: normalizedGoogleEmail,
+          });
+          setAuthReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentMember(null);
+          setAuthReady(true);
+          if (typeof window !== "undefined") {
+            window.location.assign("/login?error=not-authorized");
+          }
+        }
+      }
+    });
+
     return () => {
       cancelled = true;
+      unsub();
     };
   }, []);
 
+  const isAdmin = useMemo(() => isWorkerOwner(currentMember), [currentMember]);
+  const hasLimitedAccess = useMemo(
+    () => hasLimitedWorkspaceAccess(currentMember),
+    [currentMember],
+  );
+  const allowedTabs = useMemo(() => {
+    if (hasLimitedAccess) {
+      return ["members", "projects"];
+    }
+    return TAB_ORDER;
+  }, [hasLimitedAccess]);
+
   useEffect(() => {
-    if (!sessionReady) return;
+    if (!firebaseReady || !authReady || !currentMember) {
+      setSharedMembers([]);
+      setSharedProjects([]);
+      setSharedTasks([]);
+      return;
+    }
+
+    const unsubMembers = subscribeCollection("members", setSharedMembers);
+    const unsubProjects = subscribeCollection("projects", setSharedProjects);
+    const unsubTasks = subscribeCollection("tasks", setSharedTasks);
+
+    return () => {
+      unsubMembers();
+      unsubProjects();
+      unsubTasks();
+    };
+  }, [authReady, currentMember]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!currentMember) return;
     if (typeof window === "undefined") return;
 
-    const userKey = sessionUser || "viewer";
+    const userKey =
+      normalizeEmailValue(currentMember.email) ||
+      String(currentMember.name || "viewer");
     const key = `${VIEWER_IDENTITY_KEY_PREFIX}:${userKey}`;
 
     try {
@@ -214,13 +333,25 @@ export default function Home() {
           return;
         }
       }
-      const created = buildLocalIdentity(sessionUser);
+      const created = buildLocalIdentity(currentMember.name || currentMember.email);
       localStorage.setItem(key, JSON.stringify(created));
       setIdentity(created);
     } catch {
-      setIdentity(buildLocalIdentity(sessionUser));
+      setIdentity(buildLocalIdentity(currentMember.name || currentMember.email));
     }
-  }, [sessionReady, sessionUser]);
+  }, [authReady, currentMember]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    if (activeTab === "memberDirectory") {
+      setActiveTab("members");
+    }
+  }, [activeTab, isAdmin]);
+
+  useEffect(() => {
+    if (allowedTabs.includes(activeTab)) return;
+    setActiveTab("members");
+  }, [activeTab, allowedTabs]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -269,343 +400,158 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    isPageVisibleRef.current = isPageVisible;
-    if (!isPageVisible) {
-      peerTargetsRef.current = new Map();
-      setSmoothedPeerCursors([]);
-    }
-  }, [isPageVisible]);
-
-  useEffect(() => {
-    if (!firebaseReady || !isPageVisible) {
+    if (!firebaseReady || !realtimeDb || !authReady || !currentMember) {
       setPresenceRows([]);
       return;
     }
-    const unsub = subscribeCollectionQuery(
-      "presence",
-      {
-        orderByField: "lastSeen",
-        orderDirection: "desc",
-        limitCount: 120,
-      },
-      setPresenceRows,
-    );
+
+    const presenceRef = rtdbRef(realtimeDb, "presence");
+    const unsub = onValue(presenceRef, (snapshot) => {
+      setPresenceRows(normalizePresenceRows(snapshot.val()));
+    });
+
     return () => unsub();
-  }, [isPageVisible]);
+  }, [authReady, currentMember]);
 
   useEffect(() => {
-    if (!firebaseReady || !isPageVisible) return;
-    const unsub = subscribeCollectionQuery(
-      "tabComments",
-      {
-        orderByField: "createdAt",
-        orderDirection: "desc",
-        limitCount: 300,
-      },
-      setCommentRows,
-    );
-    return () => unsub();
-  }, [isPageVisible]);
-
-  useEffect(() => {
-    if (!firebaseReady || !identity) return;
-    let stopped = false;
-
-    async function runCleanup() {
-      if (stopped) return;
-      const now = Date.now();
-      try {
-        await deleteDocumentsWhereBefore("presence", "lastSeen", now - 60 * 1000, 120);
-        await deleteDocumentsWhereBefore(
-          "meetingNotePresence",
-          "lastSeen",
-          now - 60 * 1000,
-          120,
-        );
-        await deleteDocumentsWhereBefore(
-          "tabComments",
-          "createdAt",
-          now - 14 * 24 * 60 * 60 * 1000,
-          120,
-        );
-      } catch {
-        // Ignore cleanup failures.
-      }
+    if (!firebaseReady || !realtimeDb || !isPageVisible) {
+      setCommentRows([]);
+      return;
     }
 
-    runCleanup();
-    const timer = window.setInterval(runCleanup, 30 * 60 * 1000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [identity]);
+    const commentsRef = query(
+      rtdbRef(realtimeDb, "tabComments"),
+      orderByChild("createdAt"),
+      limitToLast(300),
+    );
+    const unsub = onValue(commentsRef, (snapshot) => {
+      setCommentRows(normalizeRealtimeRows(snapshot.val()));
+    });
+
+    return () => unsub();
+  }, [isPageVisible]);
 
   const viewers = useMemo(() => {
-    const now = Date.now();
     return presenceRows
       .map((row) => ({ id: row.id, ...row.data }))
-      .filter((v) => now - Number(v.lastSeen || 0) < 15000)
       .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0));
   }, [presenceRows]);
 
   useEffect(() => {
-    if (!firebaseReady || !identity) return;
-
+    if (!firebaseReady || !realtimeDb || !identity) return;
+    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    if (!authUid) return;
+    presenceWriteAllowedRef.current = true;
     let stopped = false;
-    const MIN_WRITE_INTERVAL_MS = 80;
-    const ACTIVE_HEARTBEAT_MS = 2200;
-    const IDLE_HEARTBEAT_MS = 12000;
-    const IDLE_AFTER_MS = 9000;
-    let lastWriteAt = 0;
-    let inFlight = false;
-    let scheduledWriteTimer = null;
-    let heartbeatTimer = null;
-    let pending = false;
-    let pendingForce = false;
-    let hasUpserted = false;
-    let lastSent = { x: null, y: null, tab: null };
 
-    function markActivity() {
-      lastCursorActivityAtRef.current = Date.now();
-    }
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${authUid}`);
 
-    function isIdle() {
-      if (
-        typeof document !== "undefined" &&
-        document.visibilityState !== "visible"
-      )
-        return true;
-      return Date.now() - lastCursorActivityAtRef.current > IDLE_AFTER_MS;
-    }
-
-    async function writePresence(force = false) {
+    async function writePresence(activeFlag) {
       if (stopped) return;
-      if (inFlight) {
-        pending = true;
-        if (force) pendingForce = true;
-        return;
-      }
-
-      const x = Math.round(toCursorCoord(cursorRef.current.x));
-      const y = Math.round(toCursorCoord(cursorRef.current.y));
-      const moved = x !== lastSent.x || y !== lastSent.y;
-      const tabChanged = activeTab !== lastSent.tab;
-      const idle = isIdle();
-      const now = Date.now();
-      const heartbeatDue =
-        now - lastWriteAt >= (idle ? IDLE_HEARTBEAT_MS : ACTIVE_HEARTBEAT_MS);
-
-      if (!force && !moved && !tabChanged && !heartbeatDue) return;
-      if (!force && now - lastWriteAt < MIN_WRITE_INTERVAL_MS) {
-        pending = true;
-        return;
-      }
-
-      inFlight = true;
-      lastWriteAt = now;
+      if (!presenceWriteAllowedRef.current) return;
+      const payload = {
+        viewerId: identity.id,
+        name: identity.name,
+        color: identity.color,
+        tab: activeTab,
+        active: Boolean(activeFlag),
+        x: Math.round(cursorRef.current.x),
+        y: Math.round(cursorRef.current.y),
+        lastSeen: serverTimestamp(),
+      };
 
       try {
-        if (!hasUpserted) {
-          await replaceDocument("presence", identity.id, {
-            name: identity.name,
-            color: identity.color,
-            tab: activeTab,
-            cursorX: x,
-            cursorY: y,
-            lastSeen: Date.now(),
-          });
-          hasUpserted = true;
-        } else {
-          await updateDocument("presence", identity.id, {
-            tab: activeTab,
-            cursorX: x,
-            cursorY: y,
-            lastSeen: Date.now(),
-          });
+        await set(selfPresenceRef, payload);
+      } catch (error) {
+        if (isPermissionDeniedError(error)) {
+          presenceWriteAllowedRef.current = false;
+          return;
         }
-        lastSent = { x, y, tab: activeTab };
-      } catch {
-        // Ignore transient network issues; next write retries.
-      } finally {
-        inFlight = false;
-        if (pending && !stopped) {
-          const nextForce = pendingForce;
-          pending = false;
-          pendingForce = false;
-          if (scheduledWriteTimer) window.clearTimeout(scheduledWriteTimer);
-          scheduledWriteTimer = window.setTimeout(() => {
-            writePresence(nextForce);
-          }, MIN_WRITE_INTERVAL_MS);
-        }
+        // Ignore transient network issues; next visibility/tab change retries.
       }
-    }
-
-    function scheduleHeartbeat() {
-      if (heartbeatTimer) window.clearTimeout(heartbeatTimer);
-      const delay = isIdle() ? IDLE_HEARTBEAT_MS : ACTIVE_HEARTBEAT_MS;
-      heartbeatTimer = window.setTimeout(async () => {
-        await writePresence(false);
-        if (!stopped) scheduleHeartbeat();
-      }, delay);
-    }
-
-    function onMove(e) {
-      cursorRef.current = { x: e.clientX, y: e.clientY };
-      markActivity();
-      writePresence(false);
-      scheduleHeartbeat();
-    }
-
-    function onInteraction() {
-      markActivity();
-      writePresence(false);
-      scheduleHeartbeat();
-    }
-
-    function onKeyActivity(e) {
-      if (e.repeat) return;
-      const target = e.target;
-      const isTypingTarget =
-        target instanceof HTMLElement &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable);
-      if (isTypingTarget) return;
-      onInteraction();
     }
 
     function onVisibilityChange() {
       if (typeof document === "undefined") return;
-      if (document.visibilityState === "visible") {
-        markActivity();
-        writePresence(true);
-      }
-      scheduleHeartbeat();
+      writePresence(document.visibilityState === "visible");
     }
 
-    markActivity();
-    writePresence(true);
-    scheduleHeartbeat();
+    onDisconnect(selfPresenceRef)
+      .remove()
+      .catch(() => {});
 
-    window.addEventListener("mousemove", onMove, { passive: true });
-    window.addEventListener("mousedown", onInteraction, { passive: true });
-    window.addEventListener("keydown", onKeyActivity);
-    window.addEventListener("scroll", onInteraction, { passive: true });
+    writePresence(true);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       stopped = true;
-      if (scheduledWriteTimer) window.clearTimeout(scheduledWriteTimer);
-      if (heartbeatTimer) window.clearTimeout(heartbeatTimer);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mousedown", onInteraction);
-      window.removeEventListener("keydown", onKeyActivity);
-      window.removeEventListener("scroll", onInteraction);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      deleteDocument("presence", identity.id).catch(() => {});
+      remove(selfPresenceRef).catch(() => {});
     };
-  }, [activeTab, identity]);
-
-  const peerCursors = useMemo(() => {
-    if (!identity) return [];
-    return viewers.filter((v) => v.id !== identity.id && v.tab === activeTab);
-  }, [viewers, activeTab, identity]);
+  }, [activeTab, currentMember?.authUid, identity]);
 
   useEffect(() => {
-    const targets = new Map(
-      peerCursors.map((peer) => [
-        peer.id,
-        {
-          id: peer.id,
-          x: toCursorCoord(peer.cursorX),
-          y: toCursorCoord(peer.cursorY),
-          name: peer.name || "Viewer",
-          color: peer.color || "#1971c2",
-        },
-      ]),
-    );
-    peerTargetsRef.current = targets;
+    if (!firebaseReady || !realtimeDb || !identity) return;
+    const authUid = String(auth?.currentUser?.uid || currentMember?.authUid || "").trim();
+    if (!authUid) return;
+    const selfPresenceRef = rtdbRef(realtimeDb, `presence/${authUid}`);
 
-    setSmoothedPeerCursors((prev) => {
-      const prevById = new Map(prev.map((item) => [item.id, item]));
-      const next = [];
+    async function pushCursorUpdate(nextX, nextY) {
+      if (!presenceWriteAllowedRef.current) return;
+      const now = Date.now();
+      const previous = lastCursorPointRef.current;
+      const movedEnough =
+        Math.abs(nextX - previous.x) >= 6 || Math.abs(nextY - previous.y) >= 6;
+      if (!movedEnough) return;
+      if (now - lastCursorWriteAtRef.current < 160) return;
 
-      for (const [id, target] of targets.entries()) {
-        const existing = prevById.get(id);
-        if (existing) {
-          next.push({ ...existing, name: target.name, color: target.color });
-        } else {
-          next.push({ ...target });
+      lastCursorWriteAtRef.current = now;
+      lastCursorPointRef.current = { x: nextX, y: nextY };
+
+      try {
+        await update(selfPresenceRef, {
+          x: Math.round(nextX),
+          y: Math.round(nextY),
+          tab: activeTab,
+          active: typeof document === "undefined" ? true : document.visibilityState === "visible",
+          lastSeen: serverTimestamp(),
+        });
+      } catch (error) {
+        if (isPermissionDeniedError(error)) {
+          presenceWriteAllowedRef.current = false;
+          return;
         }
+        // Ignore transient cursor update failures.
       }
-
-      return next;
-    });
-  }, [peerCursors]);
-
-  useEffect(() => {
-    let frameId = null;
-    let stopped = false;
-    const alpha = 0.22;
-
-    function tick() {
-      if (stopped) return;
-      if (!isPageVisibleRef.current) {
-        frameId = window.requestAnimationFrame(tick);
-        return;
-      }
-      const targets = peerTargetsRef.current;
-
-      setSmoothedPeerCursors((prev) => {
-        if (prev.length === 0 && targets.size === 0) return prev;
-        const prevById = new Map(prev.map((item) => [item.id, item]));
-        const next = [];
-        let changed = prev.length !== targets.size;
-
-        for (const [id, target] of targets.entries()) {
-          const existing = prevById.get(id);
-          if (!existing) {
-            next.push({ ...target });
-            changed = true;
-            continue;
-          }
-
-          const lx = lerp(existing.x, target.x, alpha);
-          const ly = lerp(existing.y, target.y, alpha);
-          const x = Math.abs(target.x - lx) < 0.15 ? target.x : lx;
-          const y = Math.abs(target.y - ly) < 0.15 ? target.y : ly;
-
-          if (
-            x !== existing.x ||
-            y !== existing.y ||
-            target.name !== existing.name ||
-            target.color !== existing.color
-          ) {
-            changed = true;
-          }
-
-          next.push({
-            id,
-            x,
-            y,
-            name: target.name,
-            color: target.color,
-          });
-        }
-
-        return changed ? next : prev;
-      });
-
-      frameId = window.requestAnimationFrame(tick);
     }
 
-    frameId = window.requestAnimationFrame(tick);
+    function onMouseMove(e) {
+      cursorRef.current = { x: e.clientX, y: e.clientY };
+      pushCursorUpdate(e.clientX, e.clientY);
+    }
+
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
     return () => {
-      stopped = true;
-      if (frameId) window.cancelAnimationFrame(frameId);
+      window.removeEventListener("mousemove", onMouseMove);
     };
-  }, []);
+  }, [activeTab, currentMember?.authUid, identity]);
+
+  const peerCursors = useMemo(() => {
+    return presenceRows
+      .map((row) => ({ id: row.id, ...row.data }))
+      .filter((peer) => Boolean(peer.active))
+      .filter(
+        (peer) =>
+          peer.id !== (auth?.currentUser?.uid || currentMember?.authUid) &&
+          peer.viewerId !== identity?.id,
+      )
+      .filter((peer) => (peer.tab || "members") === activeTab)
+      .map((peer) => ({
+        ...peer,
+        x: toCursorCoord(peer.x),
+        y: toCursorCoord(peer.y),
+      }));
+  }, [activeTab, currentMember?.authUid, identity, presenceRows]);
 
   const tabComments = useMemo(
     () => commentRows.map((row) => ({ id: row.id, ...row.data })),
@@ -633,7 +579,7 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!firebaseReady || !identity) return;
+    if (!firebaseReady || !realtimeDb || !identity) return;
 
     function onKeyDown(e) {
       const t = e.target;
@@ -647,7 +593,8 @@ export default function Home() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const text = window.prompt("Add comment");
       if (!text || !text.trim()) return;
-      createDocument("tabComments", {
+      const rowRef = push(rtdbRef(realtimeDb, "tabComments"));
+      set(rowRef, {
         tab: activeTab,
         text: text.trim(),
         authorId: identity.id,
@@ -677,12 +624,74 @@ export default function Home() {
     );
   }
 
+  if (!authReady) {
+    return (
+      <main className="page-shell page-shell--single">
+        <section className="panel">
+          <h1>Checking access</h1>
+          <p>Verifying your account permissions.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!currentMember) {
+    return (
+      <main className="page-shell page-shell--single">
+        <section className="panel">
+          <h1>Access required</h1>
+          <p>Use your approved Google account to sign in.</p>
+        </section>
+      </main>
+    );
+  }
+
   function renderPage() {
-    if (activeTab === "members") return <MembersPage />;
-    if (activeTab === "memberDirectory") return <MemberDirectoryPage />;
-    if (activeTab === "projects") return <ProjectsPage />;
-    if (activeTab === "backlog") return <BacklogPage />;
-    if (activeTab === "meetingNotes") return <MeetingNotesPage />;
+    if (!allowedTabs.includes(activeTab)) {
+      return null;
+    }
+    if (activeTab === "members") {
+      return (
+        <MembersPage
+          viewerMemberId={currentMember.id}
+          viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          sharedMembers={sharedMembers}
+          sharedProjects={sharedProjects}
+          sharedTasks={sharedTasks}
+        />
+      );
+    }
+    if (activeTab === "memberDirectory") {
+      if (!isAdmin) {
+        return (
+          <section className="panel">
+            <h2>Admin only</h2>
+            <p>Only worker-owners can manage members and roles.</p>
+          </section>
+        );
+      }
+      return <MemberDirectoryPage />;
+    }
+    if (activeTab === "projects") {
+      return (
+        <ProjectsPage
+          viewerMemberId={currentMember.id}
+          viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          sharedMembers={sharedMembers}
+          sharedProjects={sharedProjects}
+          sharedTasks={sharedTasks}
+        />
+      );
+    }
+    if (activeTab === "backlog") {
+      return <BacklogPage viewerName={currentMember.name || ""} />;
+    }
+    if (activeTab === "finance") {
+      return <FinancePage />;
+    }
+    if (activeTab === "meetingNotes") {
+      return <MeetingNotesPage viewerName={currentMember.name || ""} />;
+    }
     if (activeTab === "resources") return <ResourcesPage />;
     if (DATA_TABS.includes(activeTab))
       return <DataViewPage tabKey={activeTab} />;
@@ -711,6 +720,8 @@ export default function Home() {
         onTabChange={handleTabChange}
         viewers={viewers}
         commentCounts={commentCounts}
+        isAdmin={isAdmin}
+        allowedTabs={allowedTabs}
       />
       <div className="page-main">
         <section className="page-content" key={activeTab} data-dir={slideDir}>
@@ -718,19 +729,16 @@ export default function Home() {
         </section>
 
         <div className="cursor-layer" aria-hidden="true">
-          {smoothedPeerCursors.map((peer) => (
+          {peerCursors.map((peer) => (
             <div
               key={peer.id}
               className="peer-cursor"
-              style={{ left: Number(peer.x) || 0, top: Number(peer.y) || 0 }}
+              style={{ left: `${peer.x}px`, top: `${peer.y}px` }}
             >
-              <span
-                className="peer-cursor-arrow"
-                style={{ color: peer.color || "#1971c2" }}
-              />
+              <span className="peer-cursor-arrow" />
               <span
                 className="peer-cursor-label"
-                style={{ backgroundColor: peer.color || "#1971c2" }}
+                style={{ background: peer.color || "#666" }}
               >
                 {peer.name || "Viewer"}
               </span>

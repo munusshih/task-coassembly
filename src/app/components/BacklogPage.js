@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   subscribeCollection,
   createDocument,
   deleteDocument,
   replaceDocument,
 } from "../../firestore";
-import { firebaseReady } from "../../firebase";
+import { auth, firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON, EDIT_ICON } from "./icons";
@@ -671,7 +672,7 @@ function ProjectSection({
   );
 }
 
-export default function BacklogPage() {
+export default function BacklogPage({ viewerName = "" }) {
   const [wishItems, setWishItems] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
@@ -686,10 +687,9 @@ export default function BacklogPage() {
     if (forcingLogoutRef.current) return;
     forcingLogoutRef.current = true;
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
+      if (auth) {
+        await signOut(auth);
+      }
     } catch {}
     if (typeof window !== "undefined") {
       window.location.assign("/login?expired=1");
@@ -713,37 +713,41 @@ export default function BacklogPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const next = String(viewerName || "").trim();
+    if (!next) return;
+    setCurrentUsername(next);
+    setSessionChecked(true);
+  }, [viewerName]);
 
-    async function loadSession() {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!res.ok) {
-          if (!cancelled) handleSessionExpired();
-          return;
-        }
-        const payload = await res.json();
-        if (cancelled) return;
-        const username = String(payload?.username || "")
-          .trim()
-          .toLowerCase();
-        if (!username) {
-          handleSessionExpired();
-          return;
-        }
-        setCurrentUsername(username);
-      } catch {
-        if (!cancelled) handleSessionExpired();
-      } finally {
-        if (!cancelled) setSessionChecked(true);
-      }
+  useEffect(() => {
+    if (viewerName) {
+      return undefined;
+    }
+    if (!auth) {
+      setSessionChecked(true);
+      return undefined;
     }
 
-    loadSession();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        handleSessionExpired();
+        return;
+      }
+
+      const username = String(user.email || user.displayName || "")
+        .trim()
+        .toLowerCase();
+      if (!username) {
+        handleSessionExpired();
+        return;
+      }
+
+      setCurrentUsername(username);
+      setSessionChecked(true);
+    });
+
+    return () => unsub();
+  }, [viewerName]);
 
   const sortedProjects = useMemo(
     () =>

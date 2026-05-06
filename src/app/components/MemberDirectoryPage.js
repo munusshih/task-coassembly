@@ -22,6 +22,7 @@ import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
+import { normalizeEmailValue } from "../../authAccess";
 
 const TODO_TYPE = "memberTodo";
 const METRICS_CUTOFF_ISO = "2026-04-20";
@@ -31,7 +32,6 @@ const MEETING_ROTATION = ["facilitator", "notetaker", "time keeper"];
 const MEMBER_TYPE_OPTIONS = [
   { value: "worker-owner", label: "Worker-owner" },
   { value: "associate", label: "Associate" },
-  { value: "contractor", label: "Contractor" },
   { value: "flying-member", label: "Flying member" },
   { value: "external-collaborator", label: "External collaborator" },
 ];
@@ -68,7 +68,6 @@ function normalizeMemberRole(rawRole) {
   if (value === "worker-owner" || value === "workerowner")
     return "worker-owner";
   if (value === "associate") return "associate";
-  if (value === "contractor") return "contractor";
   if (value === "flying-member" || value === "flying") return "flying-member";
   if (value === "external-collaborator" || value === "external")
     return "external-collaborator";
@@ -416,6 +415,7 @@ function TimeDonutChart({ label, segments, emptyText, ariaLabel }) {
 function emptyMemberForm() {
   return {
     name: "",
+    aliases: "",
     role: "associate",
     email: "",
     timezone: "",
@@ -425,11 +425,31 @@ function emptyMemberForm() {
   };
 }
 
+function normalizeAlsoKnownAs(rawValue) {
+  const source = Array.isArray(rawValue)
+    ? rawValue
+    : String(rawValue || "")
+        .split(/[\n,]/)
+        .map((item) => item.trim());
+
+  return source
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item, index, all) => all.indexOf(item) === index);
+}
+
+function aliasesToInputValue(rawValue) {
+  return normalizeAlsoKnownAs(rawValue).join(", ");
+}
+
 function buildFormFromMember(memberData) {
   const form = emptyMemberForm();
   if (!memberData || typeof memberData !== "object") return form;
   return {
     name: typeof memberData.name === "string" ? memberData.name : "",
+    aliases: aliasesToInputValue(
+      memberData.alsoKnownAs || memberData.aliases || "",
+    ),
     role: normalizeMemberRole(memberData.role),
     email: typeof memberData.email === "string" ? memberData.email : "",
     timezone:
@@ -690,12 +710,16 @@ export default function MemberDirectoryPage() {
     const name = newMember.name.trim();
     if (!name) return;
     const now = Date.now();
+    const email = normalizeEmailValue(newMember.email);
+    const alsoKnownAs = normalizeAlsoKnownAs(newMember.aliases);
 
     try {
       await createDocument("members", {
         name,
+        alsoKnownAs,
         role: normalizeMemberRole(newMember.role),
-        email: newMember.email.trim(),
+        email,
+        emailLower: email,
         timezone: newMember.timezone.trim(),
         joinedOn: newMember.joinedOn || monthKeyFromTs(now) + "-01",
         notes: newMember.notes.trim(),
@@ -734,12 +758,16 @@ export default function MemberDirectoryPage() {
     const name = editDraft.name.trim();
     if (!name) return;
     const now = Date.now();
+    const email = normalizeEmailValue(editDraft.email);
+    const alsoKnownAs = normalizeAlsoKnownAs(editDraft.aliases);
     try {
       await replaceDocument("members", member.id, {
         ...member.data,
         name,
+        alsoKnownAs,
         role: normalizeMemberRole(editDraft.role),
-        email: editDraft.email.trim(),
+        email,
+        emailLower: email,
         timezone: editDraft.timezone.trim(),
         joinedOn: editDraft.joinedOn || null,
         notes: editDraft.notes.trim(),
@@ -940,6 +968,17 @@ export default function MemberDirectoryPage() {
                       updateNewMemberField("name", e.target.value)
                     }
                     placeholder="Member name"
+                  />
+                </label>
+                <label className="member-form-field member-form-field--full">
+                  <span>Also known as</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.aliases}
+                    onChange={(e) =>
+                      updateNewMemberField("aliases", e.target.value)
+                    }
+                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
                   />
                 </label>
                 <label className="member-form-field">
@@ -1452,6 +1491,15 @@ export default function MemberDirectoryPage() {
                 value={editDraft.name}
                 onChange={(e) => updateEditField("name", e.target.value)}
                 autoFocus
+              />
+            </label>
+            <label className="member-form-field member-form-field--full">
+              <span>Also known as</span>
+              <InputField
+                className="member-form-input"
+                value={editDraft.aliases}
+                onChange={(e) => updateEditField("aliases", e.target.value)}
+                placeholder="Comma separated aliases"
               />
             </label>
             <label className="member-form-field">

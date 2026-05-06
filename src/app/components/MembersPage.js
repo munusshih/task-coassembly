@@ -21,6 +21,7 @@ import PaperSurface from "./ui/PaperSurface";
 import PageControls from "./ui/PageControls";
 import Pill from "./ui/Pill";
 import SelectField from "./ui/SelectField";
+import SectionBlock from "./ui/SectionBlock";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
@@ -1620,7 +1621,13 @@ function MemberCard({
 
 // ─── MembersPage ────────────────────────────────────────────────────────────────────────────────
 
-export default function MembersPage() {
+export default function MembersPage({
+  viewerMemberId = null,
+  viewerRole = "associate",
+  sharedMembers = null,
+  sharedProjects = null,
+  sharedTasks = null,
+}) {
   const [members, setMembers] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -1628,8 +1635,15 @@ export default function MembersPage() {
   const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
   const [memberViewMode, setMemberViewMode] = useState("member");
   const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
+  const isLimitedViewer =
+    viewerRole === "flying-member" || viewerRole === "external-collaborator";
+  const hasSharedData =
+    Array.isArray(sharedMembers) &&
+    Array.isArray(sharedProjects) &&
+    Array.isArray(sharedTasks);
 
   useEffect(() => {
+    if (hasSharedData) return;
     const cached = readTaskBoardCache();
     if (cached.members.length) setMembers(cached.members);
     if (cached.tasks.length)
@@ -1640,9 +1654,17 @@ export default function MembersPage() {
     if (typeof storedWeek === "string") {
       setSelectedWeek(storedWeek);
     }
-  }, []);
+  }, [hasSharedData]);
 
   useEffect(() => {
+    if (!hasSharedData) return;
+    setMembers(sharedMembers);
+    setProjects(sharedProjects);
+    setAllTasks(sharedTasks.filter((i) => i?.data?.type === TODO_TYPE));
+  }, [hasSharedData, sharedMembers, sharedProjects, sharedTasks]);
+
+  useEffect(() => {
+    if (hasSharedData) return;
     if (!firebaseReady) return;
     const u1 = subscribeCollection("members", setMembers);
     const u2 = subscribeCollection("tasks", (items) =>
@@ -1654,7 +1676,7 @@ export default function MembersPage() {
       u2();
       u3();
     };
-  }, []);
+  }, [hasSharedData]);
 
   useEffect(() => {
     writeLocalJSON(TASK_BOARD_CACHE_KEY, {
@@ -1669,47 +1691,74 @@ export default function MembersPage() {
     writeLocalJSON(TASK_BOARD_WEEK_KEY, selectedWeek);
   }, [selectedWeek]);
 
+  useEffect(() => {
+    if (!isLimitedViewer) return;
+    if (memberViewMode !== "member") {
+      setMemberViewMode("member");
+    }
+  }, [isLimitedViewer, memberViewMode]);
+
+  const visibleMembers = useMemo(() => {
+    if (!isLimitedViewer) return members;
+    if (!viewerMemberId) return [];
+    return members.filter((member) => member.id === viewerMemberId);
+  }, [isLimitedViewer, members, viewerMemberId]);
+
+  const visibleProjects = useMemo(() => {
+    if (!isLimitedViewer) return projects;
+    if (!viewerMemberId) return [];
+    return projects.filter((project) =>
+      isMemberAssignedToProject(project, viewerMemberId),
+    );
+  }, [isLimitedViewer, projects, viewerMemberId]);
+
+  const visibleTasks = useMemo(() => {
+    if (!isLimitedViewer) return allTasks;
+    if (!viewerMemberId) return [];
+    return allTasks.filter((task) => task?.data?.memberId === viewerMemberId);
+  }, [allTasks, isLimitedViewer, viewerMemberId]);
+
   const tasksByMember = useMemo(() => {
     const g = {};
-    for (const t of allTasks) {
+    for (const t of visibleTasks) {
       const mid = t.data.memberId;
       if (!mid) continue;
       if (!g[mid]) g[mid] = [];
       g[mid].push(t);
     }
     return g;
-  }, [allTasks]);
+  }, [visibleTasks]);
 
   const sortedProjectsForView = useMemo(
     () =>
-      [...projects].sort((a, b) =>
+      [...visibleProjects].sort((a, b) =>
         (a.data?.name || "").localeCompare(b.data?.name || ""),
       ),
-    [projects],
+    [visibleProjects],
   );
 
   const tasksByProject = useMemo(() => {
     const g = {};
-    for (const t of allTasks) {
+    for (const t of visibleTasks) {
       if (t.data.archived) continue;
       const pid = t.data.projectId || "__none__";
       if (!g[pid]) g[pid] = [];
       g[pid].push(t);
     }
     return g;
-  }, [allTasks]);
+  }, [visibleTasks]);
 
   // Collect all weeks that have archived tasks, plus current week
   const availableWeeks = useMemo(() => {
     const weeks = new Set([currentWeekKey()]);
-    for (const t of allTasks) {
+    for (const t of visibleTasks) {
       if (t.data.archived) {
         const ts = Number(t.data.archivedAt || t.data.updatedAt || 0);
         if (ts) weeks.add(weekKey(ts));
       }
     }
     return [...weeks].sort().reverse(); // newest first
-  }, [allTasks]);
+  }, [visibleTasks]);
 
   useEffect(() => {
     if (!availableWeeks.length) return;
@@ -1728,18 +1777,22 @@ export default function MembersPage() {
   }
 
   async function handleCreate(memberId, taskData) {
+    if (isLimitedViewer && memberId !== viewerMemberId) {
+      addToast("You can only add tasks to your own board", true);
+      return false;
+    }
     const now = Date.now();
     const nextProjectId = taskData.projectId || null;
     if (
       nextProjectId &&
-      !isProjectIdAssignable(projects, memberId, nextProjectId)
+      !isProjectIdAssignable(visibleProjects, memberId, nextProjectId)
     ) {
       addToast("Project is not assigned to this member", true);
       return false;
     }
 
     try {
-      await createDocument("tasks", {
+      const created = {
         type: TODO_TYPE,
         memberId,
         title: taskData.title,
@@ -1753,7 +1806,9 @@ export default function MembersPage() {
         orderIndex: now,
         createdAt: now,
         updatedAt: now,
-      });
+      };
+      const id = await createDocument("tasks", created);
+      setAllTasks((prev) => [{ id, data: created }, ...prev]);
       addToast("Task added");
       return true;
     } catch (e) {
@@ -1764,11 +1819,17 @@ export default function MembersPage() {
 
   async function handleToggle(task, checked) {
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         completed: checked,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not update", true);
     }
@@ -1784,11 +1845,17 @@ export default function MembersPage() {
     };
 
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         subtasks,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not update subtask", true);
     }
@@ -1798,11 +1865,15 @@ export default function MembersPage() {
     const title = (draft.title || "").trim();
     if (!title) return false;
     const memberId = task.data.memberId;
+    if (isLimitedViewer && memberId !== viewerMemberId) {
+      addToast("You can only edit your own tasks", true);
+      return false;
+    }
     const nextProjectId = draft.projectId || null;
     if (
       nextProjectId &&
       nextProjectId !== (task.data.projectId || null) &&
-      !isProjectIdAssignable(projects, memberId, nextProjectId)
+      !isProjectIdAssignable(visibleProjects, memberId, nextProjectId)
     ) {
       addToast("Project is not assigned to this member", true);
       return false;
@@ -1813,7 +1884,7 @@ export default function MembersPage() {
       Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
 
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         title,
         timeUnits: nextTimeUnits,
@@ -1822,7 +1893,13 @@ export default function MembersPage() {
         subtasks: normalizeTaskSubtaskList(draft.subtasks),
         links: normalizeTaskLinkList(draft.links),
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
       addToast("Task updated");
       return true;
     } catch (e) {
@@ -1837,6 +1914,7 @@ export default function MembersPage() {
       onConfirm: async () => {
         try {
           await deleteDocument("tasks", task.id);
+          setAllTasks((prev) => prev.filter((item) => item.id !== task.id));
           addToast("Deleted");
         } catch (e) {
           addToast(e.message || "Could not delete", true);
@@ -1849,17 +1927,27 @@ export default function MembersPage() {
 
   async function handleOvertimeSave(task, otUnits) {
     try {
-      await replaceDocument("tasks", task.id, {
+      const nextData = {
         ...task.data,
         overtimeUnits: otUnits || null,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("tasks", task.id, nextData);
+      setAllTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, data: nextData } : item,
+        ),
+      );
     } catch (e) {
       addToast(e.message || "Could not save overtime", true);
     }
   }
 
   async function handleArchiveAll(memberId) {
+    if (isLimitedViewer && memberId !== viewerMemberId) {
+      addToast("You can only archive your own tasks", true);
+      return;
+    }
     const tasks = (tasksByMember[memberId] || []).filter(
       (t) => !t.data.archived && t.data.completed,
     );
@@ -1875,6 +1963,20 @@ export default function MembersPage() {
           }),
         ),
       );
+      const taskIdSet = new Set(tasks.map((task) => task.id));
+      setAllTasks((prev) =>
+        prev.map((item) => {
+          if (!taskIdSet.has(item.id)) return item;
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              archived: true,
+              archivedAt: now,
+            },
+          };
+        }),
+      );
       addToast("Flushed completed tasks to archive");
     } catch (e) {
       addToast(e.message || "Could not archive", true);
@@ -1882,6 +1984,10 @@ export default function MembersPage() {
   }
 
   async function handleUnarchiveAll(memberId) {
+    if (isLimitedViewer && memberId !== viewerMemberId) {
+      addToast("You can only restore your own tasks", true);
+      return;
+    }
     const tasks = (tasksByMember[memberId] || []).filter(
       (t) => t.data.archived,
     );
@@ -1896,6 +2002,20 @@ export default function MembersPage() {
           }),
         ),
       );
+      const taskIdSet = new Set(tasks.map((task) => task.id));
+      setAllTasks((prev) =>
+        prev.map((item) => {
+          if (!taskIdSet.has(item.id)) return item;
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              archived: false,
+              archivedAt: null,
+            },
+          };
+        }),
+      );
       addToast("Restored all archived tasks");
     } catch (e) {
       addToast(e.message || "Could not restore", true);
@@ -1904,7 +2024,7 @@ export default function MembersPage() {
 
   function projectRemainingHint(memberId, projectId, excludeTaskId = null) {
     if (!projectId || !memberId) return null;
-    const project = projects.find((p) => p.id === projectId);
+    const project = visibleProjects.find((p) => p.id === projectId);
     if (!project || !Array.isArray(project.data?.staffing)) return null;
 
     const memberStaffing = project.data.staffing.find(
@@ -1913,7 +2033,7 @@ export default function MembersPage() {
     if (!memberStaffing) return "Not assigned in this project's staffing";
 
     const capacityHours = Number(memberStaffing.maxHours) || 0;
-    const assignedHours = allTasks
+    const assignedHours = visibleTasks
       .filter((t) => t.id !== excludeTaskId)
       .filter((t) => !t.data.archived)
       .filter((t) => t.data.memberId === memberId)
@@ -1927,14 +2047,12 @@ export default function MembersPage() {
   const MEMBER_TYPE_ORDER = [
     "worker-owner",
     "associate",
-    "contractor",
     "flying-member",
     "external-collaborator",
   ];
   const MEMBER_TYPE_LABELS = {
     "worker-owner": "Worker-owners",
     associate: "Associates",
-    contractor: "Contractors",
     "flying-member": "Flying members",
     "external-collaborator": "External collaborators",
   };
@@ -1945,7 +2063,6 @@ export default function MembersPage() {
       .toLowerCase()
       .replace(/[_\s]+/g, "-");
     if (v === "worker-owner" || v === "workerowner") return "worker-owner";
-    if (v === "contractor") return "contractor";
     if (v === "flying-member" || v === "flying") return "flying-member";
     if (v === "external-collaborator" || v === "external")
       return "external-collaborator";
@@ -1954,13 +2071,13 @@ export default function MembersPage() {
 
   const membersByType = useMemo(() => {
     const groups = {};
-    for (const m of members) {
+    for (const m of visibleMembers) {
       const type = normalizeMemberType(m.data?.role);
       if (!groups[type]) groups[type] = [];
       groups[type].push(m);
     }
     return groups;
-  }, [members]);
+  }, [visibleMembers]);
 
   const memberViewOptions = [
     {
@@ -1968,14 +2085,18 @@ export default function MembersPage() {
       title: "Member view",
       icon: MEMBER_VIEW_ICON,
     },
-    {
-      value: "project",
-      title: "Project view",
-      icon: PROJECT_VIEW_ICON,
-    },
+    ...(isLimitedViewer
+      ? []
+      : [
+          {
+            value: "project",
+            title: "Project view",
+            icon: PROJECT_VIEW_ICON,
+          },
+        ]),
   ];
 
-  const memberBoardSubtitle = `${members.length} member${members.length !== 1 ? "s" : ""} · Weekly planning board`;
+  const memberBoardSubtitle = `${visibleMembers.length} member${visibleMembers.length !== 1 ? "s" : ""} · Weekly planning board`;
 
   return (
     <TabPage
@@ -2009,7 +2130,7 @@ export default function MembersPage() {
         </PageControls>
       }
     >
-      {members.length === 0 && (
+      {visibleMembers.length === 0 && (
         <EmptyState>No members found in Firestore.</EmptyState>
       )}
 
@@ -2020,7 +2141,7 @@ export default function MembersPage() {
               key={project.id}
               project={project}
               tasks={tasksByProject[project.id] || []}
-              members={members}
+              members={visibleMembers}
               onCreate={handleCreate}
               onToggle={handleToggle}
               onDelete={handleDelete}
@@ -2031,7 +2152,7 @@ export default function MembersPage() {
               key="__none__"
               project={null}
               tasks={tasksByProject["__none__"] || []}
-              members={members}
+              members={visibleMembers}
               onCreate={handleCreate}
               onToggle={handleToggle}
               onDelete={handleDelete}
@@ -2051,7 +2172,7 @@ export default function MembersPage() {
                     key={member.id}
                     member={member}
                     todos={tasksByMember[member.id] || []}
-                    projects={projects}
+                    projects={visibleProjects}
                     onCreate={handleCreate}
                     onToggle={handleToggle}
                     onToggleSubtask={handleToggleSubtask}

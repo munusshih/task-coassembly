@@ -4,8 +4,6 @@ export default function EditorToolbar({
   editor,
   showDateObjectButton = false,
   onInsertDateObject,
-  onInsertCodeBlock,
-  onInsertIframe,
 }) {
   if (!editor) return null;
 
@@ -16,7 +14,10 @@ export default function EditorToolbar({
   const ToolBtn = ({ icon, label, active, onClick }) => (
     <button
       className={`toolbar-btn ${active ? "is-active" : ""}`}
-      onClick={onClick}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        onClick?.();
+      }}
       title={label}
       type="button"
     >
@@ -86,17 +87,6 @@ export default function EditorToolbar({
           label="Ordered List"
           active={editor.isActive("orderedList")}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        />
-        <ToolBtn
-          icon="Code"
-          label="Insert code block"
-          active={editor.isActive("codeBlock")}
-          onClick={() => onInsertCodeBlock?.()}
-        />
-        <ToolBtn
-          icon="Frame"
-          label="Insert iframe"
-          onClick={() => onInsertIframe?.()}
         />
       </ButtonGroup>
 

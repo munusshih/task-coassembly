@@ -85,12 +85,15 @@ const EMPTY_FORM = {
   budget: "",
   budgetCurrency: "TWD",
   donationPercent: "20",
+  companyTax: false,
+  legacyMode: false,
   projectedHourlyWage: "",
   maxHours: "",
   startDate: "",
+  endDate: "",
   // stagePlans: [{id, name, weeks, perspectiveHours, delayWeeks, order}]
   stagePlans: [],
-  // staffing: [{id, memberId, roles: string[], maxHours}]
+  // staffing: [{id, memberId, roles: string[], maxHours, allocatedAmount}]
   staffing: [],
 };
 
@@ -126,6 +129,10 @@ function donationAmount(amountTWD, donationPercent) {
 
 function isInternalOrAdminKind(kind) {
   return kind === "Internal" || kind === "Admin";
+}
+
+function isPassThroughKind(kind) {
+  return kind === "Pass-through";
 }
 
 function fmtH(h) {
@@ -220,7 +227,16 @@ function fmtDate(dateStr) {
   });
 }
 
-function phaseNowLabel(startDate, stagePlans) {
+function phaseNowLabel(startDate, stagePlans, endDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (endDate) {
+    const end = new Date(endDate + "T00:00:00");
+    end.setHours(0, 0, 0, 0);
+    if (today > end) return `Completed · ended ${fmtDate(endDate)}`;
+  }
+
   if (!Array.isArray(stagePlans) || stagePlans.length === 0) {
     return startDate
       ? `Not started · starts ${fmtDate(startDate)}`
@@ -233,9 +249,7 @@ function phaseNowLabel(startDate, stagePlans) {
   if (!startDate) return `Setup · ${sorted[0]?.name || "No stage"}`;
 
   const start = new Date(startDate + "T00:00:00");
-  const today = new Date();
   start.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
 
   if (today < start) return `Not started · starts ${fmtDate(startDate)}`;
 
@@ -256,6 +270,33 @@ function newUUID() {
     const r = (Math.random() * 16) | 0;
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
+}
+
+function isAssignedToProject(project, memberId) {
+  if (!project || !memberId) return false;
+  const staffing = Array.isArray(project?.data?.staffing)
+    ? project.data.staffing
+    : [];
+  return staffing.some((entry) => entry?.memberId === memberId);
+}
+
+function dedupeById(items) {
+  const map = new Map();
+  for (const item of items || []) {
+    if (!item?.id) continue;
+    const existing = map.get(item.id);
+    if (!existing) {
+      map.set(item.id, item);
+      continue;
+    }
+
+    const existingUpdated = Number(existing?.data?.updatedAt || existing?.data?.createdAt || 0);
+    const incomingUpdated = Number(item?.data?.updatedAt || item?.data?.createdAt || 0);
+    if (incomingUpdated >= existingUpdated) {
+      map.set(item.id, item);
+    }
+  }
+  return [...map.values()];
 }
 
 // ─ StagePlanEdit ────────────────────────────────────────────────────────────────────────────
@@ -366,15 +407,30 @@ function StagePlanEdit({ stagePlans, onChange }) {
 // ─ StaffingEdit ─────────────────────────────────────────────────────────────────────────────
 
 // Multi-member assignment with roles + per-member maxHours
-function StaffingEdit({ staffing, members, onChange, hourly }) {
+function StaffingEdit({
+  staffing,
+  members,
+  onChange,
+  hourly,
+  legacyMode,
+  singleMemberMode = false,
+  autoPayByMemberId = {},
+}) {
   function toggleMember(memberId) {
     const exists = staffing.find((s) => s.memberId === memberId);
     if (exists) {
       onChange(staffing.filter((s) => s.memberId !== memberId));
     } else {
+      const nextEntry = {
+        id: newUUID(),
+        memberId,
+        roles: ["doer"],
+        maxHours: "",
+        allocatedAmount: "",
+      };
       onChange([
-        ...staffing,
-        { id: newUUID(), memberId, roles: ["doer"], maxHours: "" },
+        ...(singleMemberMode ? [] : staffing),
+        nextEntry,
       ]);
     }
   }
@@ -395,15 +451,24 @@ function StaffingEdit({ staffing, members, onChange, hourly }) {
     <div className="staffing-list">
       <div className="staffing-grid-head">
         <span>Name</span>
-        <span>Role</span>
-        <span>Max hrs</span>
-        <span>Pay est.</span>
+        {!legacyMode && <span>Role</span>}
+        {legacyMode ? <span>Allocated (TWD)</span> : <span>Max hrs</span>}
+        {!legacyMode && <span>Pay est.</span>}
       </div>
       {members.map((m) => {
         const entry = staffing.find((s) => s.memberId === m.id);
         const active = !!entry;
         const hours = Number(entry?.maxHours) || 0;
-        const pay = hourly != null ? Math.round(hourly * hours) : null;
+        const autoPay =
+          autoPayByMemberId && autoPayByMemberId[m.id] != null
+            ? Number(autoPayByMemberId[m.id])
+            : null;
+        const pay =
+          autoPay != null
+            ? autoPay
+            : hourly != null
+              ? Math.round(hourly * hours)
+              : null;
         return (
           <div
             key={m.id}
@@ -421,44 +486,65 @@ function StaffingEdit({ staffing, members, onChange, hourly }) {
                 {m.data.name || m.id}
               </span>
             </label>
-            <div
-              className="staffing-col staffing-col--roles"
-              aria-label="Primary role"
-            >
-              {STAFFING_ROLES.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
+            {!legacyMode && (
+              <div
+                className="staffing-col staffing-col--roles"
+                aria-label="Primary role"
+              >
+                {STAFFING_ROLES.map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    disabled={!active}
+                    className={
+                      "role-chip" +
+                      (active && entry.roles.includes(r.value)
+                        ? " role-chip--on"
+                        : "")
+                    }
+                    onClick={() => setPrimaryRole(m.id, r.value)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {legacyMode ? (
+              <label className="staffing-col staffing-col--hours">
+                <InputField
+                  className="project-field staffing-field--hours"
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  step="1"
                   disabled={!active}
-                  className={
-                    "role-chip" +
-                    (active && entry.roles.includes(r.value)
-                      ? " role-chip--on"
-                      : "")
+                  value={active ? (entry.allocatedAmount ?? "") : ""}
+                  onChange={(e) =>
+                    setStaffField(m.id, "allocatedAmount", e.target.value)
                   }
-                  onClick={() => setPrimaryRole(m.id, r.value)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            <label className="staffing-col staffing-col--hours">
-              <InputField
-                className="project-field staffing-field--hours"
-                type="number"
-                placeholder="0"
-                min="0"
-                step="1"
-                disabled={!active}
-                value={active ? entry.maxHours : ""}
-                onChange={(e) =>
-                  setStaffField(m.id, "maxHours", e.target.value)
-                }
-              />
-            </label>
-            <div className="staffing-col staffing-col--pay">
-              {active ? (pay != null ? fmtTWD(pay) : "—") : "—"}
-            </div>
+                />
+              </label>
+            ) : (
+              <>
+                <label className="staffing-col staffing-col--hours">
+                  <InputField
+                    className="project-field staffing-field--hours"
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    step="1"
+                    disabled={!active}
+                    value={active ? entry.maxHours : ""}
+                    onChange={(e) =>
+                      setStaffField(m.id, "maxHours", e.target.value)
+                    }
+                  />
+                </label>
+                <div className="staffing-col staffing-col--pay">
+                  {active ? (pay != null ? fmtTWD(pay) : "—") : "—"}
+                </div>
+              </>
+            )}
           </div>
         );
       })}
@@ -495,6 +581,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       memberId: s.memberId || "",
       roles: Array.isArray(s.roles) ? s.roles : ["doer"],
       maxHours: s.maxHours != null ? String(s.maxHours) : "",
+      allocatedAmount: s.allocatedAmount != null ? String(s.allocatedAmount) : "",
     }));
   }
 
@@ -506,12 +593,17 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     budgetCurrency: d.budgetCurrency || "TWD",
     donationPercent:
       d.donationPercent != null ? String(d.donationPercent) : "20",
+    companyTax: Boolean(d.companyTax),
+    legacyMode: Boolean(d.legacyMode),
     projectedHourlyWage:
       d.projectedHourlyWage != null ? String(d.projectedHourlyWage) : "",
     maxHours: d.maxHours != null ? String(d.maxHours) : "",
     startDate: d.startDate || "",
+    endDate: d.endDate || "",
     stagePlans: normalizeStagePlans(d.stagePlans),
-    staffing: normalizeStaffing(d.staffing),
+    staffing: isPassThroughKind(d.kind)
+      ? normalizeStaffing(d.staffing).slice(0, 1)
+      : normalizeStaffing(d.staffing),
   });
 
   function setField(k, v) {
@@ -566,7 +658,11 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         memberId: s.memberId,
         roles: s.roles,
         maxHours: Number(s.maxHours) || 0,
+        allocatedAmount: s.allocatedAmount ? Number(s.allocatedAmount) : null,
       }));
+    const normalizedStaffing = isPassThroughKind(form.kind)
+      ? staffing.slice(0, 1)
+      : staffing;
 
     onSave(project, {
       name: form.name.trim(),
@@ -575,12 +671,15 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       budget: form.budget ? Number(form.budget) : null,
       budgetCurrency: form.budgetCurrency,
       donationPercent: Number(form.donationPercent) || 0,
+      companyTax: Boolean(form.companyTax),
+      legacyMode: Boolean(form.legacyMode),
       projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
       maxHours: form.maxHours ? Number(form.maxHours) : null,
       startDate: form.startDate || null,
+      endDate: form.endDate || null,
       stagePlans,
       stages,
-      staffing,
+      staffing: normalizedStaffing,
     });
     setEditing(false);
   }
@@ -589,6 +688,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   const maxH = d.maxHours ? Number(d.maxHours) : null;
   const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
   const internalOrAdmin = isInternalOrAdminKind(d.kind);
+  const passThrough = isPassThroughKind(d.kind);
   const projectedHourlyWage =
     d.projectedHourlyWage != null ? Number(d.projectedHourlyWage) : null;
   const effectiveProjectedHourly =
@@ -598,15 +698,21 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
       : null;
   const donationPct = Number(d.donationPercent) || 0;
   const donationTWD = donationAmount(budgTWD, donationPct);
+  const companyTaxRate = d.companyTax ? 0.05 : 0;
+  const companyTaxTWD =
+    budgTWD != null ? Math.round(budgTWD * companyTaxRate) : null;
   const effectiveBudgetTWD =
-    budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
+    budgTWD != null
+      ? Math.max(0, budgTWD - (donationTWD || 0) - (companyTaxTWD || 0))
+      : null;
+  const isLegacyMode = Boolean(d.legacyMode);
   const leadStaff = Array.isArray(d.staffing)
     ? d.staffing.find((s) => (s.roles || []).includes("lead"))
     : null;
-  // Lead bonus: 10% of post-donation budget, always applied to non-Internal/Admin projects
+  // Lead bonus: 5% of post-donation budget, always applied to non-Internal/Admin projects
   const leadBonusTWD =
-    !internalOrAdmin && effectiveBudgetTWD != null
-      ? Math.round(effectiveBudgetTWD * 0.1)
+    !internalOrAdmin && !passThrough && effectiveBudgetTWD != null
+      ? Math.round(effectiveBudgetTWD * 0.05)
       : null;
   const teamDistributableTWD =
     effectiveBudgetTWD != null && leadBonusTWD != null
@@ -645,8 +751,8 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
   }, [d.stagePlans]);
 
   const phaseNow = useMemo(
-    () => phaseNowLabel(d.startDate, sortedStagePlans),
-    [d.startDate, sortedStagePlans],
+    () => phaseNowLabel(d.startDate, sortedStagePlans, d.endDate),
+    [d.startDate, sortedStagePlans, d.endDate],
   );
 
   const teamMaxHours = useMemo(() => {
@@ -687,6 +793,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
   if (editing) {
     const formInternalOrAdmin = isInternalOrAdminKind(form.kind);
+    const formPassThrough = isPassThroughKind(form.kind);
     const formProjectedHourly = form.projectedHourlyWage
       ? Number(form.projectedHourlyWage)
       : null;
@@ -697,14 +804,21 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         : null;
     const formBudgetTWD = budgetToTWD(form.budget, form.budgetCurrency);
     const formDonationTWD = donationAmount(formBudgetTWD, form.donationPercent);
+    const formCompanyTaxTWD =
+      form.companyTax && formBudgetTWD != null
+        ? Math.round(formBudgetTWD * 0.05)
+        : null;
     const formEffectiveBudgetTWD =
       formBudgetTWD != null
-        ? Math.max(0, formBudgetTWD - (formDonationTWD || 0))
+        ? Math.max(
+            0,
+            formBudgetTWD - (formDonationTWD || 0) - (formCompanyTaxTWD || 0),
+          )
         : null;
     // Lead bonus always applies to non-Internal/Admin projects
     const formLeadBonusTWD =
-      !formInternalOrAdmin && formEffectiveBudgetTWD != null
-        ? Math.round(formEffectiveBudgetTWD * 0.1)
+      !formInternalOrAdmin && !formPassThrough && formEffectiveBudgetTWD != null
+        ? Math.round(formEffectiveBudgetTWD * 0.05)
         : null;
     const formTeamDistributableTWD =
       formEffectiveBudgetTWD != null && formLeadBonusTWD != null
@@ -731,6 +845,10 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
     const formStaffingUnassigned = form.maxHours
       ? Math.max(0, Number(form.maxHours) - formStaffingHours)
       : null;
+    const passThroughAutoPayByMemberId =
+      formPassThrough && form.staffing.length === 1 && formTeamDistributableTWD != null
+        ? { [form.staffing[0].memberId]: formTeamDistributableTWD }
+        : {};
 
     return (
       <li className="project-row">
@@ -793,6 +911,15 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   onChange={(e) => setField("startDate", e.target.value)}
                 />
               </label>
+              <label className="edit-field-group">
+                <span className="edit-field-label">End date</span>
+                <InputField
+                  className="project-field"
+                  type="date"
+                  value={form.endDate}
+                  onChange={(e) => setField("endDate", e.target.value)}
+                />
+              </label>
               <div className="edit-field-group">
                 <span className="edit-field-label">Budget</span>
                 <div className="project-budget-group">
@@ -829,6 +956,25 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                   ))}
                 </SelectField>
               </label>
+              <div className="edit-field-group edit-field-group--checkbox-row">
+                <label className="edit-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={form.companyTax}
+                    onChange={(e) => setField("companyTax", e.target.checked)}
+                  />
+                  <span>Company tax 5%</span>
+                </label>
+                <label className="edit-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={form.legacyMode}
+                    onChange={(e) => setField("legacyMode", e.target.checked)}
+                  />
+                  <span>Legacy mode</span>
+                  <span className="edit-checkbox-hint">Past projects — set allocated amounts directly</span>
+                </label>
+              </div>
               {formInternalOrAdmin && (
                 <label className="edit-field-group">
                   <span className="edit-field-label">
@@ -901,6 +1047,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     members={members}
                     onChange={(v) => setField("staffing", v)}
                     hourly={formHourly}
+                    legacyMode={form.legacyMode}
+                    singleMemberMode={formPassThrough}
+                    autoPayByMemberId={passThroughAutoPayByMemberId}
                   />
                 </div>
               </details>
@@ -1206,25 +1355,35 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     −{fmtTWD(donationTWD)}
                   </span>
                 </div>
-                <div className="detail-ledger-row detail-ledger-row--deduct">
-                  <span className="detail-ledger-label">
-                    Lead bonus 10%
-                    {leadStaff ? (
-                      <span className="detail-ledger-who">
-                        {" "}
-                        ·{" "}
-                        {staffingResolved.find((s) =>
-                          (s.roles || []).includes("lead"),
-                        )?.member?.data?.name || "lead"}
-                      </span>
-                    ) : (
-                      ""
-                    )}
-                  </span>
-                  <span className="detail-ledger-val detail-ledger-val--deduct">
-                    −{fmtTWD(leadBonusTWD)}
-                  </span>
-                </div>
+                {companyTaxTWD != null && companyTaxTWD > 0 && (
+                  <div className="detail-ledger-row detail-ledger-row--deduct">
+                    <span className="detail-ledger-label">Company tax 5%</span>
+                    <span className="detail-ledger-val detail-ledger-val--deduct">
+                      −{fmtTWD(companyTaxTWD)}
+                    </span>
+                  </div>
+                )}
+                {leadBonusTWD != null && (
+                  <div className="detail-ledger-row detail-ledger-row--deduct">
+                    <span className="detail-ledger-label">
+                      Lead bonus 5%
+                      {leadStaff ? (
+                        <span className="detail-ledger-who">
+                          {" "}
+                          ·{" "}
+                          {staffingResolved.find((s) =>
+                            (s.roles || []).includes("lead"),
+                          )?.member?.data?.name || "lead"}
+                        </span>
+                      ) : (
+                        ""
+                      )}
+                    </span>
+                    <span className="detail-ledger-val detail-ledger-val--deduct">
+                      −{fmtTWD(leadBonusTWD)}
+                    </span>
+                  </div>
+                )}
                 <div className="detail-ledger-divider" />
                 <div className="detail-ledger-row detail-ledger-row--total">
                   <span className="detail-ledger-label">
@@ -1313,15 +1472,13 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           <div className="detail-team">
             <div className="detail-section-head">
               <span className="detail-section-label">Team</span>
+              {isLegacyMode && (
+                <span className="detail-section-badge detail-section-badge--legacy">Legacy</span>
+              )}
               <span className="detail-section-meta">
-                {fmtH(teamMaxHours)}
-                {maxH != null ? ` / ${fmtH(maxH)}` : ""}
-                {unassignedTeamHours != null && unassignedTeamHours > 0
-                  ? ` · ${fmtH(unassignedTeamHours)} unassigned`
-                  : ""}
-                {teamWorkedHours > 0
-                  ? ` · ${fmtH(teamWorkedHours)} worked`
-                  : ""}
+                {isLegacyMode
+                  ? `${staffingResolved.length} member${staffingResolved.length !== 1 ? "s" : ""}`
+                  : `${fmtH(teamMaxHours)}${maxH != null ? ` / ${fmtH(maxH)}` : ""}${unassignedTeamHours != null && unassignedTeamHours > 0 ? ` · ${fmtH(unassignedTeamHours)} unassigned` : ""}${teamWorkedHours > 0 ? ` · ${fmtH(teamWorkedHours)} worked` : ""}`}
               </span>
             </div>
             {staffingResolved.length === 0 ? (
@@ -1330,9 +1487,9 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
               <div className="detail-team-table">
                 <div className="detail-team-thead">
                   <span>Name</span>
-                  <span>Role</span>
-                  <span>Allocated</span>
-                  <span>Worked</span>
+                  {!isLegacyMode && <span>Role</span>}
+                  <span>{isLegacyMode ? "Allocated" : "Allocated"}</span>
+                  {!isLegacyMode && <span>Worked</span>}
                   <span>Pay est.</span>
                 </div>
                 {staffingResolved.map((s, i) => {
@@ -1342,14 +1499,19 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                     project.id,
                     s.memberId,
                   );
-                  const payEst =
-                    hourly != null
+                  const legacyAllocated =
+                    s.allocatedAmount != null ? Number(s.allocatedAmount) : null;
+                  const payEst = isLegacyMode
+                    ? legacyAllocated
+                    : hourly != null
                       ? Math.round((Number(s.maxHours) || 0) * hourly)
                       : null;
                   const totalPay =
-                    isLead && leadBonusTWD != null && payEst != null
-                      ? payEst + leadBonusTWD
-                      : payEst;
+                    passThrough && staffingResolved.length === 1
+                      ? teamDistributableTWD
+                      : !isLegacyMode && isLead && leadBonusTWD != null && payEst != null
+                        ? payEst + leadBonusTWD
+                        : payEst;
                   const workedPay =
                     hourly != null ? Math.round(workedHours * hourly) : null;
                   const finished = finishedByMember[s.memberId] || {
@@ -1361,35 +1523,47 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
                       key={s.id || i}
                       className={
                         "detail-team-row" +
-                        (isLead ? " detail-team-row--lead" : "")
+                        (isLead && !isLegacyMode ? " detail-team-row--lead" : "")
                       }
                     >
                       <span className="detail-team-name">
                         {s.member?.data?.name || s.memberId}
                       </span>
-                      <span className="detail-team-role">
-                        {STAFFING_ROLES.find(
-                          (sr) => sr.value === (s.roles || [])[0],
-                        )?.label || "—"}
-                      </span>
-                      <span className="detail-team-hours">
-                        {s.maxHours > 0 ? `${s.maxHours}h` : "—"}
-                        <span className="detail-team-hours-meta">
-                          done {fmtH(finished.week)} this week · {fmtH(finished.total)} total
+                      {!isLegacyMode && (
+                        <span className="detail-team-role">
+                          {STAFFING_ROLES.find(
+                            (sr) => sr.value === (s.roles || [])[0],
+                          )?.label || "—"}
                         </span>
-                      </span>
-                      <span className="detail-team-worked">
-                        {workedHours > 0 ? `${workedHours}h` : "—"}
-                        {workedPay != null && workedPay > 0 && (
-                          <span className="detail-team-worked-pay">
-                            {" "}
-                            · {fmtTWD(workedPay)}
+                      )}
+                      <span className="detail-team-hours">
+                        {isLegacyMode
+                          ? legacyAllocated != null
+                            ? fmtTWD(legacyAllocated)
+                            : "—"
+                          : s.maxHours > 0
+                            ? `${s.maxHours}h`
+                            : "—"}
+                        {!isLegacyMode && (
+                          <span className="detail-team-hours-meta">
+                            done {fmtH(finished.week)} this week · {fmtH(finished.total)} total
                           </span>
                         )}
                       </span>
+                      {!isLegacyMode && (
+                        <span className="detail-team-worked">
+                          {workedHours > 0 ? `${workedHours}h` : "—"}
+                          {workedPay != null && workedPay > 0 && (
+                            <span className="detail-team-worked-pay">
+                              {" "}
+                              · {fmtTWD(workedPay)}
+                            </span>
+                          )}
+                        </span>
+                      )}
                       <span className="detail-team-pay">
                         {totalPay != null ? fmtTWD(totalPay) : "—"}
-                        {isLead && leadBonusTWD != null && (
+                        {!passThrough && !isLegacyMode && isLead && leadBonusTWD != null && (
                           <span className="detail-team-pay-note"> +bonus</span>
                         )}
                       </span>
@@ -1413,13 +1587,17 @@ function ProjectKanbanCard({ project, allTasks }) {
   const d = project.data;
   const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
   const internalOrAdmin = isInternalOrAdminKind(d.kind);
+  const passThrough = isPassThroughKind(d.kind);
   const donationPct = Number(d.donationPercent) || 0;
   const donationTWD = donationAmount(budgTWD, donationPct);
+  const companyTaxTWD = d.companyTax && budgTWD != null ? Math.round(budgTWD * 0.05) : null;
   const effectiveBudgetTWD =
-    budgTWD != null ? Math.max(0, budgTWD - (donationTWD || 0)) : null;
+    budgTWD != null
+      ? Math.max(0, budgTWD - (donationTWD || 0) - (companyTaxTWD || 0))
+      : null;
   const leadBonusTWD =
-    !internalOrAdmin && effectiveBudgetTWD != null
-      ? Math.round(effectiveBudgetTWD * 0.1)
+    !internalOrAdmin && !passThrough && effectiveBudgetTWD != null
+      ? Math.round(effectiveBudgetTWD * 0.05)
       : null;
   const teamDistributableTWD =
     effectiveBudgetTWD != null && leadBonusTWD != null
@@ -1520,7 +1698,13 @@ function ProjectKanbanBoard({ projects, allTasks }) {
   );
 }
 
-export default function ProjectsPage() {
+export default function ProjectsPage({
+  viewerMemberId = null,
+  viewerRole = "associate",
+  sharedMembers = null,
+  sharedProjects = null,
+  sharedTasks = null,
+}) {
   const [projects, setProjects] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1529,8 +1713,15 @@ export default function ProjectsPage() {
   const [toasts, setToasts] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const isLimitedViewer =
+    viewerRole === "flying-member" || viewerRole === "external-collaborator";
+  const hasSharedData =
+    Array.isArray(sharedMembers) &&
+    Array.isArray(sharedProjects) &&
+    Array.isArray(sharedTasks);
 
   useEffect(() => {
+    if (hasSharedData) return;
     if (!firebaseReady) return;
     const u1 = subscribeCollection("projects", setProjects);
     const u2 = subscribeCollection("tasks", setAllTasks);
@@ -1540,7 +1731,14 @@ export default function ProjectsPage() {
       u2();
       u3();
     };
-  }, []);
+  }, [hasSharedData]);
+
+  useEffect(() => {
+    if (!hasSharedData) return;
+    setMembers(sharedMembers);
+    setProjects(sharedProjects);
+    setAllTasks(sharedTasks);
+  }, [hasSharedData, sharedMembers, sharedProjects, sharedTasks]);
 
   function addToast(message, isError = false) {
     const id = Date.now() + Math.random();
@@ -1566,6 +1764,10 @@ export default function ProjectsPage() {
   }
 
   async function handleAdd(e) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to create projects", true);
+      return;
+    }
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
@@ -1586,20 +1788,30 @@ export default function ProjectsPage() {
     }
     setSaving(true);
     try {
-      await createDocument("projects", {
+      const created = {
         name,
         kind: form.kind || null,
         status: form.status || null,
         budget: form.budget ? Number(form.budget) : null,
         budgetCurrency: form.budgetCurrency,
         donationPercent: Number(form.donationPercent) || 0,
+        companyTax: Boolean(form.companyTax),
+        legacyMode: Boolean(form.legacyMode),
         projectedHourlyWage: internalOrAdmin ? projectedHourlyWage : null,
         maxHours: form.maxHours ? Number(form.maxHours) : null,
         startDate: form.startDate || null,
+        endDate: form.endDate || null,
         stagePlans: [],
         stages: [],
         staffing: [],
         createdAt: Date.now(),
+      };
+      const id = await createDocument("projects", created);
+      setProjects((prev) => {
+        if (prev.some((row) => row.id === id)) {
+          return prev.map((row) => (row.id === id ? { id, data: created } : row));
+        }
+        return [{ id, data: created }, ...prev];
       });
       setForm(EMPTY_FORM);
       addToast("Project added");
@@ -1611,12 +1823,22 @@ export default function ProjectsPage() {
   }
 
   async function handleSave(project, data) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to edit projects", true);
+      return;
+    }
     try {
-      await replaceDocument("projects", project.id, {
+      const nextData = {
         ...project.data,
         ...data,
         updatedAt: Date.now(),
-      });
+      };
+      await replaceDocument("projects", project.id, nextData);
+      setProjects((prev) =>
+        prev.map((item) =>
+          item.id === project.id ? { ...item, data: nextData } : item,
+        ),
+      );
       addToast("Saved");
     } catch (err) {
       addToast(err.message || "Could not save", true);
@@ -1624,11 +1846,16 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(project) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to delete projects", true);
+      return;
+    }
     setDeleteTarget({
       label: project.data?.name || "this project",
       onConfirm: async () => {
         try {
           await deleteDocument("projects", project.id);
+          setProjects((prev) => prev.filter((item) => item.id !== project.id));
           addToast("Deleted");
         } catch (err) {
           addToast(err.message || "Could not delete", true);
@@ -1639,33 +1866,48 @@ export default function ProjectsPage() {
     });
   }
 
+  const visibleProjects = useMemo(() => {
+    const uniqueProjects = dedupeById(projects);
+    if (!isLimitedViewer) return uniqueProjects;
+    if (!viewerMemberId) return [];
+    return uniqueProjects.filter((project) =>
+      isAssignedToProject(project, viewerMemberId),
+    );
+  }, [isLimitedViewer, projects, viewerMemberId]);
+
+  const visibleTasks = useMemo(() => {
+    if (!isLimitedViewer) return allTasks;
+    const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
+    return allTasks.filter((task) => visibleProjectIds.has(task?.data?.projectId));
+  }, [allTasks, isLimitedViewer, visibleProjects]);
+
   const totalBudgetTWD = useMemo(
     () =>
-      projects.reduce(
+      visibleProjects.reduce(
         (s, p) => s + (budgetToTWD(p.data.budget, p.data.budgetCurrency) || 0),
         0,
       ),
-    [projects],
+    [visibleProjects],
   );
 
   const totalCompanyPoolTWD = useMemo(
     () =>
-      projects.reduce((s, p) => {
+      visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
         return s + (donationAmount(budget, p.data.donationPercent) || 0);
       }, 0),
-    [projects],
+    [visibleProjects],
   );
 
   const totalMemberDistributableTWD = useMemo(
     () =>
-      projects.reduce((s, p) => {
+      visibleProjects.reduce((s, p) => {
         const budget = budgetToTWD(p.data.budget, p.data.budgetCurrency);
         const donation = donationAmount(budget, p.data.donationPercent) || 0;
         if (budget == null) return s;
         return s + Math.max(0, budget - donation);
       }, 0),
-    [projects],
+    [visibleProjects],
   );
 
   const projectViewOptions = [
@@ -1693,7 +1935,7 @@ export default function ProjectsPage() {
     <TabPage
       className="projects-page"
       title="Projects"
-      badge={`${projects.length} project${projects.length !== 1 ? "s" : ""}`}
+      badge={`${visibleProjects.length} project${visibleProjects.length !== 1 ? "s" : ""}`}
       subtitle={projectSubtitle}
       right={
         <PageControls compact>
@@ -1707,13 +1949,14 @@ export default function ProjectsPage() {
         </PageControls>
       }
     >
-      <SectionBlock
-        className="project-create-section"
-        title="Create project"
-        titleTag="h3"
-        texture={SURFACE_TEXTURES.projectCreate}
-      >
-        <form className="project-add-form" onSubmit={handleAdd}>
+      {!isLimitedViewer ? (
+        <SectionBlock
+          className="project-create-section"
+          title="Create project"
+          titleTag="h3"
+          texture={SURFACE_TEXTURES.projectCreate}
+        >
+          <form className="project-add-form" onSubmit={handleAdd}>
           <InputField
             className="project-field project-field--name"
             type="text"
@@ -1777,6 +2020,20 @@ export default function ProjectsPage() {
               </option>
             ))}
           </SelectField>
+          <InputField
+            className="project-field"
+            type="date"
+            value={form.startDate}
+            onChange={(e) => setField("startDate", e.target.value)}
+            title="Project start date"
+          />
+          <InputField
+            className="project-field"
+            type="date"
+            value={form.endDate}
+            onChange={(e) => setField("endDate", e.target.value)}
+            title="Project end date"
+          />
           {isInternalOrAdminKind(form.kind) && (
             <InputField
               className="project-field"
@@ -1789,13 +2046,23 @@ export default function ProjectsPage() {
               title="Projected hourly wage for Internal/Admin projects (TWD)"
             />
           )}
-          <Button type="submit" disabled={saving || !form.name.trim()}>
-            Add project
-          </Button>
-        </form>
-      </SectionBlock>
+            <Button type="submit" disabled={saving || !form.name.trim()}>
+              Add project
+            </Button>
+          </form>
+        </SectionBlock>
+      ) : (
+        <SectionBlock
+          className="project-create-section"
+          title="Project access"
+          titleTag="h3"
+          texture={SURFACE_TEXTURES.projectCreate}
+        >
+          <p>You can view projects where you are assigned in staffing.</p>
+        </SectionBlock>
+      )}
 
-      {projects.length === 0 ? (
+      {visibleProjects.length === 0 ? (
         <EmptyState>No projects yet.</EmptyState>
       ) : viewMode === "kanban" ? (
         <SectionBlock
@@ -1804,7 +2071,7 @@ export default function ProjectsPage() {
           titleTag="h3"
           texture={SURFACE_TEXTURES.projectKanban}
         >
-          <ProjectKanbanBoard projects={projects} allTasks={allTasks} />
+          <ProjectKanbanBoard projects={visibleProjects} allTasks={visibleTasks} />
         </SectionBlock>
       ) : (
         <SectionBlock
@@ -1821,7 +2088,7 @@ export default function ProjectsPage() {
             <span />
           </div>
           <CollectionLayout as="ul" variant="list" className="project-list">
-            {[...projects]
+            {[...visibleProjects]
               .sort(
                 (a, b) =>
                   (Number(b.data.createdAt) || 0) -
@@ -1831,7 +2098,7 @@ export default function ProjectsPage() {
                 <ProjectRow
                   key={p.id}
                   project={p}
-                  allTasks={allTasks}
+                  allTasks={visibleTasks}
                   members={members}
                   onSave={handleSave}
                   onDelete={handleDelete}
