@@ -1286,6 +1286,13 @@ function MemberCard({
             ))}
           </ul>
 
+          {!addActive ? (
+            <button className="notepad-add-trigger" onClick={activateAdd}>
+              <span className="notepad-add-plus">+</span>
+              <span className="notepad-add-placeholder">New task…</span>
+            </button>
+          ) : null}
+
           {reviewedTodos.length > 0 ? (
             <div className="reviewed-section">
               <div className="reviewed-section-head">
@@ -1354,12 +1361,7 @@ function MemberCard({
             </div>
           ) : null}
 
-          {!addActive ? (
-            <button className="notepad-add-trigger" onClick={activateAdd}>
-              <span className="notepad-add-plus">+</span>
-              <span className="notepad-add-placeholder">New task…</span>
-            </button>
-          ) : (
+          {addActive && (
             <div className="notepad-add-active">
               <div className="notepad-add-main">
                 <span className="notepad-add-plus">+</span>
