@@ -1,10 +1,34 @@
+// All week keys are computed in Asia/Taipei (UTC+8) so every member
+// sees the same week boundary regardless of their local timezone.
+const TZ = "Asia/Taipei";
+
+function taipeiDateParts(ts) {
+  const d = new Date(ts);
+  // Use Intl to get the wall-clock date in Taipei time
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const year = Number(parts.find((p) => p.type === "year").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const dow = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    weekday: "short",
+  }).format(d); // "Mon", "Tue", ..., "Sun"
+  return { year, month, day, dow };
+}
+
 export function weekStartDateForTs(ts) {
-  const date = new Date(ts);
-  date.setHours(0, 0, 0, 0);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  return date;
+  const { year, month, day, dow } = taipeiDateParts(ts);
+  // Monday-anchored week: Sunday = -6, others = 1 - dayIndex
+  const dayIndex = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(dow);
+  const diff = dayIndex === 0 ? -6 : 1 - dayIndex;
+  // Build a UTC date at midnight for that Taipei calendar date, then apply diff
+  const base = new Date(Date.UTC(year, month - 1, day + diff));
+  return base;
 }
 
 export function weekKeyFromTs(ts) {
