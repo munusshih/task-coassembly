@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "presence": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "tabComments": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": "createdAt"
+    }
+  }
+}

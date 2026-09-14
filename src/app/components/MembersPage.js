@@ -1291,77 +1291,7 @@ function MemberCard({
               <span className="notepad-add-plus">+</span>
               <span className="notepad-add-placeholder">New task…</span>
             </button>
-          ) : null}
-
-          {reviewedTodos.length > 0 ? (
-            <div className="reviewed-section">
-              <div className="reviewed-section-head">
-                <p className="meta-label reviewed-section-label">
-                  Reviewed (locked)
-                </p>
-                <Button
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  onClick={() => onUndoReviewWeek(member.id)}
-                >
-                  Undo review this week
-                </Button>
-              </div>
-              <ul className="todo-list reviewed-list">
-                {reviewedTodos.map((todo) => {
-                  const projName = projects.find(
-                    (p) => p.id === todo.data.projectId,
-                  )?.data?.name;
-                  const t = Number(todo.data.timeUnits) || 0;
-                  const ot = Number(todo.data.overtimeUnits) || 0;
-                  return (
-                    <li key={todo.id} className="todo-item">
-                      <div className="todo-checkbox-cell">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(todo.data.completed)}
-                          disabled
-                          tabIndex={-1}
-                        />
-                      </div>
-                      <div
-                        className="todo-content"
-                        style={{ cursor: "default" }}
-                      >
-                        <span
-                          className={
-                            todo.data.completed
-                              ? "todo-text todo-text--done"
-                              : "todo-text"
-                          }
-                        >
-                          {todo.data.title || "Untitled"}
-                        </span>
-                        <div className="todo-chips">
-                          {t > 0 ? (
-                            <Pill className="chip--time">
-                              {formatTimeUnits(t)}
-                            </Pill>
-                          ) : null}
-                          {ot > 0 ? (
-                            <Pill className="chip--ot">
-                              +{formatTimeUnits(ot)} OT
-                            </Pill>
-                          ) : null}
-                          {projName ? (
-                            <Pill className="chip--project">{projName}</Pill>
-                          ) : null}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
-
-          {addActive && (
+          ) : (
             <div className="notepad-add-active">
               <div className="notepad-add-main">
                 <span className="notepad-add-plus">+</span>
@@ -1442,26 +1372,19 @@ function MemberCard({
                     ) : (
                       <div className="todo-edit-list">
                         {addSubtasks.map((subtask, idx) => (
-                          <div
-                            key={`add-subtask-${idx}`}
-                            className="todo-edit-row"
-                          >
+                          <div key={`add-subtask-${idx}`} className="todo-edit-row">
                             <input
                               type="checkbox"
                               className="todo-edit-row-check"
-                              checked={Boolean(subtask.completed)}
+                              checked={subtask.completed || false}
                               onChange={(e) =>
-                                setAddSubtask(
-                                  idx,
-                                  "completed",
-                                  e.target.checked,
-                                )
+                                setAddSubtask(idx, "completed", e.target.checked)
                               }
                             />
                             <input
                               className="todo-edit-row-input"
-                              value={subtask.text}
-                              placeholder="Subtask"
+                              value={subtask.text || ""}
+                              placeholder="Subtask…"
                               onChange={(e) =>
                                 setAddSubtask(idx, "text", e.target.value)
                               }
@@ -1514,16 +1437,16 @@ function MemberCard({
                             <div className="todo-edit-row-fields">
                               <input
                                 className="todo-edit-row-input"
-                                value={link.name}
-                                placeholder="Link name"
+                                value={link.name || ""}
+                                placeholder="Label…"
                                 onChange={(e) =>
                                   setAddLink(idx, "name", e.target.value)
                                 }
                               />
                               <input
                                 className="todo-edit-row-input todo-edit-row-input--url"
-                                value={link.url}
-                                placeholder="https://..."
+                                value={link.url || ""}
+                                placeholder="URL…"
                                 onChange={(e) =>
                                   setAddLink(idx, "url", e.target.value)
                                 }
@@ -1565,6 +1488,75 @@ function MemberCard({
               </div>
             </div>
           )}
+
+          {reviewedTodos.length > 0 ? (
+            <div className="reviewed-section">
+              <div className="reviewed-section-head">
+                <p className="meta-label reviewed-section-label">
+                  Reviewed (locked)
+                </p>
+                <Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  onClick={() => onUndoReviewWeek(member.id)}
+                >
+                  Undo review this week
+                </Button>
+              </div>
+              <ul className="todo-list reviewed-list">
+                {reviewedTodos.map((todo) => {
+                  const projName = projects.find(
+                    (p) => p.id === todo.data.projectId,
+                  )?.data?.name;
+                  const t = Number(todo.data.timeUnits) || 0;
+                  const ot = Number(todo.data.overtimeUnits) || 0;
+                  return (
+                    <li key={todo.id} className="todo-item">
+                      <div className="todo-checkbox-cell">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(todo.data.completed)}
+                          disabled
+                          tabIndex={-1}
+                        />
+                      </div>
+                      <div
+                        className="todo-content"
+                        style={{ cursor: "default" }}
+                      >
+                        <span
+                          className={
+                            todo.data.completed
+                              ? "todo-text todo-text--done"
+                              : "todo-text"
+                          }
+                        >
+                          {todo.data.title || "Untitled"}
+                        </span>
+                        <div className="todo-chips">
+                          {t > 0 ? (
+                            <Pill className="chip--time">
+                              {formatTimeUnits(t)}
+                            </Pill>
+                          ) : null}
+                          {ot > 0 ? (
+                            <Pill className="chip--ot">
+                              +{formatTimeUnits(ot)} OT
+                            </Pill>
+                          ) : null}
+                          {projName ? (
+                            <Pill className="chip--project">{projName}</Pill>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
         </PaperSurface>
       ) : (
         <PaperSurface texture={snapshotTexture}>

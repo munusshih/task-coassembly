@@ -24,5 +24,9 @@ service cloud.firestore {
     match /meetingNotes/{document=**} {
       allow read, write: if signedIn();
     }
+
+    match /resources/{document=**} {
+      allow read, write: if signedIn();
+    }
   }
 }
