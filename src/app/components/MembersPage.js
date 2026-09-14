@@ -46,6 +46,7 @@ import {
   isMemberActive,
   isMemberAssignedToProject,
   isUnfinishedTaskOutsideWeek,
+  isProjectClosed,
   isProjectIdAssignable,
   taskWeekKey,
   weekKeyFromTs,
@@ -1790,23 +1791,34 @@ export default function MembersPage({
   );
 
   const visibleProjects = useMemo(() => {
-    if (!isLimitedViewer) return projects;
+    const activeProjects = projects.filter(
+      (project) => !isProjectClosed(project),
+    );
+    if (!isLimitedViewer) return activeProjects;
     if (!viewerMemberId) return [];
-    return projects.filter((project) =>
+    return activeProjects.filter((project) =>
       isMemberAssignedToProject(project, viewerMemberId),
     );
   }, [isLimitedViewer, projects, viewerMemberId]);
 
   const visibleTasks = useMemo(() => {
-    const tasksForVisibleMembers = dedupeItemsById(allTasks).filter((task) =>
-      visibleMemberIds.has(task?.data?.memberId),
+    const closedProjectIds = new Set(
+      projects
+        .filter(isProjectClosed)
+        .map((project) => project.id),
+    );
+    const tasksForVisibleMembers = dedupeItemsById(allTasks).filter(
+      (task) =>
+        visibleMemberIds.has(task?.data?.memberId) &&
+        !task?.data?.archived &&
+        !closedProjectIds.has(task?.data?.projectId),
     );
     if (!isLimitedViewer) return tasksForVisibleMembers;
     if (!viewerMemberId) return [];
     return tasksForVisibleMembers.filter(
       (task) => task?.data?.memberId === viewerMemberId,
     );
-  }, [allTasks, isLimitedViewer, viewerMemberId, visibleMemberIds]);
+  }, [allTasks, isLimitedViewer, projects, viewerMemberId, visibleMemberIds]);
 
   const tasksByMember = useMemo(() => {
     const g = {};

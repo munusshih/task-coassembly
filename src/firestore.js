@@ -11,6 +11,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -114,6 +115,20 @@ export async function replaceDocument(collectionName, id, payload) {
 
 export async function updateDocument(collectionName, id, payload) {
   await updateDoc(doc(getDb(), collectionName, id), payload);
+}
+
+export async function updateDocumentsAtomically(operations) {
+  if (!Array.isArray(operations) || operations.length === 0) return;
+  if (operations.length > 500) {
+    throw new Error("Too many documents to update in one operation.");
+  }
+
+  const database = getDb();
+  const batch = writeBatch(database);
+  operations.forEach(({ collectionName, id, payload }) => {
+    batch.update(doc(database, collectionName, id), payload);
+  });
+  await batch.commit();
 }
 
 export async function deleteDocument(collectionName, id) {

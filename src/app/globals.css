@@ -2646,7 +2646,7 @@ input[type="radio"] {
 /* Column headers */
 .project-col-headers {
   display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.3fr) 80px;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.3fr) 150px;
   gap: 0 12px;
   padding: 8px 14px;
   font-size: 11px;
@@ -2718,7 +2718,7 @@ input[type="radio"] {
 /* Summary row (always visible, click to expand) */
 .project-row-summary {
   display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.3fr) 80px;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.3fr) 150px;
   gap: 0 12px;
   align-items: center;
   padding: 10px 14px;
@@ -3163,6 +3163,24 @@ input[type="radio"] {
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
+}
+
+.project-complete-btn,
+.kanban-complete-btn {
+  color: #2e7d32;
+  border-color: rgba(46, 125, 50, 0.28);
+  background: rgba(232, 245, 233, 0.9);
+}
+
+.project-complete-btn:hover,
+.kanban-complete-btn:hover {
+  border-color: rgba(46, 125, 50, 0.5);
+  background: #dff0e1;
+}
+
+.kanban-complete-btn {
+  margin-top: 10px;
+  width: 100%;
 }
 
 .project-row-chevron {

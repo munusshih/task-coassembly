@@ -54,9 +54,18 @@ export function isMemberAssignedToProject(project, memberId) {
   return staffing.some((entry) => entry?.memberId === memberId);
 }
 
+export function isProjectClosed(project) {
+  const status = String(project?.data?.status || "")
+    .trim()
+    .toLowerCase();
+  return status === "completed" || status === "cancelled";
+}
+
 export function getAssignableProjects(projects, memberId) {
-  return (projects || []).filter((project) =>
-    isMemberAssignedToProject(project, memberId),
+  return (projects || []).filter(
+    (project) =>
+      !isProjectClosed(project) &&
+      isMemberAssignedToProject(project, memberId),
   );
 }
 
@@ -70,7 +79,10 @@ export function getAssignableMembersForProject(members, project) {
 export function isProjectIdAssignable(projects, memberId, projectId) {
   if (!projectId) return true;
   const project = (projects || []).find((item) => item.id === projectId);
-  return isMemberAssignedToProject(project, memberId);
+  return (
+    !isProjectClosed(project) &&
+    isMemberAssignedToProject(project, memberId)
+  );
 }
 
 export function isMemberActive(member) {

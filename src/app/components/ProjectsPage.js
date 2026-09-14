@@ -5,6 +5,7 @@ import {
   subscribeCollection,
   createDocument,
   replaceDocument,
+  updateDocumentsAtomically,
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
@@ -28,6 +29,7 @@ import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import ViewToggle from "./ui/ViewToggle";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import { isProjectClosed } from "./taskBoardRules";
 
 // ─ Constants ───────────────────────────────────────────────────────────────────────────────────
 
@@ -630,7 +632,14 @@ function SelfFundingEdit({ selfFunding, members, onChange }) {
 
 // ─ ProjectRow ──────────────────────────────────────────────────────────────────────────────────
 
-function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
+function ProjectRow({
+  project,
+  allTasks,
+  members,
+  onSave,
+  onComplete,
+  onDelete,
+}) {
   const d = project.data;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -1299,6 +1308,14 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
         <div className="project-row-main">
           <span className="project-row-name">{d.name || "Unnamed"}</span>
           <div className="project-row-badges">
+            {d.status && (
+              <span
+                className="project-row-status"
+                style={{ background: statusSt.bg, color: statusSt.color }}
+              >
+                {d.status}
+              </span>
+            )}
             {d.kind && (
               <span
                 className="project-row-kind"
@@ -1388,6 +1405,17 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
           onClick={(e) => e.stopPropagation()}
         >
           <span className="project-row-chevron">{open ? "▴" : "▾"}</span>
+          {onComplete && !isProjectClosed(project) ? (
+            <Button
+              type="button"
+              size="small"
+              variant="secondary"
+              className="project-complete-btn"
+              onClick={() => onComplete(project)}
+            >
+              Complete
+            </Button>
+          ) : null}
           <IconButton onClick={() => setEditing(true)} title="Edit">
             {EDIT_ICON}
           </IconButton>
@@ -1850,7 +1878,7 @@ function ProjectRow({ project, allTasks, members, onSave, onDelete }) {
 
 // ─ Kanban board ────────────────────────────────────────────────────────────────────────────────
 
-function ProjectKanbanCard({ project, allTasks }) {
+function ProjectKanbanCard({ project, allTasks, onComplete }) {
   const d = project.data;
   const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
   const internalOrAdmin = isInternalOrAdminKind(d.kind);
@@ -1918,11 +1946,22 @@ function ProjectKanbanCard({ project, allTasks }) {
           </span>
         )}
       </div>
+      {onComplete && !isProjectClosed(project) ? (
+        <Button
+          type="button"
+          size="small"
+          variant="secondary"
+          className="kanban-complete-btn"
+          onClick={() => onComplete(project)}
+        >
+          Complete project
+        </Button>
+      ) : null}
     </div>
   );
 }
 
-function ProjectKanbanBoard({ projects, allTasks }) {
+function ProjectKanbanBoard({ projects, allTasks, onComplete }) {
   const sorted = [...projects].sort(
     (a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0),
   );
@@ -1958,7 +1997,12 @@ function ProjectKanbanBoard({ projects, allTasks }) {
             <span className="kanban-col-count">{grouped[status].length}</span>
           </div>
           {grouped[status].map((p) => (
-            <ProjectKanbanCard key={p.id} project={p} allTasks={allTasks} />
+            <ProjectKanbanCard
+              key={p.id}
+              project={p}
+              allTasks={allTasks}
+              onComplete={onComplete}
+            />
           ))}
         </div>
       ))}
@@ -1981,6 +2025,8 @@ export default function ProjectsPage({
   const [toasts, setToasts] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [completingProjectId, setCompletingProjectId] = useState(null);
   const isLimitedViewer =
     viewerRole === "flying-member" || viewerRole === "external-collaborator";
   const hasSharedData =
@@ -2103,6 +2149,10 @@ export default function ProjectsPage({
       addToast("You do not have permission to edit projects", true);
       return;
     }
+    if (String(data?.status || "").trim().toLowerCase() === "completed") {
+      await handleCompleteProject(project, data);
+      return;
+    }
     try {
       const nextData = {
         ...project.data,
@@ -2140,6 +2190,97 @@ export default function ProjectsPage({
         }
       },
     });
+  }
+
+  function requestCompleteProject(project) {
+    const activeTaskCount = allTasks.filter(
+      (task) =>
+        task?.data?.projectId === project.id && !task?.data?.archived,
+    ).length;
+    setCompleteTarget({ project, activeTaskCount });
+  }
+
+  async function handleCompleteProject(project, projectUpdates = {}) {
+    if (isLimitedViewer) {
+      addToast("You do not have permission to complete projects", true);
+      return false;
+    }
+
+    const now = Date.now();
+    const alreadyCompleted =
+      String(project.data?.status || "").trim().toLowerCase() === "completed";
+    const linkedTasks = allTasks.filter(
+      (task) =>
+        task?.data?.projectId === project.id && !task?.data?.archived,
+    );
+    const projectPatch = {
+      ...projectUpdates,
+      status: "Completed",
+      completedAt: alreadyCompleted
+        ? Number(project.data?.completedAt) || now
+        : now,
+      updatedAt: now,
+    };
+    const taskPatches = new Map(
+      linkedTasks.map((task) => {
+        const finishedAt = task.data.completed
+          ? Number(task.data.archivedAt) ||
+            Number(task.data.reviewedAt) ||
+            Number(task.data.updatedAt) ||
+            now
+          : now;
+        return [
+          task.id,
+          {
+            completed: true,
+            completionState: "completed",
+            reviewed: true,
+            reviewedAt: Number(task.data.reviewedAt) || finishedAt,
+            archived: true,
+            archivedAt: Number(task.data.archivedAt) || finishedAt,
+            updatedAt: now,
+          },
+        ];
+      }),
+    );
+
+    setCompletingProjectId(project.id);
+    try {
+      await updateDocumentsAtomically([
+        { collectionName: "projects", id: project.id, payload: projectPatch },
+        ...linkedTasks.map((task) => ({
+          collectionName: "tasks",
+          id: task.id,
+          payload: taskPatches.get(task.id),
+        })),
+      ]);
+      setProjects((prev) =>
+        prev.map((item) =>
+          item.id === project.id
+            ? { ...item, data: { ...item.data, ...projectPatch } }
+            : item,
+        ),
+      );
+      setAllTasks((prev) =>
+        prev.map((item) => {
+          const patch = taskPatches.get(item.id);
+          return patch
+            ? { ...item, data: { ...item.data, ...patch } }
+            : item;
+        }),
+      );
+      addToast(
+        linkedTasks.length
+          ? `Project completed · ${linkedTasks.length} task${linkedTasks.length === 1 ? "" : "s"} archived`
+          : "Project completed",
+      );
+      return true;
+    } catch (err) {
+      addToast(err.message || "Could not complete project", true);
+      return false;
+    } finally {
+      setCompletingProjectId(null);
+    }
   }
 
   const visibleProjects = useMemo(() => {
@@ -2368,6 +2509,7 @@ export default function ProjectsPage({
           <ProjectKanbanBoard
             projects={visibleProjects}
             allTasks={visibleTasks}
+            onComplete={isLimitedViewer ? null : requestCompleteProject}
           />
         </SectionBlock>
       ) : (
@@ -2398,6 +2540,9 @@ export default function ProjectsPage({
                   allTasks={visibleTasks}
                   members={members}
                   onSave={handleSave}
+                  onComplete={
+                    isLimitedViewer ? null : requestCompleteProject
+                  }
                   onDelete={handleDelete}
                 />
               ))}
@@ -2422,6 +2567,54 @@ export default function ProjectsPage({
           onConfirm={deleteTarget.onConfirm}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+
+      {completeTarget && (
+        <ModalShell
+          title="Complete project"
+          onClose={() => setCompleteTarget(null)}
+          size="sm"
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setCompleteTarget(null)}
+                disabled={Boolean(completingProjectId)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="small"
+                onClick={async () => {
+                  const completed = await handleCompleteProject(
+                    completeTarget.project,
+                  );
+                  if (completed) setCompleteTarget(null);
+                }}
+                disabled={Boolean(completingProjectId)}
+              >
+                {completingProjectId ? "Completing…" : "Complete project"}
+              </Button>
+            </>
+          }
+        >
+          <p className="delete-confirm-body">
+            Complete{" "}
+            <strong>
+              {completeTarget.project.data?.name || "this project"}
+            </strong>
+            ?
+            {completeTarget.activeTaskCount > 0
+              ? ` Its ${completeTarget.activeTaskCount} linked task${completeTarget.activeTaskCount === 1 ? "" : "s"} will be marked completed and removed from the active Task board.`
+              : " It will be removed from the active Task board."}
+          </p>
+          <p className="delete-confirm-detail">
+            Project and task history will remain available for reporting.
+          </p>
+        </ModalShell>
       )}
     </TabPage>
   );
