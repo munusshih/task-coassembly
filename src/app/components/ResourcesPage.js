@@ -365,6 +365,7 @@ function FreeBoard({ links, positions, onPositionChange, onEdit, onDelete }) {
 
   function startDrag(e, link, index) {
     if (e.button !== 0) return;
+    if (e.target.closest("a, button, input, textarea, select")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const pos = positions[link.id] ?? defaultFreePos(index);
     dragRef.current = {
