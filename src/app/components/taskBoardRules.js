@@ -39,6 +39,20 @@ export function currentWeekKey() {
   return weekKeyFromTs(Date.now());
 }
 
+export function previousWeekKey(referenceTs = Date.now()) {
+  const previousWeekStart = weekStartDateForTs(referenceTs);
+  previousWeekStart.setUTCDate(previousWeekStart.getUTCDate() - 7);
+  return previousWeekStart.toISOString().slice(0, 10);
+}
+
+export function isEditableWeekKey(weekKey, referenceTs = Date.now()) {
+  if (!weekKey) return true;
+  return (
+    weekKey === weekKeyFromTs(referenceTs) ||
+    weekKey === previousWeekKey(referenceTs)
+  );
+}
+
 export function taskWeekKey(taskData) {
   const explicit = String(taskData?.taskWeek || "").trim();
   if (explicit) return explicit;

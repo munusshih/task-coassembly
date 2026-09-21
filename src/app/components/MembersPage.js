@@ -45,11 +45,12 @@ import {
   getAssignableProjects,
   isMemberActive,
   isMemberAssignedToProject,
+  isEditableWeekKey,
   isUnfinishedTaskOutsideWeek,
   isProjectClosed,
   isProjectIdAssignable,
+  previousWeekKey,
   taskWeekKey,
-  weekKeyFromTs,
   weekStartDateForTs,
 } from "./taskBoardRules";
 
@@ -802,6 +803,8 @@ function ProjectGroupCard({
   project,
   tasks,
   members,
+  selectedWeek,
+  isEditableWeek,
   onCreate,
   onToggle,
   onPushBacklog,
@@ -842,14 +845,18 @@ function ProjectGroupCard({
   async function handleAdd() {
     const title = addTitle.trim();
     if (!title || !addMemberId) return;
-    await onCreate(addMemberId, {
-      title,
-      timeUnits: null,
-      projectId: project?.id || null,
-      deadline: null,
-      subtasks: [],
-      links: [],
-    });
+    await onCreate(
+      addMemberId,
+      {
+        title,
+        timeUnits: null,
+        projectId: project?.id || null,
+        deadline: null,
+        subtasks: [],
+        links: [],
+      },
+      selectedWeek,
+    );
     setAddTitle("");
     setAddMemberId("");
     setAddOpen(false);
@@ -881,6 +888,7 @@ function ProjectGroupCard({
                         type="checkbox"
                         className="wish-task-check"
                         checked={Boolean(task.data.completed)}
+                        disabled={!isEditableWeek}
                         onChange={(e) => onToggle(task, e.target.checked)}
                       />
                       <span
@@ -897,7 +905,7 @@ function ProjectGroupCard({
                           {formatTimeUnits(task.data.timeUnits)}
                         </Pill>
                       )}
-                      {canPushTaskToNewestWeek(task.data) ? (
+                      {isEditableWeek && canPushTaskToNewestWeek(task.data) ? (
                         <IconButton
                           type="button"
                           title="Push to newest week"
@@ -906,7 +914,7 @@ function ProjectGroupCard({
                           <span>{">>"}</span>
                         </IconButton>
                       ) : null}
-                      {canPushTaskToWishes(task.data) ? (
+                      {isEditableWeek && canPushTaskToWishes(task.data) ? (
                         <IconButton
                           type="button"
                           title="Push back to wishes"
@@ -915,7 +923,9 @@ function ProjectGroupCard({
                           <IconBacklog />
                         </IconButton>
                       ) : null}
-                      {task.data.completed && !task.data.reviewed ? (
+                      {isEditableWeek &&
+                      task.data.completed &&
+                      !task.data.reviewed ? (
                         <div className="wish-item-controls">
                           <button
                             type="button"
@@ -933,7 +943,7 @@ function ProjectGroupCard({
                           </button>
                         </div>
                       ) : null}
-                      {!task.data.completed ? (
+                      {isEditableWeek && !task.data.completed ? (
                         <IconButton
                           type="button"
                           variant="delete"
@@ -950,61 +960,63 @@ function ProjectGroupCard({
             </PaperSurface>
           </div>
         ))}
-        <CreateBar
-          open={addOpen}
-          onOpen={() => setAddOpen(true)}
-          label="Add task"
-          inset
-          rowClassName="backlog-add-row backlog-add-row--inset"
-        >
-          <InputField
-            className="backlog-add-input"
-            type="text"
-            placeholder="Task title…"
-            value={addTitle}
-            autoFocus
-            onChange={(e) => setAddTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
+        {isEditableWeek ? (
+          <CreateBar
+            open={addOpen}
+            onOpen={() => setAddOpen(true)}
+            label="Add task"
+            inset
+            rowClassName="backlog-add-row backlog-add-row--inset"
+          >
+            <InputField
+              className="backlog-add-input"
+              type="text"
+              placeholder="Task title…"
+              value={addTitle}
+              autoFocus
+              onChange={(e) => setAddTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setAddOpen(false);
+                  setAddTitle("");
+                  setAddMemberId("");
+                }
+              }}
+            />
+            <SelectField
+              className="backlog-member-select"
+              value={addMemberId}
+              onChange={(e) => setAddMemberId(e.target.value)}
+            >
+              <option value="">Member…</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.data?.name || m.id}
+                </option>
+              ))}
+            </SelectField>
+            <Button
+              type="button"
+              size="small"
+              onClick={handleAdd}
+              disabled={!addTitle.trim() || !addMemberId}
+            >
+              Add
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="small"
+              onClick={() => {
                 setAddOpen(false);
                 setAddTitle("");
                 setAddMemberId("");
-              }
-            }}
-          />
-          <SelectField
-            className="backlog-member-select"
-            value={addMemberId}
-            onChange={(e) => setAddMemberId(e.target.value)}
-          >
-            <option value="">Member…</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.data?.name || m.id}
-              </option>
-            ))}
-          </SelectField>
-          <Button
-            type="button"
-            size="small"
-            onClick={handleAdd}
-            disabled={!addTitle.trim() || !addMemberId}
-          >
-            Add
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              setAddOpen(false);
-              setAddTitle("");
-              setAddMemberId("");
-            }}
-          >
-            Cancel
-          </Button>
-        </CreateBar>
+              }}
+            >
+              Cancel
+            </Button>
+          </CreateBar>
+        ) : null}
       </div>
     </BoardSection>
   );
@@ -1033,7 +1045,7 @@ function MemberCard({
   const [ui, setUi] = useState(() => loadMemberDraft(member.id));
   const addInputRef = useRef(null);
 
-  const isCurrentWeek = !selectedWeek || selectedWeek === currentWeekKey();
+  const isEditableWeek = isEditableWeekKey(selectedWeek);
   const memberWeekTodos = useMemo(
     () => todos.filter((t) => taskWeekKey(t.data) === selectedWeek),
     [todos, selectedWeek],
@@ -1055,8 +1067,8 @@ function MemberCard({
     editDraft,
   } = ui;
 
-  // For past-week snapshot: show all tasks assigned to that week
-  const snapshotTodos = !isCurrentWeek ? sortTodos(memberWeekTodos) : [];
+  // Weeks older than the immediately previous week remain read-only snapshots.
+  const snapshotTodos = !isEditableWeek ? sortTodos(memberWeekTodos) : [];
 
   const snapshotMin = snapshotTodos.reduce(
     (s, t) =>
@@ -1129,14 +1141,18 @@ function MemberCard({
 
   async function submitAdd() {
     if (!addTitle.trim()) return;
-    const created = await onCreate(member.id, {
-      title: addTitle.trim(),
-      timeUnits: addTime ? Number(addTime) : null,
-      projectId: addProject || null,
-      deadline: addDeadline || null,
-      subtasks: normalizeTaskSubtaskList(addSubtasks),
-      links: normalizeTaskLinkList(addLinks),
-    });
+    const created = await onCreate(
+      member.id,
+      {
+        title: addTitle.trim(),
+        timeUnits: addTime ? Number(addTime) : null,
+        projectId: addProject || null,
+        deadline: addDeadline || null,
+        subtasks: normalizeTaskSubtaskList(addSubtasks),
+        links: normalizeTaskLinkList(addLinks),
+      },
+      selectedWeek,
+    );
     if (!created) return;
     patchUi({
       addTitle: "",
@@ -1244,13 +1260,13 @@ function MemberCard({
           </div>
         </div>
         <span className="member-week-time">
-          {isCurrentWeek
+          {isEditableWeek
             ? weeklyLabel || "no tasks"
             : formatWeeklyTime(snapshotMin) || "—"}
         </span>
       </div>
 
-      {isCurrentWeek ? (
+      {isEditableWeek ? (
         <PaperSurface texture={memberTexture}>
           <ul className="todo-list">
             {weekTodos.length === 0 && (
@@ -1851,9 +1867,9 @@ export default function MembersPage({
     return g;
   }, [visibleTasks, selectedWeek]);
 
-  // Collect all weeks that have tasks, plus current week
+  // Always offer the two editable weeks, plus older weeks that have tasks.
   const availableWeeks = useMemo(() => {
-    const weeks = new Set([currentWeekKey()]);
+    const weeks = new Set([currentWeekKey(), previousWeekKey()]);
     for (const t of visibleTasks) {
       weeks.add(taskWeekKey(t.data));
     }
@@ -1883,7 +1899,11 @@ export default function MembersPage({
     );
   }
 
-  async function handleCreate(memberId, taskData) {
+  async function handleCreate(
+    memberId,
+    taskData,
+    targetWeek = currentWeekKey(),
+  ) {
     if (createInFlightRef.current) return false;
     if (
       !canViewerManageMemberTask({ isLimitedViewer, viewerMemberId, memberId })
@@ -1892,6 +1912,10 @@ export default function MembersPage({
       return false;
     }
     const now = Date.now();
+    if (!isEditableWeekKey(targetWeek, now)) {
+      addToast("Only this week and last week can be edited", true);
+      return false;
+    }
     const nextProjectId = taskData.projectId || null;
     if (
       nextProjectId &&
@@ -1916,7 +1940,7 @@ export default function MembersPage({
         reviewed: false,
         completionState: "open",
         archived: false,
-        taskWeek: weekKeyFromTs(now),
+        taskWeek: targetWeek,
         orderIndex: now,
         createdAt: now,
         updatedAt: now,
@@ -2507,6 +2531,8 @@ export default function MembersPage({
               project={project}
               tasks={tasksByProject[project.id] || []}
               members={visibleMembers}
+              selectedWeek={selectedWeek}
+              isEditableWeek={isEditableWeekKey(selectedWeek)}
               onCreate={handleCreate}
               onToggle={handleToggle}
               onPushBacklog={requestPushBackToBacklog}
@@ -2522,6 +2548,8 @@ export default function MembersPage({
               project={null}
               tasks={tasksByProject["__none__"] || []}
               members={visibleMembers}
+              selectedWeek={selectedWeek}
+              isEditableWeek={isEditableWeekKey(selectedWeek)}
               onCreate={handleCreate}
               onToggle={handleToggle}
               onPushBacklog={requestPushBackToBacklog}
