@@ -1944,6 +1944,49 @@ input[type="radio"] {
   color: #2e4f72;
 }
 
+.project-resources-paper {
+  padding: 10px 14px;
+}
+
+.project-resource-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.project-resource-item {
+  display: grid;
+  gap: 2px;
+  padding: 8px 2px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.project-resource-item:last-child {
+  border-bottom: 0;
+}
+
+.project-resource-link {
+  width: fit-content;
+  color: #355a7a;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-decoration: underline;
+  text-decoration-color: rgba(53, 90, 122, 0.4);
+  overflow-wrap: anywhere;
+}
+
+.project-resource-link:hover {
+  color: #1f405e;
+}
+
+.project-resource-source {
+  color: #8a8580;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .chip {
   font-size: 11px;
   color: #999;

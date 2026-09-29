@@ -11,6 +11,7 @@ import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import {
+  DATE_VIEW_ICON,
   DELETE_ICON,
   MEMBER_VIEW_ICON,
   PROJECT_VIEW_ICON,
@@ -252,6 +253,18 @@ function totalWeeklyMinutes(todos) {
   return todos.reduce((s, t) => s + (Number(t.data.timeUnits) || 0) * 15, 0);
 }
 
+function workedWeeklyMinutes(todos) {
+  return todos.reduce((sum, task) => {
+    if (!task.data.completed) return sum;
+    return (
+      sum +
+      ((Number(task.data.timeUnits) || 0) +
+        (Number(task.data.overtimeUnits) || 0)) *
+        15
+    );
+  }, 0);
+}
+
 function formatWeeklyTime(minutes) {
   if (!minutes) return null;
   const h = Math.floor(minutes / 60);
@@ -321,6 +334,64 @@ function dedupeItemsById(items) {
     if (nextUpdated >= prevUpdated) map.set(id, item);
   }
   return [...map.values()];
+}
+
+function ReadOnlyTaskDetails({ todo, keyPrefix }) {
+  const subtasks = normalizeTaskSubtaskList(todo.data.subtasks);
+  const links = normalizeTaskLinkList(todo.data.links);
+
+  if (subtasks.length === 0 && links.length === 0) return null;
+
+  return (
+    <details className="todo-inline-details">
+      <summary className="todo-inline-details-summary">
+        Details
+        {subtasks.length > 0
+          ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}`
+          : ""}
+        {links.length > 0
+          ? ` · ${links.length} link${links.length > 1 ? "s" : ""}`
+          : ""}
+      </summary>
+      {subtasks.length > 0 && (
+        <ul className="todo-subtasks">
+          {subtasks.map((subtask, idx) => (
+            <li
+              key={`${keyPrefix}-subtask-${todo.id}-${idx}`}
+              className="todo-subtask-item"
+            >
+              <span
+                className={
+                  subtask.completed
+                    ? "todo-subtask-text todo-subtask-text--done"
+                    : "todo-subtask-text"
+                }
+              >
+                {subtask.completed ? "[x] " : "[ ] "}
+                {subtask.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {links.length > 0 && (
+        <div className="todo-links">
+          {links.map((link, idx) => (
+            <a
+              key={`${keyPrefix}-link-${todo.id}-${idx}`}
+              className="todo-link"
+              href={toLinkHref(link.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={link.url}
+            >
+              {link.name || formatLinkLabel(link.url)}
+            </a>
+          ))}
+        </div>
+      )}
+    </details>
+  );
 }
 
 // ─── TaskItem ─────────────────────────────────────────────────────────────────────────────────
@@ -1022,6 +1093,60 @@ function ProjectGroupCard({
   );
 }
 
+function ProjectResourcesCard({ project, resources, members }) {
+  const memberNameById = useMemo(() => {
+    const map = {};
+    members.forEach((member) => {
+      map[member.id] = member.data?.name || member.id;
+    });
+    return map;
+  }, [members]);
+
+  return (
+    <BoardSection
+      title={project.data?.name || "Untitled project"}
+      badge={`${resources.length} resource${resources.length !== 1 ? "s" : ""}`}
+    >
+      <PaperSurface
+        className="project-resources-paper"
+        texture={SURFACE_TEXTURES.memberProjectBoard}
+      >
+        <ul className="project-resource-list">
+          {resources.map(({ link, task, weekKey }, index) => {
+            const sourceBits = [
+              task.data.title || "Untitled task",
+              memberNameById[task.data.memberId],
+              weekKey
+                ? weekLabel(new Date(`${weekKey}T00:00:00`))
+                : null,
+            ].filter(Boolean);
+
+            return (
+              <li
+                key={`${task.id}-${link.url}-${index}`}
+                className="project-resource-item"
+              >
+                <a
+                  className="project-resource-link"
+                  href={toLinkHref(link.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={link.url}
+                >
+                  {link.name || formatLinkLabel(link.url)}
+                </a>
+                <span className="project-resource-source">
+                  {sourceBits.join(" · ")}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </PaperSurface>
+    </BoardSection>
+  );
+}
+
 // ─── MemberCard ───────────────────────────────────────────────────────────────────────────────
 
 function MemberCard({
@@ -1070,13 +1195,6 @@ function MemberCard({
   // Weeks older than the immediately previous week remain read-only snapshots.
   const snapshotTodos = !isEditableWeek ? sortTodos(memberWeekTodos) : [];
 
-  const snapshotMin = snapshotTodos.reduce(
-    (s, t) =>
-      s +
-      ((Number(t.data.timeUnits) || 0) + (Number(t.data.overtimeUnits) || 0)) *
-        15,
-    0,
-  );
   const activeCount = weekTodos.length;
   const reviewedCount = reviewedTodos.length;
 
@@ -1088,7 +1206,13 @@ function MemberCard({
     [projects, member.id],
   );
 
-  const weeklyLabel = formatWeeklyTime(totalWeeklyMinutes(memberWeekTodos));
+  const plannedMinutes = totalWeeklyMinutes(memberWeekTodos);
+  const workedMinutes = workedWeeklyMinutes(memberWeekTodos);
+  const weeklyLabel = memberWeekTodos.length
+    ? `${formatWeeklyTime(workedMinutes) || "0m"} / ${
+        formatWeeklyTime(plannedMinutes) || "0m"
+      }`
+    : "no tasks";
   const memberTexture = memberPlanningTexture(member?.data?.role);
   const snapshotTexture = memberSnapshotTexture(member?.data?.role);
 
@@ -1259,10 +1383,11 @@ function MemberCard({
             </span>
           </div>
         </div>
-        <span className="member-week-time">
-          {isEditableWeek
-            ? weeklyLabel || "no tasks"
-            : formatWeeklyTime(snapshotMin) || "—"}
+        <span
+          className="member-week-time"
+          title="Worked time / planned time"
+        >
+          {weeklyLabel}
         </span>
       </div>
 
@@ -1566,6 +1691,10 @@ function MemberCard({
                             <Pill className="chip--project">{projName}</Pill>
                           ) : null}
                         </div>
+                        <ReadOnlyTaskDetails
+                          todo={todo}
+                          keyPrefix="reviewed"
+                        />
                       </div>
                     </li>
                   );
@@ -1587,8 +1716,6 @@ function MemberCard({
                 )?.data?.name;
                 const t = Number(todo.data.timeUnits) || 0;
                 const ot = Number(todo.data.overtimeUnits) || 0;
-                const subtasks = normalizeTaskSubtaskList(todo.data.subtasks);
-                const links = normalizeTaskLinkList(todo.data.links);
                 const done = Boolean(todo.data.completed);
                 return (
                   <li key={todo.id} className="todo-item">
@@ -1623,56 +1750,10 @@ function MemberCard({
                           <Pill className="chip--project">{projName}</Pill>
                         )}
                       </div>
-                      {(subtasks.length > 0 || links.length > 0) && (
-                        <details className="todo-inline-details">
-                          <summary className="todo-inline-details-summary">
-                            Details
-                            {subtasks.length > 0
-                              ? ` · ${subtasks.length} subtask${subtasks.length > 1 ? "s" : ""}`
-                              : ""}
-                            {links.length > 0
-                              ? ` · ${links.length} link${links.length > 1 ? "s" : ""}`
-                              : ""}
-                          </summary>
-                          {subtasks.length > 0 && (
-                            <ul className="todo-subtasks">
-                              {subtasks.map((subtask, idx) => (
-                                <li
-                                  key={`snapshot-subtask-${todo.id}-${idx}`}
-                                  className="todo-subtask-item"
-                                >
-                                  <span
-                                    className={
-                                      subtask.completed
-                                        ? "todo-subtask-text todo-subtask-text--done"
-                                        : "todo-subtask-text"
-                                    }
-                                  >
-                                    {subtask.completed ? "[x] " : "[ ] "}
-                                    {subtask.text}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {links.length > 0 && (
-                            <div className="todo-links">
-                              {links.map((link, idx) => (
-                                <a
-                                  key={`snapshot-link-${todo.id}-${idx}`}
-                                  className="todo-link"
-                                  href={toLinkHref(link.url)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title={link.url}
-                                >
-                                  {link.name || formatLinkLabel(link.url)}
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </details>
-                      )}
+                      <ReadOnlyTaskDetails
+                        todo={todo}
+                        keyPrefix="snapshot"
+                      />
                     </div>
                     <div className="todo-actions">
                       {canPushTaskToNewestWeek(todo.data) ? (
@@ -1866,6 +1947,59 @@ export default function MembersPage({
     }
     return g;
   }, [visibleTasks, selectedWeek]);
+
+  const resourcesByProject = useMemo(() => {
+    const grouped = {};
+    const visibleProjectIds = new Set(
+      sortedProjectsForView.map((project) => project.id),
+    );
+
+    for (const task of visibleTasks) {
+      const projectId = task.data.projectId;
+      if (!projectId || !visibleProjectIds.has(projectId)) continue;
+
+      const links = normalizeTaskLinkList(task.data.links);
+      if (!links.length) continue;
+
+      if (!grouped[projectId]) grouped[projectId] = [];
+      links.forEach((link) => {
+        grouped[projectId].push({
+          link,
+          task,
+          weekKey: taskWeekKey(task.data),
+        });
+      });
+    }
+
+    Object.values(grouped).forEach((resources) => {
+      resources.sort((left, right) => {
+        const leftLabel =
+          left.link.name || formatLinkLabel(left.link.url) || left.link.url;
+        const rightLabel =
+          right.link.name || formatLinkLabel(right.link.url) || right.link.url;
+        return leftLabel.localeCompare(rightLabel);
+      });
+    });
+
+    return grouped;
+  }, [sortedProjectsForView, visibleTasks]);
+
+  const projectsWithResources = useMemo(
+    () =>
+      sortedProjectsForView.filter(
+        (project) => (resourcesByProject[project.id] || []).length > 0,
+      ),
+    [resourcesByProject, sortedProjectsForView],
+  );
+
+  const resourceCount = useMemo(
+    () =>
+      Object.values(resourcesByProject).reduce(
+        (sum, resources) => sum + resources.length,
+        0,
+      ),
+    [resourcesByProject],
+  );
 
   // Always offer the two editable weeks, plus older weeks that have tasks.
   const availableWeeks = useMemo(() => {
@@ -2473,17 +2607,32 @@ export default function MembersPage({
             title: "Project view",
             icon: PROJECT_VIEW_ICON,
           },
+          {
+            value: "resources",
+            title: "Project resources across all weeks",
+            icon: DATE_VIEW_ICON,
+          },
         ]),
   ];
 
   const memberBoardSubtitle = `${visibleMembers.length} member${visibleMembers.length !== 1 ? "s" : ""} · Weekly planning board`;
+  const isResourceView = memberViewMode === "resources";
+  const pageTitle = isResourceView
+    ? "Project resources"
+    : relativeWeekTitle(selectedWeek);
+  const pageBadge = isResourceView
+    ? `${resourceCount} resource${resourceCount !== 1 ? "s" : ""}`
+    : quarterLabel(selectedWeek);
+  const pageSubtitle = isResourceView
+    ? "Task links grouped by project across all weeks"
+    : memberBoardSubtitle;
 
   return (
     <TabPage
       className="members-page"
-      title={relativeWeekTitle(selectedWeek)}
-      badge={quarterLabel(selectedWeek)}
-      subtitle={memberBoardSubtitle}
+      title={pageTitle}
+      badge={pageBadge}
+      subtitle={pageSubtitle}
       right={
         <PageControls compact>
           <ViewToggle
@@ -2493,29 +2642,33 @@ export default function MembersPage({
             options={memberViewOptions}
             ariaLabel="Member board view"
           />
-          <SelectField
-            className="week-select"
-            value={selectedWeek}
-            onChange={(e) => setSelectedWeek(e.target.value)}
-          >
-            {availableWeeks.map((wk) => {
-              const monday = new Date(wk + "T00:00:00");
-              return (
-                <option key={wk} value={wk}>
-                  {weekLabel(monday)}
-                </option>
-              );
-            })}
-          </SelectField>
-          <Button
-            type="button"
-            size="small"
-            variant="ghost"
-            onClick={requestMoveAllUnfinishedToCurrentWeek}
-            disabled={movableUnfinishedCount === 0}
-          >
-            Move all unfinished to current week ({movableUnfinishedCount})
-          </Button>
+          {!isResourceView ? (
+            <>
+              <SelectField
+                className="week-select"
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(e.target.value)}
+              >
+                {availableWeeks.map((wk) => {
+                  const monday = new Date(wk + "T00:00:00");
+                  return (
+                    <option key={wk} value={wk}>
+                      {weekLabel(monday)}
+                    </option>
+                  );
+                })}
+              </SelectField>
+              <Button
+                type="button"
+                size="small"
+                variant="ghost"
+                onClick={requestMoveAllUnfinishedToCurrentWeek}
+                disabled={movableUnfinishedCount === 0}
+              >
+                Move all unfinished to current week ({movableUnfinishedCount})
+              </Button>
+            </>
+          ) : null}
         </PageControls>
       }
     >
@@ -2523,7 +2676,22 @@ export default function MembersPage({
         <EmptyState>No members found in Firestore.</EmptyState>
       )}
 
-      {memberViewMode === "project" ? (
+      {memberViewMode === "resources" ? (
+        projectsWithResources.length > 0 ? (
+          <CollectionLayout variant="board" className="backlog-grid">
+            {projectsWithResources.map((project) => (
+              <ProjectResourcesCard
+                key={project.id}
+                project={project}
+                resources={resourcesByProject[project.id] || []}
+                members={visibleMembers}
+              />
+            ))}
+          </CollectionLayout>
+        ) : (
+          <EmptyState>No project resources found.</EmptyState>
+        )
+      ) : memberViewMode === "project" ? (
         <CollectionLayout variant="board" className="backlog-grid">
           {sortedProjectsForView.map((project) => (
             <ProjectGroupCard
