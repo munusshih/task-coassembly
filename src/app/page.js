@@ -36,6 +36,7 @@ import PayoutsPage from "./components/PayoutsPage";
 import ResourcesPage from "./components/ResourcesPage";
 import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
+import PageGuide from "./components/PageGuide";
 
 const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
 const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
@@ -760,6 +761,7 @@ export default function Home() {
         allowedTabs={allowedTabs}
       />
       <div className="page-main">
+        <PageGuide tabKey={activeTab} />
         <section className="page-content" key={activeTab} data-dir={slideDir}>
           {renderPage()}
         </section>

@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import "driver.js/dist/driver.css";
 import { Analytics } from "@vercel/analytics/react";
 
 const sentient = localFont({
@@ -25,7 +26,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${sentient.variable} ${sponact.variable}`}>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         {process.env.NODE_ENV === "production" ? <Analytics /> : null}
       </body>
