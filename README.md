@@ -103,3 +103,26 @@ They remain server-side only (do not use `NEXT_PUBLIC_` prefix).
 - Document editing is raw JSON overwrite, not a form UI.
 - No Firebase data is deleted unless you explicitly delete a document from the page.
 - The repo is plain JavaScript now; TypeScript and lint tooling were removed to keep it minimal.
+
+## Shareable views
+
+Navigation uses readable, stable paths:
+
+- `/tasks?week=2026-10-12` pins the Task board to a specific week. Add `&view=project` for project grouping.
+- `/projects/PROJECT_ID` opens a project. `/projects?view=kanban` opens the board.
+- `/notes/NOTE_ID` opens a note, including older notes outside the recent list.
+- `/finance?year=2026&view=person` selects a year and view.
+
+Only nondefault controls for the current tab appear in the query (`view`, `q`, `group`, `layout`, `year`, `quarter`, `category`). Task weeks are always explicit so links stay on the same date when opened later. Opening a note drops list filters. Switching tabs drops the previous tab’s filters. IDs remain complete and stable when titles change.
+
+The URL schema lives in `src/app/lib/viewUrl.mjs`, with no shortening service or lookup database. Previous `/?tab=...` links still work and are normalized with `replaceState`. Back/Forward and refresh restore the view; typing in search replaces history. Navigation links support opening in a new tab. Login retains the destination and existing access checks still apply. Drafts and edit mode remain local.
+
+Run URL regression checks with `npm test`.
+
+### Fixed short share links
+
+**Copy link** (sidebar or note dialog) saves a view under `/s/<16-character-id>`. IDs derive from a versioned SHA-256 digest of the normalized destination. Identical views reuse one record, and a transaction verifies the full destination before reusing an ID. Saved records are immutable. Navigation itself performs no share writes.
+
+The resolver requires login and opens the saved destination with existing data permissions. Invalid, missing, unsupported, and inaccessible links show a recoverable error. Clipboard failures reveal a selectable link; storage failures keep the readable address-bar URL available. Private query parameters and fragments are excluded. Saved views have no automatic expiry.
+
+Deploy the `sharedViews` rules in `firestore.rules` with the app before using production short links. The app uses the existing Firebase client and needs no additional service or dependency.

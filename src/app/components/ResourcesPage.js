@@ -1,5 +1,6 @@
 "use client";
 
+import useUrlState from "../hooks/useUrlState";
 import { useEffect, useState, useMemo, useRef } from "react";
 import {
   subscribeCollectionQuery,
@@ -34,7 +35,6 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const POSITIONS_KEY = "coassembly-resources-positions-v1";
-const VIEW_MODE_KEY = "coassembly-resources-view-mode-v1";
 const FREE_CARD_W = 220;
 const FREE_CARD_H = 210;
 
@@ -51,10 +51,6 @@ function savePositions(pos) {
   try {
     window.localStorage.setItem(POSITIONS_KEY, JSON.stringify(pos));
   } catch {}
-}
-function loadViewMode() {
-  if (typeof window === "undefined") return "category";
-  return window.localStorage.getItem(VIEW_MODE_KEY) || "category";
 }
 function defaultFreePos(index) {
   const cols = 4;
@@ -434,14 +430,9 @@ export default function ResourcesPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [pendingDelete, setPendingDelete] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState(() => loadViewMode());
+  const [searchQuery, setSearchQuery] = useUrlState("resourcesSearch", "", { replace: true });
+  const [viewMode, setViewMode] = useUrlState("resourcesView", "category", { allowed: ["category", "free"] });
   const [positions, setPositions] = useState(() => loadPositions());
-
-  useEffect(() => {
-    if (typeof window !== "undefined")
-      window.localStorage.setItem(VIEW_MODE_KEY, viewMode);
-  }, [viewMode]);
 
   function handlePositionChange(id, pos) {
     setPositions((prev) => {

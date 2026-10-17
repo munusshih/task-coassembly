@@ -1,5 +1,7 @@
 "use client";
 
+import ShareViewButton from "./ShareViewButton";
+import { viewHref } from "../lib/viewUrl.mjs";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import {
@@ -61,13 +63,18 @@ export default function Navigation({
             if (allowed && !allowed.has(tab.key)) return false;
             return true;
           }).map((tab) => (
-            <button
+            <a
               key={tab.key}
-              type="button"
+              href={viewHref(tab.key)}
+              aria-current={tab.key === activeTab ? "page" : undefined}
               className={
                 tab.key === activeTab ? "nav-tab nav-tab--active" : "nav-tab"
               }
-              onClick={() => onTabChange(tab.key)}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                onTabChange(tab.key);
+              }}
             >
               <span className="nav-tab-icon">
                 <tab.Icon />
@@ -76,11 +83,12 @@ export default function Navigation({
               {(commentCounts[tab.key] || 0) > 0 && (
                 <span className="nav-tab-count">{commentCounts[tab.key]}</span>
               )}
-            </button>
+            </a>
           ))}
         </div>
 
         <div className="nav-footer">
+          <ShareViewButton />
           <div
             className="nav-presence-total"
             title={`${viewers.length} viewer${viewers.length === 1 ? "" : "s"}`}

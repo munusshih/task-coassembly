@@ -5,6 +5,21 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Saved views are immutable. A link never grants access to its target data.
+    match /sharedViews/{viewId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && viewId.matches('^[A-Za-z0-9_-]{16}$')
+        && request.resource.data.keys().hasOnly(['version', 'destination', 'createdBy', 'createdAt'])
+        && request.resource.data.version == 1
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.destination is string
+        && request.resource.data.destination.size() <= 2048
+        && request.resource.data.destination.matches('^/(tasks|members|projects|wishes|finance|requests|notes|resources)(/|[?]|$).*');
+      allow update, delete: if false;
+    }
+
     match /members/{document=**} {
       allow read, write: if signedIn();
     }

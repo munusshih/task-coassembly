@@ -25,6 +25,7 @@ import {
   normalizeMemberRoleValue,
   normalizeEmailValue,
 } from "../authAccess";
+import useUrlState, { updateUrlState } from "./hooks/useUrlState";
 import Navigation from "./components/Navigation";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
@@ -38,7 +39,6 @@ import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
 import PageGuide from "./components/PageGuide";
 
-const ACTIVE_TAB_KEY = "coassembly-active-tab-v1";
 const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
@@ -195,7 +195,7 @@ function loadStylePrefsFromStorage() {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("members");
+  const [activeTab, setActiveTab] = useUrlState("tab", "members", { allowed: TAB_ORDER });
   const [slideDir, setSlideDir] = useState("right");
   const [authReady, setAuthReady] = useState(false);
   const [currentMember, setCurrentMember] = useState(null);
@@ -229,7 +229,7 @@ export default function Home() {
         setCurrentMember(null);
         setAuthReady(true);
         if (typeof window !== "undefined") {
-          window.location.assign("/login");
+          window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         }
         return;
       }
@@ -352,35 +352,11 @@ export default function Home() {
   }, [authReady, currentMember]);
 
   useEffect(() => {
-    if (isAdmin) return;
-    if (activeTab === "memberDirectory") {
-      setActiveTab("members");
+    if (!authReady || !currentMember) return;
+    if (!allowedTabs.includes(activeTab) || (activeTab === "memberDirectory" && !isAdmin)) {
+      updateUrlState({ tab: "members" }, { replace: true });
     }
-  }, [activeTab, isAdmin]);
-
-  useEffect(() => {
-    if (allowedTabs.includes(activeTab)) return;
-    setActiveTab("members");
-  }, [activeTab, allowedTabs]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const storedTab = window.localStorage.getItem(ACTIVE_TAB_KEY);
-      if (storedTab) setActiveTab(storedTab);
-    } catch {
-      // Ignore storage read failures.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-    } catch {
-      // Ignore storage write failures.
-    }
-  }, [activeTab]);
+  }, [authReady, currentMember, activeTab, allowedTabs, isAdmin, setActiveTab]);
 
   useEffect(() => {
     const loaded = loadStylePrefsFromStorage();

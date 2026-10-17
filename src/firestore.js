@@ -155,3 +155,14 @@ export async function deleteDocumentsWhereBefore(
   await Promise.all(snapshot.docs.map((row) => deleteDoc(row.ref)));
   return snapshot.docs.length;
 }
+
+export function subscribeDocument(collectionName, id, onData) {
+  return onSnapshot(
+    doc(getDb(), collectionName, id),
+    (snapshot) => onData(snapshot.exists() ? { id: snapshot.id, data: snapshot.data() } : null),
+    (error) => {
+      onData(null);
+      console.warn(`Firestore subscription failed for document "${collectionName}/${id}".`, error);
+    },
+  );
+}

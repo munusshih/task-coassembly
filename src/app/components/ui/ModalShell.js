@@ -2,6 +2,7 @@
 
 export default function ModalShell({
   title,
+  headerActions,
   onClose,
   children,
   footer,
@@ -51,6 +52,7 @@ export default function ModalShell({
         {(title || onClose) && (
           <div className="edit-modal-header">
             <span className="edit-modal-title">{title}</span>
+            {headerActions}
             {onClose ? (
               <button
                 type="button"

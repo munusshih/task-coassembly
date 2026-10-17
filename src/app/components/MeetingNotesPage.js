@@ -1,5 +1,7 @@
 "use client";
 
+import ShareViewButton from "./ShareViewButton";
+import useUrlState, { isDocumentId } from "../hooks/useUrlState";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -14,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import {
   subscribeCollection,
+  subscribeDocument,
   subscribeCollectionQuery,
   createDocument,
   updateDocument,
@@ -274,7 +277,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [newProjectId, setNewProjectId] = useState("");
   const [newRoles, setNewRoles] = useState(() => emptyRoleAssignments());
 
-  const [viewingId, setViewingId] = useState(null);
+  const [viewingId, setViewingId] = useUrlState("note", null, { validate: isDocumentId });
+  const [linkedNote, setLinkedNote] = useState(null);
+  const [loadedNoteId, setLoadedNoteId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
   const [editMeta, setEditMeta] = useState(() => emptyEditMeta());
@@ -286,9 +291,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const editEmojiTriggerRef = useRef(null);
   const editEmojiPopoverRef = useRef(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [groupMode, setGroupMode] = useState("date");
-  const [notesLayout, setNotesLayout] = useState("grid");
+  const [searchQuery, setSearchQuery] = useUrlState("notesSearch", "", { replace: true });
+  const [groupMode, setGroupMode] = useUrlState("notesGroup", "date", { allowed: ["date", "project"] });
+  const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "grid", { allowed: ["grid", "shelf"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [notePresenceRows, setNotePresenceRows] = useState([]);
@@ -301,6 +306,20 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [resources, setResources] = useState([]);
+
+  useEffect(() => {
+    setLinkedNote(null);
+    if (!firebaseReady || !viewingId) return;
+    return subscribeDocument("meetingNotes", viewingId, (note) => {
+      setLinkedNote(note);
+      setLoadedNoteId(viewingId);
+    });
+  }, [viewingId]);
+
+  useEffect(() => {
+    // History navigation leaves the editor and restores the linked read view.
+    if (editingId && editingId !== viewingId) setEditingId(null);
+  }, [viewingId, editingId]);
 
   useEffect(() => {
     editSelectionRef.current = {
@@ -1468,8 +1487,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       : groupedNotesByProject.length;
 
   const activeNote = useMemo(
-    () => notes.find((note) => note.id === viewingId) || null,
-    [notes, viewingId],
+    () => notes.find((note) => note.id === viewingId) ||
+      (linkedNote?.id === viewingId ? linkedNote : null),
+    [notes, viewingId, linkedNote],
   );
   const activeEditors = useMemo(() => {
     if (!activeNote?.id) return [];
@@ -1711,9 +1731,18 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         )}
       </CollectionLayout>
 
+      {viewingId && !activeNote && (
+        <ModalShell title="Note details" onClose={() => setViewingId(null)}>
+          <p>{loadedNoteId === viewingId
+            ? "This note is unavailable. It may have been deleted or you may not have access."
+            : "Loading note…"}</p>
+        </ModalShell>
+      )}
+
       {activeNote && (
         <ModalShell
           title={editingId === activeNote.id ? "Edit note" : "Note details"}
+          headerActions={<ShareViewButton compact />}
           size="lg"
           className="note-detail-modal"
           onClose={() => {

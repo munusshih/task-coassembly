@@ -1,5 +1,6 @@
 "use client";
 
+import useUrlState, { isDateKey, updateUrlState } from "../hooks/useUrlState";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   subscribeCollection,
@@ -61,7 +62,6 @@ const TODO_TYPE = "memberTodo";
 const UNIT_OPTIONS = Array.from({ length: 40 }, (_, i) => i + 1);
 
 const TASK_BOARD_CACHE_KEY = "coassembly-task-board-cache-v1";
-const TASK_BOARD_WEEK_KEY = "coassembly-task-board-week-v1";
 const MEMBER_DRAFT_PREFIX = "coassembly-member-draft-v1";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
@@ -1799,8 +1799,8 @@ export default function MembersPage({
   const [allTasks, setAllTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [toasts, setToasts] = useState([]);
-  const [selectedWeek, setSelectedWeek] = useState(() => currentWeekKey());
-  const [memberViewMode, setMemberViewMode] = useState("member");
+  const [selectedWeek, setSelectedWeek] = useUrlState("week", currentWeekKey, { validate: isDateKey });
+  const [memberViewMode, setMemberViewMode] = useUrlState("taskView", "member", { allowed: ["member", "project", "resources"] });
   const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
   const [actionConfirm, setActionConfirm] = useState(null);
   const createInFlightRef = useRef(false);
@@ -1822,11 +1822,6 @@ export default function MembersPage({
         ),
       );
     if (cached.projects.length) setProjects(cached.projects);
-
-    const storedWeek = readLocalJSON(TASK_BOARD_WEEK_KEY, null);
-    if (typeof storedWeek === "string") {
-      setSelectedWeek(storedWeek);
-    }
   }, [hasSharedData]);
 
   useEffect(() => {
@@ -1865,13 +1860,9 @@ export default function MembersPage({
   }, [members, allTasks, projects]);
 
   useEffect(() => {
-    writeLocalJSON(TASK_BOARD_WEEK_KEY, selectedWeek);
-  }, [selectedWeek]);
-
-  useEffect(() => {
     if (!isLimitedViewer) return;
     if (memberViewMode !== "member") {
-      setMemberViewMode("member");
+      updateUrlState({ taskView: "member" }, { replace: true });
     }
   }, [isLimitedViewer, memberViewMode]);
 
@@ -2003,12 +1994,12 @@ export default function MembersPage({
 
   // Always offer the two editable weeks, plus older weeks that have tasks.
   const availableWeeks = useMemo(() => {
-    const weeks = new Set([currentWeekKey(), previousWeekKey()]);
+    const weeks = new Set([currentWeekKey(), previousWeekKey(), selectedWeek]);
     for (const t of visibleTasks) {
       weeks.add(taskWeekKey(t.data));
     }
     return [...weeks].sort().reverse(); // newest first
-  }, [visibleTasks]);
+  }, [visibleTasks, selectedWeek]);
 
   const movableUnfinishedCount = useMemo(() => {
     const targetWeek = currentWeekKey();
@@ -2016,13 +2007,6 @@ export default function MembersPage({
       isUnfinishedTaskOutsideWeek(task.data, targetWeek),
     ).length;
   }, [visibleTasks]);
-
-  useEffect(() => {
-    if (!availableWeeks.length) return;
-    if (!availableWeeks.includes(selectedWeek)) {
-      setSelectedWeek(availableWeeks[0]);
-    }
-  }, [availableWeeks, selectedWeek]);
 
   function addToast(msg, isError = false) {
     const id = Date.now() + Math.random();

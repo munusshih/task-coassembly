@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "auth:hash": "node scripts/generate-auth-accounts.mjs"
+    "auth:hash": "node scripts/generate-auth-accounts.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

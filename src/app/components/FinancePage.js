@@ -1,5 +1,6 @@
 "use client";
 
+import useUrlState, { updateUrlState } from "../hooks/useUrlState";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCollection } from "../../firestore";
 import { firebaseReady } from "../../firebase";
@@ -2023,10 +2024,10 @@ export default function FinancePage() {
   const [categoryProjectMap, setCategoryProjectMap] = useState(() =>
     readLocalJSON("finance-category-project-map-v1", {}),
   );
-  const [selectedQuarter, setSelectedQuarter] = useState("overall");
-  const [financeMainView, setFinanceMainView] = useState("project");
-  const [financeCategoryTab, setFinanceCategoryTab] = useState("projects");
-  const [selectedYear, setSelectedYear] = useState("overall");
+  const [selectedQuarter, setSelectedQuarter] = useUrlState("quarter", "overall", { validate: (value) => value === "overall" || /^\d{4}-Q[1-4]$/.test(value) });
+  const [financeMainView, setFinanceMainView] = useUrlState("financeView", "project", { allowed: ["project", "person"] });
+  const [financeCategoryTab, setFinanceCategoryTab] = useUrlState("financeCategory", "projects", { allowed: ["projects", "non-projects"] });
+  const [selectedYear, setSelectedYear] = useUrlState("year", "overall", { validate: (value) => value === "overall" || /^\d{4}$/.test(value) });
   const [mappingEditorCategory, setMappingEditorCategory] = useState("");
   const [loadingActual, setLoadingActual] = useState(false);
   const [status, setStatus] = useState("");
@@ -2270,12 +2271,12 @@ export default function FinancePage() {
 
   useEffect(() => {
     if (
-      selectedYear !== "overall" &&
+      rawSheetValues && selectedYear !== "overall" &&
       !allYears.includes(Number(selectedYear))
     ) {
-      setSelectedYear(allYears[0] ? String(allYears[0]) : "overall");
+      updateUrlState({ year: allYears[0] ? String(allYears[0]) : "overall" }, { replace: true });
     }
-  }, [allYears, selectedYear]);
+  }, [allYears, selectedYear, rawSheetValues]);
 
   const actualByYearMember = useMemo(() => {
     const map = {};
@@ -2502,12 +2503,12 @@ export default function FinancePage() {
 
   useEffect(() => {
     if (
-      selectedQuarter !== "overall" &&
+      rawSheetValues && selectedQuarter !== "overall" &&
       !quarterOptions.includes(selectedQuarter)
     ) {
-      setSelectedQuarter("overall");
+      updateUrlState({ quarter: "overall" }, { replace: true });
     }
-  }, [quarterOptions, selectedQuarter]);
+  }, [quarterOptions, selectedQuarter, rawSheetValues]);
 
   const dashboard = useMemo(
     () =>

@@ -1,5 +1,6 @@
 "use client";
 
+import useUrlState from "../hooks/useUrlState";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
@@ -695,7 +696,7 @@ export default function BacklogPage({ viewerName = "" }) {
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useUrlState("wishesSearch", "", { replace: true });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [sessionChecked, setSessionChecked] = useState(false);

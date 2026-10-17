@@ -992,6 +992,7 @@ input[type="radio"] {
 }
 
 .nav-tab {
+  text-decoration: none;
   position: relative;
   width: 100%;
   border: 1px solid transparent;
@@ -8502,3 +8503,10 @@ input[type="radio"] {
   color: #222;
   box-sizing: border-box;
 }
+
+.share-view { width: 100%; text-align: center; }
+.share-view-status { display: block; font-size: 11px; color: var(--text-subtle); overflow-wrap: anywhere; }
+.share-view input { width: 100%; min-width: 0; font-size: 11px; }
+
+.share-view--compact { width: auto; margin-left: auto; }
+.share-view--compact .share-view-status { max-width: 240px; }

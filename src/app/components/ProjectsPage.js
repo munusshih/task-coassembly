@@ -1,5 +1,6 @@
 "use client";
 
+import useUrlState from "../hooks/useUrlState";
 import { useEffect, useState, useMemo } from "react";
 import {
   subscribeCollection,
@@ -634,6 +635,8 @@ function SelfFundingEdit({ selfFunding, members, onChange }) {
 
 function ProjectRow({
   project,
+  focusedProject,
+  onFocusProject,
   allTasks,
   members,
   onSave,
@@ -641,7 +644,13 @@ function ProjectRow({
   onDelete,
 }) {
   const d = project.data;
-  const [open, setOpen] = useState(false);
+  const open = focusedProject === project.id;
+  function setOpen(next) {
+    onFocusProject((previous) => {
+      const isOpen = previous === project.id;
+      return (typeof next === "function" ? next(isOpen) : next) ? project.id : "";
+    });
+  }
   const [editing, setEditing] = useState(false);
 
   // Normalize Firebase data to our form shape
@@ -2023,7 +2032,8 @@ export default function ProjectsPage({
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toasts, setToasts] = useState([]);
-  const [viewMode, setViewMode] = useState("list");
+  const [focusedProject, setFocusedProject] = useUrlState("project", "");
+  const [viewMode, setViewMode] = useUrlState("projectView", "list", { allowed: ["list", "kanban"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [completeTarget, setCompleteTarget] = useState(null);
   const [completingProjectId, setCompletingProjectId] = useState(null);
@@ -2537,6 +2547,8 @@ export default function ProjectsPage({
                 <ProjectRow
                   key={p.id}
                   project={p}
+                  focusedProject={focusedProject}
+                  onFocusProject={setFocusedProject}
                   allTasks={visibleTasks}
                   members={members}
                   onSave={handleSave}
