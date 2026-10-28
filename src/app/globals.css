@@ -8586,3 +8586,10 @@ sub, sup { font-size: var(--type-body); }
 .member-profile-details { display: grid; justify-items: start; gap: 16px; }
 .member-profile-details dl { display: grid; grid-template-columns: auto 1fr; gap: 12px 24px; margin: 0; }
 .member-profile-details dd { margin: 0; overflow-wrap: anywhere; }
+.member-avatar { width: 160px; height: 160px; flex-basis: 160px; font-size: 60px; margin-bottom: 16px; }
+.member-role-row .member-tenure { font-size: 20px; line-height: 1.35; margin: 4px 0; max-width: 240px; }
+.member-milestones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.member-role-row .member-milestones .metadata-pill { font-size: 16px; line-height: 1.5; }
+.member-milestone--soon { border: 1px dashed #000; }
+.member-profile-details .member-avatar { width: 200px; height: 200px; flex-basis: 200px; }
+@media (max-width: 600px) { .member-avatar { width: 128px; height: 128px; flex-basis: 128px; } }

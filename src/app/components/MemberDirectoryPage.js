@@ -3,6 +3,8 @@
 
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import TaskClockIcon from "./ui/TaskClockIcon";
+import MemberMilestones from "./ui/MemberMilestones";
+import { calendarDate, tenureText } from "./memberMilestones.mjs";
 import MemberAvatar from "./ui/MemberAvatar";
 import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
@@ -409,6 +411,9 @@ function emptyMemberForm() {
     email: "",
     timezone: "",
     joinedOn: "",
+    birthday: "",
+    leftOn: "",
+    photoURL: "",
     notes: "",
     active: true,
   };
@@ -445,6 +450,9 @@ function buildFormFromMember(memberData) {
       typeof memberData.timezone === "string" ? memberData.timezone : "",
     joinedOn:
       typeof memberData.joinedOn === "string" ? memberData.joinedOn : "",
+    birthday: memberData.birthday || "",
+    leftOn: memberData.leftOn || "",
+    photoURL: memberData.photoURL || "",
     notes: typeof memberData.notes === "string" ? memberData.notes : "",
     active: memberData.active !== false,
   };
@@ -466,6 +474,11 @@ export default function MemberDirectoryPage() {
   const [projects, setProjects] = useState([]);
   const [newMember, setNewMember] = useState(() => emptyMemberForm());
   const [expandedMembers, setExpandedMembers] = useState({});
+  const [today, setToday] = useState(() => calendarDate());
+  useEffect(() => {
+    const timer = setInterval(() => setToday(calendarDate()), 60000);
+    return () => clearInterval(timer);
+  }, []);
   const [profileId, setProfileId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(() => emptyMemberForm());
@@ -712,6 +725,9 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: newMember.timezone.trim(),
         joinedOn: newMember.joinedOn || monthKeyFromTs(now) + "-01",
+        birthday: newMember.birthday || null,
+        leftOn: newMember.leftOn || null,
+        photoURL: newMember.photoURL.trim() || null,
         notes: newMember.notes.trim(),
         active: Boolean(newMember.active),
         meetingAttendance: {},
@@ -745,6 +761,10 @@ export default function MemberDirectoryPage() {
   async function saveEdit(member) {
     const name = editDraft.name.trim();
     if (!name) return;
+    if (editDraft.leftOn && editDraft.joinedOn && editDraft.leftOn < editDraft.joinedOn) {
+      setNotice({ error: true, text: "The leaving date must be on or after the join date." });
+      return;
+    }
     const now = Date.now();
     const email = normalizeEmailValue(editDraft.email);
     const alsoKnownAs = normalizeAlsoKnownAs(editDraft.aliases);
@@ -758,6 +778,9 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: editDraft.timezone.trim(),
         joinedOn: editDraft.joinedOn || null,
+        birthday: editDraft.birthday || null,
+        leftOn: editDraft.leftOn || null,
+        photoURL: editDraft.photoURL.trim() || null,
         notes: editDraft.notes.trim(),
         active: Boolean(editDraft.active),
         updatedAt: now,
@@ -1172,9 +1195,11 @@ export default function MemberDirectoryPage() {
         <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
         <h3>{name}</h3>
         {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
+        <p className="member-tenure">{tenureText(member.data || {}, today)}</p>
         <button className="member-joined-edit" type="button" onClick={() => startEdit(member)} aria-label={`Edit join date for ${name}`}>
           Joined {joined ? new Date(`${joined}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'date not set'} <span aria-hidden="true">↗</span>
         </button>
+        <MemberMilestones member={member} today={today} />
       </div>
       <div className="member-role-projects">
         <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
@@ -1302,11 +1327,17 @@ export default function MemberDirectoryPage() {
                     type="date"
                     className="member-form-input"
                     value={newMember.joinedOn}
+                onInput={event => updateNewMemberField("joinedOn", event.target.value)}
+                onBlur={event => updateNewMemberField("joinedOn", event.target.value)}
                     onChange={(e) =>
                       updateNewMemberField("joinedOn", e.target.value)
                     }
                   />
                 </label>
+            <label className="member-form-field"><span>Birthday</span><InputField type="date" className="member-form-input" value={newMember.birthday} onInput={event => updateNewMemberField("birthday", event.target.value)} onBlur={event => updateNewMemberField("birthday", event.target.value)} onChange={event => updateNewMemberField("birthday", event.target.value)} /></label>
+            <label className="member-form-field"><span>Left on (inactive members)</span><InputField type="date" className="member-form-input" value={newMember.leftOn} onInput={event => updateNewMemberField("leftOn", event.target.value)} onBlur={event => updateNewMemberField("leftOn", event.target.value)} min={newMember.joinedOn || undefined} onChange={event => updateNewMemberField("leftOn", event.target.value)} /></label>
+            <label className="member-form-field"><span>Profile photo URL</span><InputField type="url" className="member-form-input" value={newMember.photoURL} onChange={event => updateNewMemberField("photoURL", event.target.value)} /></label>
+
                 <label className="member-form-field member-form-field--toggle">
                   <input
                     type="checkbox"
@@ -1347,7 +1378,9 @@ export default function MemberDirectoryPage() {
         <div className="member-profile-details">
           <MemberAvatar member={profileMember} onClick={() => { startEdit(profileMember); setProfileId(null); }} />
           <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
-          <dl><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
+          <p className="member-tenure">{tenureText(profileMember.data || {}, today)}</p>
+          <MemberMilestones member={profileMember} today={today} />
+          <dl><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
           {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
         </div>
       </ModalShell>}
@@ -1432,9 +1465,15 @@ export default function MemberDirectoryPage() {
                 type="date"
                 className="member-form-input"
                 value={editDraft.joinedOn}
+                onInput={event => updateEditField("joinedOn", event.target.value)}
+                onBlur={event => updateEditField("joinedOn", event.target.value)}
                 onChange={(e) => updateEditField("joinedOn", e.target.value)}
               />
             </label>
+            <label className="member-form-field"><span>Birthday</span><InputField type="date" className="member-form-input" value={editDraft.birthday} onInput={event => updateEditField("birthday", event.target.value)} onBlur={event => updateEditField("birthday", event.target.value)} onChange={event => updateEditField("birthday", event.target.value)} /></label>
+            <label className="member-form-field"><span>Left on (inactive members)</span><InputField type="date" className="member-form-input" value={editDraft.leftOn} onInput={event => updateEditField("leftOn", event.target.value)} onBlur={event => updateEditField("leftOn", event.target.value)} min={editDraft.joinedOn || undefined} onChange={event => updateEditField("leftOn", event.target.value)} /></label>
+            <label className="member-form-field"><span>Profile photo URL</span><InputField type="url" className="member-form-input" value={editDraft.photoURL} onChange={event => updateEditField("photoURL", event.target.value)} /></label>
+
             <label className="member-form-field member-form-field--toggle">
               <input
                 type="checkbox"
