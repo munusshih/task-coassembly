@@ -1,0 +1,49 @@
+import { taskWeekKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToProject } from './taskBoardRules.js';
+
+export const WORK_CATEGORIES = [
+  { key: 'rd', label: 'R&D', tone: 'project' },
+  { key: 'work', label: 'Work · commercial', tone: 'worked' },
+  { key: 'admin', label: 'Admin', tone: 'date' },
+  { key: 'unclassified', label: 'Unclassified', tone: 'neutral' },
+];
+
+export function workCategory(kind) {
+  const value = String(kind || '').trim().toLowerCase();
+  if (['internal', 'self-funded', 'grant', 'rd', 'r&d'].includes(value)) return 'rd';
+  if (['commissioned', 'pass-through', 'commercial'].includes(value)) return 'work';
+  if (value === 'admin') return 'admin';
+  return 'unclassified';
+}
+
+// Allocation follows the Task board's Taipei week and never substitutes edits or
+// completion dates for the week the task was actually planned for.
+export function memberRoleMetrics(memberId, tasks, projects, now = Date.now()) {
+  const projectById = new Map(projects.map(p => [p.id, p]));
+  const start = weekStartDateForTs(now);
+  const weeks = Array.from({ length: 4 }, (_, index) => {
+    const date = new Date(start); date.setUTCDate(date.getUTCDate() - index * 7);
+    return { key: date.toISOString().slice(0, 10), units: 0, projects: new Map() };
+  });
+  const categories = Object.fromEntries(WORK_CATEGORIES.map(c => [c.key, 0]));
+  const current = new Map(projects.filter(p => !isProjectClosed(p) && isMemberAssignedToProject(p, memberId)).map(p => [p.id, p]));
+  for (const task of tasks) {
+    const data = task.data || {};
+    if (data.type !== 'memberTodo' || data.memberId !== memberId) continue;
+    const project = projectById.get(data.projectId);
+    if (project && !isProjectClosed(project) && !data.archived && !data.completed) current.set(project.id, project);
+    const week = weeks.find(w => w.key === taskWeekKey(data));
+    if (!week) continue;
+    const units = Math.max(0, Number(data.timeUnits) || 0);
+    const name = project?.data?.name || (data.projectId ? 'Unknown project' : 'No project');
+    week.units += units;
+    week.projects.set(name, (week.projects.get(name) || 0) + units);
+    categories[workCategory(project?.data?.kind)] += units;
+  }
+  const total = weeks.reduce((sum, w) => sum + w.units, 0);
+  return {
+    currentProjects: [...current.values()].sort((a, b) => String(a.data?.name || a.id).localeCompare(String(b.data?.name || b.id))),
+    weeks: weeks.map(w => ({ ...w, projects: [...w.projects].filter(([, units]) => units > 0).sort((a, b) => b[1] - a[1]) })),
+    categories: WORK_CATEGORIES.filter(c => c.key !== 'unclassified' || categories[c.key] > 0).map(c => ({ ...c, units: categories[c.key], percent: total ? categories[c.key] / total * 100 : 0 })),
+    total,
+  };
+}

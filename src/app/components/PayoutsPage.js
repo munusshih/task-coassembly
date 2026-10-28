@@ -120,7 +120,7 @@ function ThermalReceipt({ row, isAdmin, onApprove, onReject, onMarkPaid, onDelet
       <div className="thermal-paper">
 
         {/* store name / org header */}
-        <div className="thermal-org">CoAssembly</div>
+        <div className="thermal-org">Protocol</div>
         <div className="thermal-org-sub">Internal Request</div>
 
         <div className="thermal-rule" />

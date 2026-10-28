@@ -3,7 +3,7 @@ import "driver.js/dist/driver.css";
 import { Analytics } from "@vercel/analytics/react";
 
 export const metadata = {
-  title: "CoAssembly Task",
+  title: "Protocol",
   description: "Team management dashboard.",
 };
 

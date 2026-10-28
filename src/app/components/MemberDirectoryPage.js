@@ -2,6 +2,7 @@
 
 
 import WorkspacePageHero from "./ui/WorkspacePageHero";
+import { memberRoleMetrics } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
 import useUrlState from "../hooks/useUrlState";
 import { SERIES_COLORS } from "./ui/palette";
@@ -470,7 +471,6 @@ export default function MemberDirectoryPage() {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [rotationOpen, setRotationOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [memberTimeTabById, setMemberTimeTabById] = useState({});
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -737,9 +737,7 @@ export default function MemberDirectoryPage() {
     setExpandedMembers((prev) => ({ ...prev, [memberId]: !prev[memberId] }));
   }
 
-  function setMemberTimeTab(memberId, tab) {
-    setMemberTimeTabById((prev) => ({ ...prev, [memberId]: tab }));
-  }
+
 
   async function saveEdit(member) {
     const name = editDraft.name.trim();
@@ -942,7 +940,7 @@ export default function MemberDirectoryPage() {
             assigned: metric.assignedThisWeekCount,
             completed: metric.completedThisWeekCount,
           };
-          const timeTab = directoryView === "role" ? memberTimeTabById[member.id] || "weekly" : directoryView;
+          const timeTab = directoryView;
           const role = normalizeMemberRole(member?.data?.role);
           const meetingRequired = isWorkerOwner(role);
 
@@ -1066,35 +1064,6 @@ export default function MemberDirectoryPage() {
                     </div>
 
                     <div className="member-chart-section">
-                      <div className="member-time-tabs" role="tablist" aria-label="Time analytics view">
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={timeTab === "weekly"}
-                          className={
-                            timeTab === "weekly"
-                              ? "member-time-tab member-time-tab--active"
-                              : "member-time-tab"
-                          }
-                          onClick={() => setMemberTimeTab(member.id, "weekly")}
-                        >
-                          Weekly
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={timeTab === "overall"}
-                          className={
-                            timeTab === "overall"
-                              ? "member-time-tab member-time-tab--active"
-                              : "member-time-tab"
-                          }
-                          onClick={() => setMemberTimeTab(member.id, "overall")}
-                        >
-                          Overall
-                        </button>
-                      </div>
-
                       {timeTab === "weekly" ? (
                         <>
                           <span className="member-directory-meta-label">This week</span>
@@ -1190,6 +1159,38 @@ export default function MemberDirectoryPage() {
 
   }
 
+  function renderRoleMember(member) {
+    const metric = memberRoleMetrics(member.id, tasks, projects);
+    const name = member.data?.name || member.id;
+    const joined = member.data?.joinedOn;
+    return <article key={member.id} className="member-role-row">
+      <div className="member-role-identity">
+        <h3>{name}</h3>
+        {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
+        <button className="member-joined-edit" type="button" onClick={() => startEdit(member)} aria-label={`Edit join date for ${name}`}>
+          Joined {joined ? new Date(`${joined}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'date not set'} <span aria-hidden="true">↗</span>
+        </button>
+        <IconButton onClick={() => startEdit(member)} title={`Edit ${name}`}>{EDIT_ICON}</IconButton>
+      </div>
+      <div className="member-role-projects">
+        <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
+        <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone="project">{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
+        <h4>Work mix</h4>
+        <div className="member-work-mix" aria-label={`Allocated work mix for ${name}`}>{metric.categories.filter(c => c.percent > 0).map(c => <span key={c.key} style={{ width: `${c.percent}%`, background: `var(--workspace-${c.tone})` }} title={`${c.label}: ${Math.round(c.percent)}%`} />)}</div>
+        <div className="member-role-pills">{metric.categories.map(c => <MetadataPill key={c.key} tone={c.tone}>{c.label} {Math.round(c.percent)}%</MetadataPill>)}</div>
+        <p className="member-role-caption">Based on allocated time over these four weeks.</p>
+      </div>
+      <div className="member-role-history">
+        <h4>Last four weeks <MetadataPill tone="planned">{formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
+        <p className="member-role-caption">Current week and the previous three</p>
+        {metric.weeks.map(week => <div key={week.key} className="member-role-week">
+          <div className="member-role-week-heading"><span>{formatWeekKeyLabel(week.key)}</span><strong>{formatUnitsAsHours(week.units)}</strong></div>
+          <div className="member-role-pills">{week.projects.length ? week.projects.map(([project, units]) => <MetadataPill key={project} tone="planned">{project} · {formatUnitsAsHours(units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
+        </div>)}
+      </div>
+    </article>;
+  }
+
   const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
 
   return (
@@ -1215,7 +1216,7 @@ export default function MemberDirectoryPage() {
       {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : directoryView === "role" ? (
         <div className="member-role-sections">{MEMBER_TYPE_OPTIONS.map((option) => {
           const group = membersSorted.filter((member) => normalizeMemberRole(member.data.role) === option.value);
-          return group.length ? <section key={option.value} className="member-role-section"><div className="member-role-heading"><h2>{option.label}s</h2><span className="task-scope-count">{group.length}</span></div><CollectionLayout variant="grid" className="member-directory-list">{group.map(renderDirectoryMember)}</CollectionLayout></section> : null;
+          return group.length ? <section key={option.value} className="member-role-section"><div className="member-role-heading"><h2>{option.label}s</h2><span className="task-scope-count">{group.length}</span></div><CollectionLayout variant="grid" className="member-role-list">{group.map(renderRoleMember)}</CollectionLayout></section> : null;
         })}</div>
       ) : <CollectionLayout variant="grid" className="member-directory-list">{directoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
 

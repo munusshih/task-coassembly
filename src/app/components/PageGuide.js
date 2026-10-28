@@ -111,17 +111,11 @@ const PAGE_GUIDES = {
         ),
       },
       {
-        element: ".member-directory-page .member-directory-card--open",
-        reveal: {
-          trigger:
-            ".member-directory-page .member-directory-card-actions button[aria-expanded]",
-          openSelector:
-            ".member-directory-page .member-directory-card--open",
-        },
+        element: ".member-directory-page .member-role-row, .member-directory-page .member-directory-card",
         title: copy("Read capacity and project history", "查看工作量與專案紀錄"),
         description: copy(
-          "Each member card summarizes current workload and assignments. Expand a card for weekly and overall task metrics, project history, role details, and edit controls.",
-          "每張成員卡會摘要目前工作量與任務分配。展開後可查看每週及整體任務數據、專案紀錄、角色資訊與編輯控制。",
+          "Each row shows a person’s editable join date, current projects, and four weeks of allocated time. The work mix compares R&D, commercial work, and admin. Switch the page selector for weekly or overall history.",
+          "每列顯示成員可編輯的加入日期、目前專案與近四週配置工時，並比較研發、商業工作及行政的比例。使用頁面選單切換每週或整體紀錄。",
         ),
         side: "top",
       },
@@ -236,8 +230,8 @@ const PAGE_GUIDES = {
   finance: {
     title: copy("Finance", "財務"),
     intro: copy(
-      "Hi—welcome to CoAssembly’s financial picture! This page compares accountant-recorded cash flow with project forecasts so the team can understand what should be received, paid, retained, or reconciled.",
-      "嗨，歡迎查看 CoAssembly 的財務全貌！這個頁面會比較會計帳上的實際現金流與專案預測，讓團隊理解應收、應付、保留與待核對的金額。",
+      "Hi—welcome to Protocol’s financial picture! This page compares accountant-recorded cash flow with project forecasts so the team can understand what should be received, paid, retained, or reconciled.",
+      "嗨，歡迎查看 Protocol 的財務全貌！這個頁面會比較會計帳上的實際現金流與專案預測，讓團隊理解應收、應付、保留與待核對的金額。",
     ),
     outro: copy(
       "You’re ready! Refresh from the accounting sheet first, resolve unmatched categories, and only then compare expected versus actual project and member payouts.",

@@ -8554,3 +8554,26 @@ sub, sup { font-size: var(--type-body); }
 }
 .member-directory-page .task-view-picker .task-view-selector:hover { color: #555; border-color: #555; }
 .member-directory-page .task-view-picker .task-view-selector option { font-size: 24px; letter-spacing: normal; }
+
+/* Role view: one person per row, with identity, current work and allocation. */
+.member-directory-page .member-role-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.member-role-row { display: grid; grid-template-columns: .7fr 1fr 1.3fr; gap: 36px; padding: 24px 0 32px; border-bottom: 1px solid #ddd; min-width: 0; }
+.member-role-row:last-child { border-bottom: 0; }
+.member-role-row h3 { margin: 0 0 12px; font-size: 32px; font-weight: 500; letter-spacing: -.03em; }
+.member-role-row h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 20px; font-weight: 500; }
+.member-role-row p { margin: 0; }
+.member-role-identity { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; }
+.member-joined-edit { border: 0; background: transparent; padding: 0; font: inherit; font-size: 18px; color: #000; text-align: left; cursor: pointer; }
+.member-joined-edit:hover { text-decoration: underline; }
+.member-role-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.member-role-projects > h4:not(:first-child) { margin-top: 24px; }
+.member-work-mix { display: flex; overflow: hidden; height: 12px; border-radius: 6px; margin: 0 0 10px; background: var(--workspace-neutral); }
+.member-role-row .member-role-caption { font-size: 16px; opacity: .55; margin-top: 8px; }
+.member-role-week { padding: 12px 0; }
+.member-role-week + .member-role-week { border-top: 1px solid #eee; }
+.member-role-week-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 18px; }
+.member-role-week-heading strong { font-weight: 500; }
+.member-role-row .metadata-pill { font-size: 16px; }
+@media (max-width: 900px) { .member-role-row { grid-template-columns: .7fr 1.3fr; gap: 24px; } .member-role-history { grid-column: 2; } }
+@media (max-width: 600px) { .member-role-row { grid-template-columns: minmax(0, 1fr); } .member-role-history { grid-column: auto; } }
+.member-role-row .task-scope-count { display: inline-grid; place-items: center; min-width: 25px; height: 25px; padding: 0 6px; border-radius: 50px; background: #000; color: #fff; font-size: 16px; }

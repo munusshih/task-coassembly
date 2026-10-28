@@ -585,7 +585,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">CoA</div>
+          <div className="splash-brand">Protocol</div>
           <div className="splash-dots" aria-hidden="true">
             <span />
             <span />
@@ -601,7 +601,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">CoA</div>
+          <div className="splash-brand">Protocol</div>
           <p className="splash-label">
             Sign in with your approved Google account to continue.
           </p>
