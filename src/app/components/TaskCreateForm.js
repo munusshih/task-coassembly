@@ -1,5 +1,6 @@
 "use client";
 
+import TaskClockIcon from "./ui/TaskClockIcon";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import SelectField from "./ui/SelectField";
@@ -7,10 +8,6 @@ import { DELETE_ICON, IconFolder } from "./icons";
 
 export function emptyTaskCreateDraft(projectId = "") {
   return { addTitle: "", addTime: "", addProject: projectId, addDeadline: "", addSubtasks: [], addLinks: [] };
-}
-
-function TaskClockIcon() {
-  return <span className="task-clock-icon" aria-hidden="true"><img src="/illustrations/clock.svg" alt="" /></span>;
 }
 
 export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: submitAdd, onCancel: cancelAdd, inputRef, projects: assignableProjects, remainingHint: addRemainingHint, unitOptions: UNIT_OPTIONS, formatUnitOption, members, assigneeId, onAssigneeChange }) {

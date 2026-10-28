@@ -1,12 +1,15 @@
 "use client";
 
 
+import AllocationClock from "./ui/AllocationClock";
+import MemberForm from "./MemberForm";
+import TaskCreateTrigger from "./TaskCreateTrigger";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import TaskClockIcon from "./ui/TaskClockIcon";
 import MemberMilestones from "./ui/MemberMilestones";
 import { calendarDate, tenureText } from "./memberMilestones.mjs";
 import MemberAvatar from "./ui/MemberAvatar";
-import { memberRoleMetrics, projectWorkTone, WORK_CATEGORIES } from "./memberRoleMetrics.mjs";
+import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
 import useUrlState from "../hooks/useUrlState";
 import { SERIES_COLORS } from "./ui/palette";
@@ -24,12 +27,9 @@ import { DELETE_ICON, EDIT_ICON } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
-import InputField from "./ui/InputField";
 import ModalShell from "./ui/ModalShell";
-import SelectField from "./ui/SelectField";
 import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
-import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
 import { normalizeEmailValue } from "../../authAccess";
@@ -412,6 +412,7 @@ function emptyMemberForm() {
     timezone: "",
     joinedOn: "",
     birthday: "",
+    pronouns: "",
     leftOn: "",
     photoURL: "",
     notes: "",
@@ -450,6 +451,7 @@ function buildFormFromMember(memberData) {
       typeof memberData.timezone === "string" ? memberData.timezone : "",
     joinedOn:
       typeof memberData.joinedOn === "string" ? memberData.joinedOn : "",
+    pronouns: memberData.pronouns || "",
     birthday: memberData.birthday || "",
     leftOn: memberData.leftOn || "",
     photoURL: memberData.photoURL || "",
@@ -479,6 +481,7 @@ export default function MemberDirectoryPage() {
     const timer = setInterval(() => setToday(calendarDate()), 60000);
     return () => clearInterval(timer);
   }, []);
+  const [highlightedMember, setHighlightedMember] = useState(null);
   const [profileId, setProfileId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(() => emptyMemberForm());
@@ -725,6 +728,7 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: newMember.timezone.trim(),
         joinedOn: newMember.joinedOn || monthKeyFromTs(now) + "-01",
+        pronouns: newMember.pronouns.trim(),
         birthday: newMember.birthday || null,
         leftOn: newMember.leftOn || null,
         photoURL: newMember.photoURL.trim() || null,
@@ -736,6 +740,7 @@ export default function MemberDirectoryPage() {
         updatedAt: now,
       });
       setNewMember(emptyMemberForm());
+      setAddMemberOpen(false);
       setNotice({ error: false, text: "Member added" });
     } catch (error) {
       setNotice({ error: true, text: error.message || "Could not add member" });
@@ -750,6 +755,12 @@ export default function MemberDirectoryPage() {
   function cancelEdit() {
     setEditingId(null);
     setEditDraft(emptyMemberForm());
+  }
+
+  function closeMemberEditor() {
+    cancelEdit();
+    if (addMemberOpen) setNewMember(emptyMemberForm());
+    setAddMemberOpen(false);
   }
 
   function toggleMemberExpanded(memberId) {
@@ -778,6 +789,7 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: editDraft.timezone.trim(),
         joinedOn: editDraft.joinedOn || null,
+        pronouns: editDraft.pronouns.trim(),
         birthday: editDraft.birthday || null,
         leftOn: editDraft.leftOn || null,
         photoURL: editDraft.photoURL.trim() || null,
@@ -985,6 +997,7 @@ export default function MemberDirectoryPage() {
                   <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
                   <h3 className="member-directory-card-name">
                     {member?.data?.name || member.id}
+                    {member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}
                   </h3>
                   <div className="member-directory-card-badges">
                     <MetadataPill tone={role === "worker-owner" ? "project" : role === "associate" ? "worked" : role === "flying-member" ? "date" : "planned"}>{roleLabel(role)}</MetadataPill>
@@ -1192,16 +1205,11 @@ export default function MemberDirectoryPage() {
 
   function renderMemberGroup(title, group, key) {
     if (!group.length) return null;
-    const totals = WORK_CATEGORIES.map(category => ({ ...category, units: group.reduce((sum, member) => sum + (roleMetricsById[member.id].categories.find(item => item.key === category.key)?.units || 0), 0) }));
-    const total = group.reduce((sum, member) => sum + roleMetricsById[member.id].total, 0);
     return <section key={key} className={`member-role-section${key === 'inactive' ? ' member-role-section--inactive' : ''}`}>
       <div className="member-role-heading"><h2>{title}</h2><span className="task-scope-count">{group.length}</span>
-        <div className="member-role-totals" aria-label={`${title} allocation totals for the last four weeks`}>
-          {totals.filter(category => category.key !== 'unclassified' || category.units > 0).map(category => <span key={category.key}>{category.label} <strong>{formatUnitsAsHours(category.units)}</strong></span>)}
-          <span className="member-role-total"><TaskClockIcon /> {formatUnitsAsHours(total)} allocated · 4 weeks</span>
-        </div>
+
       </div>
-      <CollectionLayout variant="grid" className={directoryView === 'role' ? 'member-role-list' : 'member-directory-list'}>{group.map(directoryView === 'role' ? renderRoleMember : renderDirectoryMember)}</CollectionLayout>
+      <CollectionLayout variant="grid" className={directoryView === 'role' ? 'member-role-list' : 'member-directory-list'}>{group.map(member => directoryView === 'role' || (member.data?.active === false && !roleMetricsById[member.id].total && !roleMetricsById[member.id].currentProjects.length) ? renderRoleMember(member) : renderDirectoryMember(member))}</CollectionLayout>
     </section>;
   }
 
@@ -1209,10 +1217,11 @@ export default function MemberDirectoryPage() {
     const metric = roleMetricsById[member.id];
     const name = member.data?.name || member.id;
     const joined = member.data?.joinedOn;
-    return <article key={member.id} className="member-role-row">
+    const hideEmptyWork = member.data?.active === false && !metric.total && !metric.currentProjects.length;
+    return <article key={member.id} className={`member-role-row${hideEmptyWork ? " member-role-row--profile-only" : ""}${highlightedMember && highlightedMember !== member.id ? " member-role-row--dimmed" : ""}${highlightedMember === member.id ? " member-role-row--highlighted" : ""}`}>
       <div className="member-role-identity">
         <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
-        <h3>{name}</h3>
+        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}</h3>
         {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
         <p className="member-tenure">{tenureText(member.data || {}, today)}</p>
         <button className="member-joined-edit" type="button" onClick={() => startEdit(member)} aria-label={`Edit join date for ${name}`}>
@@ -1220,13 +1229,13 @@ export default function MemberDirectoryPage() {
         </button>
         <MemberMilestones member={member} today={today} />
       </div>
+      {!hideEmptyWork && <>
       <div className="member-role-projects">
         <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
         <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.data?.kind)}>{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
         <h4>Work mix</h4>
-        <div className="member-work-mix" aria-label={`Allocated work mix for ${name}`}>{metric.categories.filter(c => c.percent > 0).map(c => <span key={c.key} style={{ width: `${c.percent}%`, background: `var(--workspace-${c.tone})` }} title={`${c.label}: ${Math.round(c.percent)}%`} />)}</div>
-        <div className="member-role-pills">{metric.categories.map(c => <MetadataPill key={c.key} tone={c.tone}>{c.label} {Math.round(c.percent)}%</MetadataPill>)}</div>
-        <p className="member-role-caption">Based on allocated time over these four weeks.</p>
+        <div className="member-work-mix-rows">{metric.categories.filter(category => category.key !== "unclassified").map(category => <div key={category.key} className="member-work-mix-row"><span>{category.label}</span><span className="member-work-mix-track"><span style={{ width: `${category.percent}%`, background: `var(--workspace-${category.tone})` }} /></span><strong>{Math.round(category.percent)}%</strong></div>)}</div>
+        <p className="member-role-caption">Based on allocated time over these four weeks.{metric.categories.find(category => category.key === "unclassified")?.percent > 0 && ` ${Math.round(metric.categories.find(category => category.key === "unclassified").percent)}% unclassified.`}</p>
       </div>
       <div className="member-role-history">
         <h4>Last four weeks <MetadataPill tone="planned"><TaskClockIcon /> {formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
@@ -1236,6 +1245,7 @@ export default function MemberDirectoryPage() {
           <div className="member-role-pills">{week.projects.length ? week.projects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.kind)}>{project.name} · {formatUnitsAsHours(project.units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
         </div>)}
       </div>
+      </>}
     </article>;
   }
 
@@ -1262,6 +1272,11 @@ export default function MemberDirectoryPage() {
 
 
 
+      {directoryView === 'role' && <section className="member-allocation-overview" aria-label="Member allocation over the last four weeks">
+        <p className="member-allocation-period">Last four weeks · by member</p>
+        <AllocationClock variant="member" subject="Member" periodLabel="Last four weeks by member" allocations={activeDirectoryMembers.map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total })).sort((a, b) => b.units - a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
+      </section>}
+
       {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">
         {directoryView === "role" ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-directory-list">{activeDirectoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
         {renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
@@ -1269,127 +1284,8 @@ export default function MemberDirectoryPage() {
 
 
 
-        <SectionBlock
-          className="member-directory-panel member-form-panel"
-          title="Add member"
-          titleTag="h2"
-          bodyClassName="member-form-panel-body"
-
-        >
-
-            <form className="member-form" onSubmit={handleCreateMember}>
-              <div className="member-form-grid">
-                <label className="member-form-field">
-                  <span>Name</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.name}
-                    onChange={(e) =>
-                      updateNewMemberField("name", e.target.value)
-                    }
-                    placeholder="Member name"
-                  />
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Also known as</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.aliases}
-                    onChange={(e) =>
-                      updateNewMemberField("aliases", e.target.value)
-                    }
-                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Type</span>
-                  <SelectField
-                    className="member-form-input"
-                    value={newMember.role}
-                    onChange={(e) =>
-                      updateNewMemberField("role", e.target.value)
-                    }
-                  >
-                    {MEMBER_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
-                <label className="member-form-field">
-                  <span>Email</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.email}
-                    onChange={(e) =>
-                      updateNewMemberField("email", e.target.value)
-                    }
-                    placeholder="name@example.com"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Timezone</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.timezone}
-                    onChange={(e) =>
-                      updateNewMemberField("timezone", e.target.value)
-                    }
-                    placeholder="America/New_York"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Joined on</span>
-                  <InputField
-                    type="date"
-                    className="member-form-input"
-                    value={newMember.joinedOn}
-                onInput={event => updateNewMemberField("joinedOn", event.target.value)}
-                onBlur={event => updateNewMemberField("joinedOn", event.target.value)}
-                    onChange={(e) =>
-                      updateNewMemberField("joinedOn", e.target.value)
-                    }
-                  />
-                </label>
-            <label className="member-form-field"><span>Birthday</span><InputField type="date" className="member-form-input" value={newMember.birthday} onInput={event => updateNewMemberField("birthday", event.target.value)} onBlur={event => updateNewMemberField("birthday", event.target.value)} onChange={event => updateNewMemberField("birthday", event.target.value)} /></label>
-            <label className="member-form-field"><span>Left on (inactive members)</span><InputField type="date" className="member-form-input" value={newMember.leftOn} onInput={event => updateNewMemberField("leftOn", event.target.value)} onBlur={event => updateNewMemberField("leftOn", event.target.value)} min={newMember.joinedOn || undefined} onChange={event => updateNewMemberField("leftOn", event.target.value)} /></label>
-            <label className="member-form-field"><span>Profile photo URL</span><InputField type="url" className="member-form-input" value={newMember.photoURL} onChange={event => updateNewMemberField("photoURL", event.target.value)} /></label>
-
-                <label className="member-form-field member-form-field--toggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(newMember.active)}
-                    onChange={(e) =>
-                      updateNewMemberField("active", e.target.checked)
-                    }
-                  />
-                  <span>Active member</span>
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Notes</span>
-                  <TextareaField
-                    className="member-form-input member-form-textarea"
-                    value={newMember.notes}
-                    onChange={(e) =>
-                      updateNewMemberField("notes", e.target.value)
-                    }
-                    placeholder="Any context for this member..."
-                  />
-                </label>
-              </div>
-              <div className="member-form-actions">
-                <Button type="submit" disabled={!newMember.name.trim()}>
-                  Save member
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setNewMember(emptyMemberForm())}
-                >
-                  Clear
-                </Button>
-              </div>
-            </form>
+        <SectionBlock className="member-directory-panel member-form-panel" title="Add member" titleTag="h2">
+          <TaskCreateTrigger label="New member…" onClick={() => setAddMemberOpen(true)} />
         </SectionBlock>
 
       {profileMember && <ModalShell title={`${profileMember.data?.name || profileMember.id} · Profile`} onClose={() => setProfileId(null)} footer={<Button onClick={() => { startEdit(profileMember); setProfileId(null); }}>Edit profile</Button>}>
@@ -1398,119 +1294,14 @@ export default function MemberDirectoryPage() {
           <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
           <p className="member-tenure">{tenureText(profileMember.data || {}, today)}</p>
           <MemberMilestones member={profileMember} today={today} />
-          <dl><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
+          <dl><dt>Pronouns</dt><dd>{profileMember.data?.pronouns || "Not set"}</dd><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
           {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
         </div>
       </ModalShell>}
 
-      {editingMember && (
-        <ModalShell
-          title={editingMember.data?.name || "Edit member"}
-          onClose={cancelEdit}
-          footer={
-            <>
-              <Button
-                type="button"
-                size="small"
-                onClick={() => saveEdit(editingMember)}
-                disabled={!editDraft.name.trim()}
-              >
-                Save
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={cancelEdit}
-              >
-                Cancel
-              </Button>
-            </>
-          }
-        >
-          <div className="member-form-grid">
-            <label className="member-form-field">
-              <span>Name</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.name}
-                onChange={(e) => updateEditField("name", e.target.value)}
-                autoFocus
-              />
-            </label>
-            <label className="member-form-field member-form-field--full">
-              <span>Also known as</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.aliases}
-                onChange={(e) => updateEditField("aliases", e.target.value)}
-                placeholder="Comma separated aliases"
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Type</span>
-              <SelectField
-                className="member-form-input"
-                value={editDraft.role}
-                onChange={(e) => updateEditField("role", e.target.value)}
-              >
-                {MEMBER_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-            <label className="member-form-field">
-              <span>Email</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.email}
-                onChange={(e) => updateEditField("email", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Timezone</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.timezone}
-                onChange={(e) => updateEditField("timezone", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Joined on</span>
-              <InputField
-                type="date"
-                className="member-form-input"
-                value={editDraft.joinedOn}
-                onInput={event => updateEditField("joinedOn", event.target.value)}
-                onBlur={event => updateEditField("joinedOn", event.target.value)}
-                onChange={(e) => updateEditField("joinedOn", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field"><span>Birthday</span><InputField type="date" className="member-form-input" value={editDraft.birthday} onInput={event => updateEditField("birthday", event.target.value)} onBlur={event => updateEditField("birthday", event.target.value)} onChange={event => updateEditField("birthday", event.target.value)} /></label>
-            <label className="member-form-field"><span>Left on (inactive members)</span><InputField type="date" className="member-form-input" value={editDraft.leftOn} onInput={event => updateEditField("leftOn", event.target.value)} onBlur={event => updateEditField("leftOn", event.target.value)} min={editDraft.joinedOn || undefined} onChange={event => updateEditField("leftOn", event.target.value)} /></label>
-            <label className="member-form-field"><span>Profile photo URL</span><InputField type="url" className="member-form-input" value={editDraft.photoURL} onChange={event => updateEditField("photoURL", event.target.value)} /></label>
-
-            <label className="member-form-field member-form-field--toggle">
-              <input
-                type="checkbox"
-                checked={Boolean(editDraft.active)}
-                onChange={(e) => updateEditField("active", e.target.checked)}
-              />
-              <span>Active member</span>
-            </label>
-            <label className="member-form-field member-form-field--full">
-              <span>Notes</span>
-              <TextareaField
-                className="member-form-input member-form-textarea"
-                value={editDraft.notes}
-                onChange={(e) => updateEditField("notes", e.target.value)}
-              />
-            </label>
-          </div>
-        </ModalShell>
-      )}
+      {(editingMember || addMemberOpen) && <ModalShell className="member-editor-modal" title={editingMember ? `Edit ${editingMember.data?.name || 'member'}` : 'New member'} onClose={closeMemberEditor}>
+        <MemberForm draft={editingMember ? editDraft : newMember} onChange={editingMember ? updateEditField : updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating={!editingMember} onCancel={closeMemberEditor} onSubmit={event => { event.preventDefault(); if (editingMember) saveEdit(editingMember); else handleCreateMember(event); }} />
+      </ModalShell>}
 
       {deleteTarget && (
         <DeleteConfirmDialog
