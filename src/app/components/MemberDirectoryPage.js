@@ -6,7 +6,7 @@ import TaskClockIcon from "./ui/TaskClockIcon";
 import MemberMilestones from "./ui/MemberMilestones";
 import { calendarDate, tenureText } from "./memberMilestones.mjs";
 import MemberAvatar from "./ui/MemberAvatar";
-import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
+import { memberRoleMetrics, projectWorkTone, WORK_CATEGORIES } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
 import useUrlState from "../hooks/useUrlState";
 import { SERIES_COLORS } from "./ui/palette";
@@ -1186,8 +1186,27 @@ export default function MemberDirectoryPage() {
 
   }
 
+  const roleMetricsById = useMemo(() => Object.fromEntries(membersSorted.map(member => [member.id, memberRoleMetrics(member.id, tasks, projects)])), [membersSorted, tasks, projects, today]);
+  const activeDirectoryMembers = directoryMembers.filter(member => member.data?.active !== false);
+  const inactiveDirectoryMembers = directoryMembers.filter(member => member.data?.active === false);
+
+  function renderMemberGroup(title, group, key) {
+    if (!group.length) return null;
+    const totals = WORK_CATEGORIES.map(category => ({ ...category, units: group.reduce((sum, member) => sum + (roleMetricsById[member.id].categories.find(item => item.key === category.key)?.units || 0), 0) }));
+    const total = group.reduce((sum, member) => sum + roleMetricsById[member.id].total, 0);
+    return <section key={key} className={`member-role-section${key === 'inactive' ? ' member-role-section--inactive' : ''}`}>
+      <div className="member-role-heading"><h2>{title}</h2><span className="task-scope-count">{group.length}</span>
+        <div className="member-role-totals" aria-label={`${title} allocation totals for the last four weeks`}>
+          {totals.filter(category => category.key !== 'unclassified' || category.units > 0).map(category => <span key={category.key}>{category.label} <strong>{formatUnitsAsHours(category.units)}</strong></span>)}
+          <span className="member-role-total"><TaskClockIcon /> {formatUnitsAsHours(total)} allocated · 4 weeks</span>
+        </div>
+      </div>
+      <CollectionLayout variant="grid" className={directoryView === 'role' ? 'member-role-list' : 'member-directory-list'}>{group.map(directoryView === 'role' ? renderRoleMember : renderDirectoryMember)}</CollectionLayout>
+    </section>;
+  }
+
   function renderRoleMember(member) {
-    const metric = memberRoleMetrics(member.id, tasks, projects);
+    const metric = roleMetricsById[member.id];
     const name = member.data?.name || member.id;
     const joined = member.data?.joinedOn;
     return <article key={member.id} className="member-role-row">
@@ -1212,8 +1231,8 @@ export default function MemberDirectoryPage() {
       <div className="member-role-history">
         <h4>Last four weeks <MetadataPill tone="planned"><TaskClockIcon /> {formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
 
-        {metric.weeks.map(week => <div key={week.key} className="member-role-week">
-          <div className="member-role-week-heading"><span>{formatWeekKeyLabel(week.key)}</span><strong><TaskClockIcon /> {formatUnitsAsHours(week.units)}</strong></div>
+        {metric.weeks.map((week, index) => <div key={week.key} className="member-role-week">
+          <div className="member-role-week-heading"><span title={formatWeekKeyLabel(week.key)}>{index === 0 ? "This week" : index === 1 ? "Last week" : formatWeekKeyLabel(week.key)}</span><strong><TaskClockIcon /> {formatUnitsAsHours(week.units)}</strong></div>
           <div className="member-role-pills">{week.projects.length ? week.projects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.kind)}>{project.name} · {formatUnitsAsHours(project.units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
         </div>)}
       </div>
@@ -1243,12 +1262,11 @@ export default function MemberDirectoryPage() {
 
 
 
-      {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : directoryView === "role" ? (
-        <div className="member-role-sections">{MEMBER_TYPE_OPTIONS.map((option) => {
-          const group = membersSorted.filter((member) => normalizeMemberRole(member.data.role) === option.value);
-          return group.length ? <section key={option.value} className="member-role-section"><div className="member-role-heading"><h2>{option.label}s</h2><span className="task-scope-count">{group.length}</span></div><CollectionLayout variant="grid" className="member-role-list">{group.map(renderRoleMember)}</CollectionLayout></section> : null;
-        })}</div>
-      ) : <CollectionLayout variant="grid" className="member-directory-list">{directoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
+      {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">
+        {directoryView === "role" ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-directory-list">{activeDirectoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
+        {renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
+      </div>}
+
 
 
         <SectionBlock

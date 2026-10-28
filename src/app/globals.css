@@ -8593,3 +8593,14 @@ sub, sup { font-size: var(--type-body); }
 .member-milestone--soon { border: 1px dashed #000; }
 .member-profile-details .member-avatar { width: 200px; height: 200px; flex-basis: 200px; }
 @media (max-width: 600px) { .member-avatar { width: 128px; height: 128px; flex-basis: 128px; } }
+.member-role-heading { flex-wrap: wrap; }
+.member-role-totals { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 18px; font-size: 16px; font-weight: 400; }
+.member-role-totals strong { font-weight: 500; }
+.member-role-totals .member-role-total { display: inline-flex; align-items: center; gap: 6px; opacity: .6; }
+.member-role-totals .task-clock-icon { width: 18px; height: 18px; flex-shrink: 0; }
+.member-role-section--inactive { margin-top: 36px; }
+.member-role-section--inactive > .member-role-heading h2 { color: #666; }
+.member-role-section--inactive .member-avatar { filter: grayscale(1); opacity: .65; }
+.member-milestones { flex-direction: column; font-size: 16px; line-height: 1.4; }
+.member-milestones time { background: transparent; color: #000; border: 0; padding: 0; }
+@media (max-width: 900px) { .member-role-totals { width: 100%; justify-content: flex-start; margin-left: 0; } }
