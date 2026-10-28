@@ -50,3 +50,27 @@ test("normalization is idempotent and preserves unrelated params and hashes", ()
   }
   assert.equal(compact("/tasks?role=associate&week=2026-10-12#task"), "/tasks?role=associate&week=2026-10-12#task");
 });
+
+test("placeholder pages and nested finance requests have stable destinations", () => {
+  assert.equal(isViewPath(["homepage"]), true);
+  assert.equal(isViewPath(["settings"]), true);
+  assert.equal(isViewPath(["finance", "requests"]), true);
+  assert.deepEqual(readViewUrl(url("/finance/requests")), { tab: "payouts" });
+  assert.equal(compact("/requests"), "/finance/requests");
+  assert.equal(compact("/tasks", { tab: "homepage" }), "/homepage");
+  assert.equal(compact("/tasks", { tab: "settings" }), "/settings");
+});
+
+test("Resource offers category or date, normalizing the removed free-arrange view", () => {
+  assert.deepEqual(readViewUrl(url("/resources?view=date")), { tab: "resources", resourcesView: "date" });
+  assert.equal(compact("/resources?view=free"), "/resources");
+});
+
+
+test("Members supports shareable role, weekly and overall views", () => {
+  assert.deepEqual(readViewUrl(url("/members?view=weekly")), { tab: "memberDirectory", memberView: "weekly" });
+  assert.equal(compact("/members", { memberView: "overall" }), "/members?view=overall");
+  assert.equal(compact("/members?view=role"), "/members");
+  assert.equal(compact("/members?view=rotation"), "/members");
+  assert.equal(compact("/members?view=weekly", { tab: "resources" }), "/resources");
+});

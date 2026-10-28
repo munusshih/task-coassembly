@@ -8,8 +8,20 @@ const SEEN_INTROS_KEY = "coassembly-page-intros-v4";
 const copy = (en, zh) => ({ en, zh });
 
 const PAGE_GUIDES = {
+  homepage: {
+    title: copy("Homepage", "首頁"),
+    intro: copy("Our shared starting point is coming soon. The menu at the top left already connects you to the rest of the workspace.", "共用首頁即將推出。左上方選單可以前往工作區的其他頁面。"),
+    outro: copy("Use Task to plan the week or Resource to find shared references.", "前往 Task 規劃本週工作，或到 Resource 尋找共用資料。"),
+    steps: [],
+  },
+  settings: {
+    title: copy("Settings", "設定"),
+    intro: copy("Workspace settings are coming soon. You can keep using the shared navigation to move between pages.", "工作區設定即將推出。你可以使用共用選單切換頁面。"),
+    outro: copy("Open the menu whenever you need to head somewhere else.", "需要前往其他頁面時，請開啟左上方選單。"),
+    steps: [],
+  },
   members: {
-    title: copy("Member To-do", "成員待辦"),
+    title: copy("TASK", "任務"),
     intro: copy(
       "Hi—welcome to the team’s weekly planning hub! This is where a loose piece of work becomes a named task with an owner, project, week, time estimate, deadline, and review status.",
       "嗨，歡迎來到團隊的每週工作規劃中心！在這裡，一件零散的工作會變成有負責人、專案、週次、工時估算、期限與複核狀態的明確任務。",
@@ -20,16 +32,16 @@ const PAGE_GUIDES = {
     ),
     steps: [
       {
-        element: ".members-page .page-header",
-        title: copy("The selected week", "目前選擇的週次"),
+        element: ".members-page .task-page-hero",
+        title: copy("Your week, together", "一起規劃這一週"),
         description: copy(
-          "The title and quarter badge tell you which weekly board you are viewing. The subtitle shows how many members are included.",
-          "標題與季度標籤會顯示目前查看的週次；副標則顯示這個工作台包含幾位成員。",
+          "Plan the week together. Use the asterisk for a friendly introduction, the reason we track time, and this month’s meeting roles.",
+          "一起規劃這一週。星號面板會介紹任務頁、記錄工時的原因，以及本月的會議分工。",
         ),
         side: "bottom",
       },
       {
-        element: ".members-page .projects-view-toggle",
+        element: ".members-page .task-view-picker",
         title: copy("Member, project, or resources", "成員、專案或資源檢視"),
         description: copy(
           "Member view shows individual workloads. Project view regroups the same week’s tasks by project. Resource view collects task links by project across every week. Available views depend on your access.",
@@ -54,8 +66,8 @@ const PAGE_GUIDES = {
         },
         title: copy("Build a task with useful detail", "建立資訊完整的任務"),
         description: copy(
-          "The task composer opens during this step. Add a title, time estimate, project, deadline, subtasks, and reference links; the tour will close it without saving when you continue.",
-          "導覽會在這一步自動開啟任務表單。你可以加入標題、工時估算、專案、期限、子任務與參考連結；繼續導覽時會自動關閉，而且不會儲存。",
+          "Give the task a title, planned time, and project. Add a date, subtasks, and useful links as needed. This guide never saves a task; any form you already had open stays open.",
+          "填寫任務標題、預估工時與專案，再依需要加入日期、子任務與連結。導覽不會儲存任務；原本已開啟的表單會保持開啟。",
         ),
       },
       {
@@ -63,8 +75,8 @@ const PAGE_GUIDES = {
           ".members-page .member-card, .members-page .project-member-paper, .members-page .project-resources-paper",
         title: copy("Plan, complete, then review", "規劃、完成，再複核"),
         description: copy(
-          "Cards show worked time versus planned time. Add an estimate, project, deadline, subtasks, and links; completed work can then be reviewed, returned, or carried to the newest week.",
-          "卡片會顯示已投入工時與原定工時。你可以加入工時估算、專案、期限、子任務與連結；完成後再進行複核、退回，或移到最新週次。",
+          "Worked time and allocated time help us understand effort and plan fairly. Add at least one link before checking off a task. Review and Reject are available only in People view.",
+          "已投入工時與預估工時幫助我們了解工作量並合理規劃。勾選完成前，請至少加入一個連結。「複核」與「退回」只在成員檢視提供。",
         ),
         side: "top",
       },
@@ -73,41 +85,29 @@ const PAGE_GUIDES = {
   memberDirectory: {
     title: copy("Members", "成員名錄"),
     intro: copy(
-      "Hi, worker-owner—welcome to the team directory! This is the administrative home for member identity, Google sign-in access, membership type, meeting responsibilities, and workload history.",
-      "嗨，社員你好，歡迎來到成員名錄！這裡集中管理成員身分、Google 登入權限、成員類型、會議分工與工作量紀錄。",
+      "Hi, worker-owner—welcome to the team directory! This is the administrative home for member identity, Google sign-in access, membership type, and workload history.",
+      "嗨，社員你好，歡迎來到成員名錄！這裡集中管理成員身分、Google 登入權限、成員類型與工作量紀錄。",
     ),
     outro: copy(
-      "You’re ready! A good first check is to confirm every active member has the correct sign-in email, timezone, member type, and current meeting role.",
-      "準備好了！建議先確認每位啟用中的成員都有正確的登入信箱、時區、成員類型與目前會議分工。",
+      "You’re ready! A good first check is to confirm every active member has the correct sign-in email, timezone, member type.",
+      "準備好了！建議先確認每位啟用中的成員都有正確的登入信箱、時區、成員類型。",
     ),
     steps: [
       {
         element: ".member-directory-page .member-form-panel",
-        reveal: {
-          trigger:
-            ".member-directory-page .member-form-panel .section-block-actions button",
-          openSelector: ".member-directory-page .member-form-panel .member-form",
-        },
         title: copy("Add a member and their access", "新增成員與登入權限"),
         description: copy(
-          "Expand this panel to record a member’s name, aliases, type, Google sign-in email, timezone, start date, active status, and notes.",
-          "展開這個區塊，可填寫成員姓名、別名、類型、Google 登入信箱、時區、加入日期、啟用狀態與備註。",
+          "Use this section at the bottom of the directory to record a member’s name, aliases, type, Google sign-in email, timezone, start date, active status, and notes.",
+          "在名錄最下方的區塊，可填寫成員姓名、別名、類型、Google 登入信箱、時區、加入日期、啟用狀態與備註。",
         ),
         side: "bottom",
       },
       {
-        element:
-          ".member-directory-page .member-directory-top .member-directory-panel:not(.member-form-panel)",
-        reveal: {
-          trigger:
-            ".member-directory-page .member-directory-top .member-directory-panel:not(.member-form-panel) .section-block-actions button",
-          openSelector:
-            ".member-directory-page .rotation-timeline, .member-directory-page .member-directory-empty",
-        },
-        title: copy("Rotate meeting responsibilities", "輪替會議分工"),
+        element: ".member-directory-page .task-view-picker",
+        title: copy("Choose your view", "選擇檢視方式"),
         description: copy(
-          "The monthly rotation assigns worker-owners to facilitation, timekeeping, and notes. Use the month controls when the team needs to swap roles or attendance.",
-          "每月輪值會安排社員擔任主持、計時與記錄。需要交換職務或調整出席時，可使用各月份的控制項。",
+          "Start with people grouped by role, or switch to Weekly and Overall to explore each person’s workload and project history.",
+          "依角色查看成員，或切換至每週及整體檢視，了解每個人的工作量與專案紀錄。",
         ),
       },
       {
@@ -384,7 +384,7 @@ const PAGE_GUIDES = {
     ],
   },
   resources: {
-    title: copy("Resources", "資源庫"),
+    title: copy("Resource", "資源庫"),
     intro: copy(
       "Hi—welcome to the shared resource shelf! This is where the team keeps reusable references, tools, vendors, services, and project material so useful knowledge does not disappear inside old tasks.",
       "嗨，歡迎來到共用資源架！團隊可在這裡保存能重複使用的參考資料、工具、廠商、服務與專案素材，避免重要知識埋在舊任務裡。",
@@ -395,11 +395,11 @@ const PAGE_GUIDES = {
     ),
     steps: [
       {
-        element: ".resources-page .page-header",
-        title: copy("Search or change the organization", "搜尋或切換整理方式"),
+        element: ".resources-page .resource-board-controls, .resources-page .workspace-page-hero",
+        title: copy("Browse by category or date", "依分類或日期瀏覽"),
         description: copy(
-          "Search checks resource names, descriptions, URLs, categories, and sub-links. Switch between grouped categories and a free-arrange board.",
-          "搜尋會檢查資源名稱、說明、網址、分類與子連結。你也可以在分類檢視和自由排列看板之間切換。",
+          "Use the view selector to group folders by category or by the month they were added.",
+          "使用檢視選單，依分類或新增月份整理資料夾。",
         ),
         side: "bottom",
       },
@@ -418,11 +418,11 @@ const PAGE_GUIDES = {
       },
       {
         element:
-          ".resources-page .resources-by-category, .resources-page .resources-free-board",
-        title: copy("Browse by category or arrange spatially", "依分類瀏覽或自由排列"),
+          ".resources-page .resources-by-category, .resources-page .resources-by-date",
+        title: copy("Images and submission details", "預覽圖片與提交資訊"),
         description: copy(
-          "Category view builds a tidy shared directory. Free-arrange view lets you drag cards into a layout that is remembered in this browser.",
-          "分類檢視會建立整齊的共用目錄；自由排列檢視則可拖曳卡片，並在這個瀏覽器中記住版面位置。",
+          "Folders use a locally cached site image or a coloured fallback, and show who added them and when. Older resources may not have contributor details.",
+          "資料夾會顯示本機快取的網站圖片，或以色塊替代，並標示提交者與新增月份。較早的資源可能沒有提交者資料。",
         ),
       },
       {
@@ -576,7 +576,7 @@ function createTour(guide) {
   return { steps, cleanupAll };
 }
 
-export default function PageGuide({ tabKey }) {
+export default function PageGuide({ tabKey, className = "", icon, iconOnly = false }) {
   const activeDriverRef = useRef(null);
   const guide = PAGE_GUIDES[tabKey];
 
@@ -587,9 +587,9 @@ export default function PageGuide({ tabKey }) {
     const tour = createTour(guide);
 
     const pageDriver = driver({
-      animate: true,
+      animate: false,
       allowClose: true,
-      overlayColor: "#2d241f",
+      overlayColor: "#171717",
       overlayOpacity: 0.55,
       showProgress: true,
       showButtons: ["next", "previous", "close"],
@@ -599,7 +599,7 @@ export default function PageGuide({ tabKey }) {
       progressText: "{{current}} / {{total}}",
       popoverClass: "coassembly-driver-popover",
       stagePadding: 10,
-      stageRadius: 14,
+      stageRadius: 4,
       steps: tour.steps,
       onDestroyed: () => {
         tour.cleanupAll();
@@ -613,13 +613,6 @@ export default function PageGuide({ tabKey }) {
     activeDriverRef.current = pageDriver;
     pageDriver.drive();
   }, [guide, tabKey]);
-
-  useEffect(() => {
-    if (!guide || readSeenIntros()[tabKey]) return undefined;
-
-    const timer = window.setTimeout(startTour, 700);
-    return () => window.clearTimeout(timer);
-  }, [guide, startTour, tabKey]);
 
   useEffect(
     () => () => {
@@ -636,19 +629,13 @@ export default function PageGuide({ tabKey }) {
   return (
     <button
       type="button"
-      className="page-guide-avatar"
+      className={`nav-signout-btn page-guide-help ${className}`}
       onClick={startTour}
       aria-label={replayLabel}
       title={replayLabel}
     >
-      <span className="page-guide-face" aria-hidden="true">
-        <span className="page-guide-eye page-guide-eye--left" />
-        <span className="page-guide-eye page-guide-eye--right" />
-        <span className="page-guide-smile" />
-      </span>
-      <span className="page-guide-badge" aria-hidden="true">
-        ?
-      </span>
+      {icon && <img src={icon} alt="" />}
+      {!iconOnly && "Help"}
     </button>
   );
 }

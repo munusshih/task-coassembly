@@ -1,5 +1,6 @@
 "use client";
 
+
 import ShareViewButton from "./ShareViewButton";
 import useUrlState, { isDocumentId } from "../hooks/useUrlState";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,8 +29,8 @@ import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
 import {
-  BOOK_GRID_ICON,
-  BOOK_SHELF_ICON,
+  KANBAN_VIEW_ICON,
+  LIST_VIEW_ICON,
   DATE_VIEW_ICON,
   DELETE_ICON,
   EDIT_ICON,
@@ -39,7 +40,6 @@ import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
 import PageControls from "./ui/PageControls";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import SectionBlock from "./ui/SectionBlock";
@@ -57,45 +57,6 @@ const ROLE_FIELDS = [
   { key: "timekeeperId", label: "Timekeeper" },
   { key: "notetakerId", label: "Notetaker" },
 ];
-
-const BOOK_PALETTE = [
-  { spine: "#b98f6f", cover: "#f3e6d8", ink: "#5f4330" },
-  { spine: "#b08f82", cover: "#f2e3dc", ink: "#5a3d3d" },
-  { spine: "#9f9b7d", cover: "#ece9d7", ink: "#48553c" },
-  { spine: "#a9968a", cover: "#efe4d9", ink: "#4f465d" },
-  { spine: "#b7a27a", cover: "#f3ead8", ink: "#5f4f2a" },
-  { spine: "#8e9eb2", cover: "#e7edf5", ink: "#2d486a" },
-  { spine: "#8da88a", cover: "#e8f0e6", ink: "#2f5a35" },
-];
-
-function hashText(value) {
-  const text = String(value || "");
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getNoteBookStyle(noteId) {
-  const hash = hashText(noteId);
-  const palette = BOOK_PALETTE[hash % BOOK_PALETTE.length];
-  const patternIndex = hash % 6;
-  return {
-    style: {
-      "--book-spine": palette.spine,
-      "--book-cover": palette.cover,
-      "--book-ink": palette.ink,
-      "--book-height": `${156 + (hash % 34)}px`,
-      "--book-tilt": `${(hash % 7) - 3}deg`,
-      "--book-band-top": `${12 + (hash % 48)}%`,
-      "--book-band-opacity": `${0.13 + ((hash >> 3) % 6) * 0.03}`,
-      "--book-grain-opacity": `${0.06 + ((hash >> 5) % 4) * 0.03}`,
-    },
-    patternClass: `note-item--pattern-${patternIndex}`,
-  };
-}
 
 function buildStarterNoteContent(title, scopeType, projectName) {
   const heading = String(title || "Meeting notes").trim() || "Meeting notes";
@@ -262,7 +223,7 @@ function colorFromTextSeed(value) {
     hash = (hash << 5) - hash + text.charCodeAt(index);
     hash |= 0;
   }
-  const palette = ["#2f5a9c", "#7a3e9d", "#2d7a58", "#b86a2f", "#8c2f56"];
+  const palette = ["#404040", "#404040", "#525252", "#525252", "#404040"];
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -1333,7 +1294,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           {notesList.map((note) => {
             const scopeType = normalizeScopeType(note?.data?.scopeType);
             const projectId = note?.data?.projectId || "";
-            const bookStyle = getNoteBookStyle(note.id);
             const isLinkShortcut = isLinkOnlyNote(note?.data);
             const shortcutHref = normalizeExternalUrl(note?.data?.linkUrl);
             const shortcutLabel = formatLinkLabel(note?.data?.linkUrl);
@@ -1342,8 +1302,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
             return (
               <li
                 key={note.id}
-                className={`note-item ${bookStyle.patternClass}${isLinkShortcut ? " note-item--link-shortcut" : ""}`}
-                style={bookStyle.style}
+                className={`note-item${isLinkShortcut ? " note-item--link-shortcut" : ""}`}
                 onClick={() => {
                   if (isLinkShortcut && shortcutHref) {
                     window.open(shortcutHref, "_blank", "noopener,noreferrer");
@@ -1546,8 +1505,8 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   ];
 
   const layoutOptions = [
-    { value: "grid", title: "Book covers", icon: BOOK_GRID_ICON },
-    { value: "shelf", title: "Bookshelf", icon: BOOK_SHELF_ICON },
+    { value: "grid", title: "Grid view", icon: KANBAN_VIEW_ICON },
+    { value: "shelf", title: "List view", icon: LIST_VIEW_ICON },
   ];
 
   return (
@@ -1582,7 +1541,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         className="note-create-section"
         title="Create note"
         titleTag="h3"
-        texture={SURFACE_TEXTURES.notesComposer}
+
         bodyClassName="note-create-area"
       >
         <div className="note-create-row">

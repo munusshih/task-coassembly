@@ -1,5 +1,8 @@
 "use client";
 
+import CrossIcon from "./ui/CrossIcon";
+
+
 import useUrlState from "../hooks/useUrlState";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -18,9 +21,8 @@ import CollectionLayout from "./ui/CollectionLayout";
 import CreateBar from "./ui/CreateBar";
 import ModalShell from "./ui/ModalShell";
 import InputField from "./ui/InputField";
-import PaperSurface from "./ui/PaperSurface";
+import Surface from "./ui/Surface";
 import PageControls from "./ui/PageControls";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import TabPage from "./ui/TabPage";
@@ -374,7 +376,7 @@ function WishItem({
                 className="wish-comment-modal-close"
                 onClick={() => setCommentsOpen(false)}
               >
-                ✕
+                <CrossIcon />
               </button>
             </div>
             <div className="wish-comment-modal-body">
@@ -576,9 +578,8 @@ function ProjectSection({
       title={project?.data?.name || "Unassigned"}
       badge={String(items.length)}
     >
-      <PaperSurface
+      <Surface
         className="wish-list-area"
-        texture={SURFACE_TEXTURES.backlogWishes}
       >
         {visibleItems.length > 0 && (
           <ul className="wish-list">
@@ -686,13 +687,14 @@ function ProjectSection({
             Cancel
           </Button>
         </CreateBar>
-      </PaperSurface>
+      </Surface>
     </BoardSection>
   );
 }
 
 export default function BacklogPage({ viewerName = "" }) {
   const [wishItems, setWishItems] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -717,7 +719,7 @@ export default function BacklogPage({ viewerName = "" }) {
 
   useEffect(() => {
     if (!firebaseReady) return;
-    const u1 = subscribeCollection("backlogItems", setWishItems);
+    const u1 = subscribeCollection("backlogItems", setWishItems, setLoadError);
     const u2 = subscribeCollection("projects", setProjects);
     const u3 = subscribeCollection("members", setMembers);
     const u4 = subscribeCollection("tasks", (items) =>
@@ -963,6 +965,18 @@ export default function BacklogPage({ viewerName = "" }) {
   }
 
   const totalItems = wishItems.length;
+
+  if (loadError) {
+    return (
+      <TabPage title="Wishes">
+        <p className="error-message" role="alert">
+          {loadError.code === "permission-denied"
+            ? "Wishes could not be loaded. The current Firebase rules do not allow access to backlogItems."
+            : "Wishes could not be loaded. Reload to try again."}
+        </p>
+      </TabPage>
+    );
+  }
 
   return (
     <TabPage

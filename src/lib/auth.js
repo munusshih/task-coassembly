@@ -110,6 +110,13 @@ function buildSessionPayload(username) {
 }
 
 function parseSessionPayload(payload) {
+  if (String(payload).startsWith("firebase:")) {
+    try {
+      const session = JSON.parse(payload.slice(9));
+      if (typeof session.uid !== "string" || !session.uid || session.uid.length > 128 || !Number.isFinite(session.ts)) return null;
+      return { ts: session.ts, username: `firebase:${session.uid}` };
+    } catch { return null; }
+  }
   const [tsRaw, ...rest] = String(payload || "").split(":");
   const ts = Number(tsRaw);
   const username = normalizeUsername(rest.join(":"));
@@ -198,6 +205,13 @@ export async function validateCredentials(username, password) {
 
 export async function createAuthCookieValue(username) {
   const payload = buildSessionPayload(username);
+  const signature = await signValue(payload, getCookieSecret());
+  return `${encodeURIComponent(payload)}.${signature}`;
+}
+
+export async function createFirebaseAuthCookieValue(uid) {
+  if (typeof uid !== "string" || !uid || uid.length > 128) throw new Error("Invalid Firebase identity");
+  const payload = `firebase:${JSON.stringify({ ts: Date.now(), uid })}`;
   const signature = await signValue(payload, getCookieSecret());
   return `${encodeURIComponent(payload)}.${signature}`;
 }

@@ -38,3 +38,6 @@ coassembly-finance-136ad8cbfec8.json
 
 # vercel
 .vercel
+
+# Local authenticated resource preview cache (URLs and generated images)
+/.cache/resource-previews/

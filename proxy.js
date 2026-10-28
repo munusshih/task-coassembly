@@ -20,9 +20,8 @@ export async function proxy(req) {
   const isAuthed = cookie ? await verifyAuthCookieValue(cookie) : false;
 
   if (isPublicPath(pathname)) {
-    if (pathname === "/login" && isAuthed) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
+    // Login restores the Firebase session before navigating; a cookie alone
+    // must not bounce a signed-out Firebase user back into the workspace.
     return NextResponse.next();
   }
 

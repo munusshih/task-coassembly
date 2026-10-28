@@ -112,14 +112,6 @@ export function canViewerManageMemberTask({
   return Boolean(memberId) && memberId === viewerMemberId;
 }
 
-export function canPushTaskToWishes(
-  taskData,
-  targetWeekKey = currentWeekKey(),
-) {
-  if (!taskData) return false;
-  return !Boolean(taskData.completed);
-}
-
 export function canPushTaskToNewestWeek(
   taskData,
   targetWeekKey = currentWeekKey(),

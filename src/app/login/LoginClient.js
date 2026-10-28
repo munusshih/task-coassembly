@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { useRouter } from "next/navigation";
 import { auth, firebaseReady, googleProvider } from "../../firebase";
 import { findMemberForAuth, isMemberEnabled } from "../../authAccess";
 
@@ -13,13 +12,23 @@ function safeNext(nextParam) {
   return nextParam;
 }
 
+async function establishSession(user) {
+  const response = await fetch("/api/auth/session", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken: await user.getIdToken() }),
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Could not establish sign-in.");
+  }
+}
+
 export default function LoginClient({
   next = "/",
   showError = false,
   showExpired = false,
   showDenied = false,
 }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -37,14 +46,15 @@ export default function LoginClient({
           setMessage("This account is not active in Members yet.");
           return;
         }
-        router.replace(safeDestination);
-      } catch {
-        // Ignore startup auth check issues on login page.
+        await establishSession(user);
+        window.location.replace(safeDestination);
+      } catch (error) {
+        setMessage(error?.message || "Could not verify sign-in.");
       }
     });
 
     return () => unsub();
-  }, [router, safeDestination]);
+  }, [safeDestination]);
 
   async function handleGoogleSignIn() {
     if (!firebaseReady || !auth || !googleProvider) {
@@ -66,7 +76,8 @@ export default function LoginClient({
         return;
       }
 
-      router.replace(safeDestination);
+      await establishSession(user);
+      window.location.replace(safeDestination);
     } catch (error) {
       setMessage(error?.message || "Could not sign in with Google.");
     } finally {

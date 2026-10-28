@@ -193,3 +193,13 @@ export const PROJECT_VIEW_ICON = <IconFolder />;
 export const DATE_VIEW_ICON = <IconDocument />;
 export const BOOK_GRID_ICON = <IconBookGrid />;
 export const BOOK_SHELF_ICON = <IconBookShelf />;
+
+export function IconMore(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="2" cy="7" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="7" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="7" r="0.8" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}

@@ -16,4 +16,6 @@ export {
   IconFolder,
   IconLink,
   IconUsers,
+  IconKanban,
+  IconMore,
 } from "./ui/icons";

@@ -40,6 +40,18 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    match /backlogItems/{document=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /reimbursements/{document=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /financeConfig/{document=**} {
+      allow read, write: if signedIn();
+    }
+
     match /resources/{document=**} {
       allow read, write: if signedIn();
     }

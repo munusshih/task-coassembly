@@ -10,7 +10,7 @@ export default function ViewToggle({
   const classes = ["view-toggle-group", className].filter(Boolean).join(" ");
 
   return (
-    <div className={classes} role="tablist" aria-label={ariaLabel}>
+    <div className={classes} role="group" aria-label={ariaLabel}>
       {options.map((option) => {
         const active = option.value === value;
         const buttonClass = "view-toggle-btn" + (active ? " view-toggle-btn--active" : "");
@@ -24,7 +24,7 @@ export default function ViewToggle({
             aria-pressed={active}
           >
             {option.icon ? <span className="view-toggle-icon">{option.icon}</span> : null}
-            {option.label ? <span className="view-toggle-label">{option.label}</span> : null}
+            <span className="view-toggle-label">{option.label || option.title || option.value}</span>
           </button>
         );
       })}

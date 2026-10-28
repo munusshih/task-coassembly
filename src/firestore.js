@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -40,17 +41,33 @@ function sortDocuments(items) {
   });
 }
 
-export function subscribeCollection(collectionName, onData) {
+function handleSubscriptionError(collectionName, error) {
+  const message = `Firestore subscription failed for collection "${collectionName}".`;
+  if (error?.code === "permission-denied") {
+    console.warn(message, error);
+    return;
+  }
+  console.error(message, error);
+}
+
+export function subscribeCollection(collectionName, onData, onError) {
   const collectionRef = collection(getDb(), collectionName);
 
-  return onSnapshot(collectionRef, (snapshot) => {
-    const documents = snapshot.docs.map((snapshotDocument) => ({
-      id: snapshotDocument.id,
-      data: snapshotDocument.data(),
-    }));
+  return onSnapshot(
+    collectionRef,
+    (snapshot) => {
+      const documents = snapshot.docs.map((snapshotDocument) => ({
+        id: snapshotDocument.id,
+        data: snapshotDocument.data(),
+      }));
 
-    onData(sortDocuments(documents));
-  });
+      onData(sortDocuments(documents));
+    },
+    (error) => {
+      handleSubscriptionError(collectionName, error);
+      onError?.(error);
+    },
+  );
 }
 
 export async function fetchCollection(collectionName) {
@@ -93,14 +110,18 @@ export function subscribeCollectionQuery(
     ? query(collectionRef, ...constraints)
     : collectionRef;
 
-  return onSnapshot(source, (snapshot) => {
-    const documents = snapshot.docs.map((snapshotDocument) => ({
-      id: snapshotDocument.id,
-      data: snapshotDocument.data(),
-    }));
+  return onSnapshot(
+    source,
+    (snapshot) => {
+      const documents = snapshot.docs.map((snapshotDocument) => ({
+        id: snapshotDocument.id,
+        data: snapshotDocument.data(),
+      }));
 
-    onData(sortDocuments(documents));
-  });
+      onData(sortDocuments(documents));
+    },
+    (error) => handleSubscriptionError(collectionName, error),
+  );
 }
 
 export async function createDocument(collectionName, payload) {
@@ -110,7 +131,22 @@ export async function createDocument(collectionName, payload) {
 }
 
 export async function replaceDocument(collectionName, id, payload) {
-  await setDoc(doc(getDb(), collectionName, id), payload);
+  const documentRef = doc(getDb(), collectionName, id);
+  if (collectionName !== "tasks") {
+    await setDoc(documentRef, payload);
+    return;
+  }
+  // Ordinary task edits can carry an old snapshot. Keep counters owned by the
+  // time-entry transaction, even when an editor was opened before a timer ended.
+  await runTransaction(getDb(), async (transaction) => {
+    const snapshot = await transaction.get(documentRef);
+    const next = { ...payload };
+    for (const field of ["trackedSeconds", "trackedEntryCount"]) {
+      delete next[field];
+      if (snapshot.exists() && snapshot.data()[field] !== undefined) next[field] = snapshot.data()[field];
+    }
+    transaction.set(documentRef, next);
+  });
 }
 
 export async function updateDocument(collectionName, id, payload) {

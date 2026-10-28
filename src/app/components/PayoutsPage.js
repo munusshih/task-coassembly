@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useEffect, useMemo, useState } from "react";
 import {
   createDocument,
@@ -96,12 +97,12 @@ function formatTime(ts) {
   });
 }
 
-// Generates a short receipt-style ID from a Firestore doc ID
+// Compact reference for a request.
 function shortId(id) {
   return String(id || "").slice(-6).toUpperCase();
 }
 
-// ─── ThermalReceipt ───────────────────────────────────────────────────────────
+// ─── RequestEntry ───────────────────────────────────────────────────────────
 
 function ThermalReceipt({ row, isAdmin, onApprove, onReject, onMarkPaid, onDelete }) {
   const type = row?.data?.type || "reimbursement";
@@ -406,6 +407,7 @@ export default function PayoutsPage({
   sharedMembers = [],
 }) {
   const [rows, setRows] = useState([]);
+  const [loadError, setLoadError] = useState(null);
 
   const isAdmin = useMemo(() => isWorkerOwner({ role: viewerRole }), [viewerRole]);
 
@@ -415,7 +417,7 @@ export default function PayoutsPage({
   );
 
   useEffect(() => {
-    const unsub = subscribeCollection("reimbursements", setRows);
+    const unsub = subscribeCollection("reimbursements", setRows, setLoadError);
     return () => unsub();
   }, []);
 
@@ -465,6 +467,18 @@ export default function PayoutsPage({
   const visibleMembers = isAdmin
     ? activeMembers
     : activeMembers.filter((m) => m.id === viewerMemberId);
+
+  if (loadError) {
+    return (
+      <TabPage title="Requests">
+        <p className="error-message" role="alert">
+          {loadError.code === "permission-denied"
+            ? "Requests could not be loaded. The current Firebase rules do not allow access to reimbursements."
+            : "Requests could not be loaded. Reload to try again."}
+        </p>
+      </TabPage>
+    );
+  }
 
   return (
     <TabPage

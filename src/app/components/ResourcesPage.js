@@ -1,7 +1,10 @@
 "use client";
 
+import CrossIcon from "./ui/CrossIcon";
+
+
 import useUrlState from "../hooks/useUrlState";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   subscribeCollectionQuery,
   createDocument,
@@ -18,13 +21,13 @@ import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
 import InputField from "./ui/InputField";
 import ModalShell from "./ui/ModalShell";
-import PageControls from "./ui/PageControls";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
-import { resourceTexture } from "./ui/paperTextures";
-import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import TabPage from "./ui/TabPage";
-import ViewToggle from "./ui/ViewToggle";
+import { resourceDate, contributorName } from "./resourceMetadata.mjs";
+import { COVER_COLORS } from "./ui/palette";
+import ResourcePreviewImage from "./ResourcePreviewImage";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
 
 const DEFAULT_CATEGORIES = [
   "general",
@@ -33,32 +36,6 @@ const DEFAULT_CATEGORIES = [
   "finance",
   "others",
 ];
-
-const POSITIONS_KEY = "coassembly-resources-positions-v1";
-const FREE_CARD_W = 220;
-const FREE_CARD_H = 210;
-
-function loadPositions() {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(window.localStorage.getItem(POSITIONS_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-function savePositions(pos) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(POSITIONS_KEY, JSON.stringify(pos));
-  } catch {}
-}
-function defaultFreePos(index) {
-  const cols = 4;
-  return {
-    x: (index % cols) * (FREE_CARD_W + 16) + 8,
-    y: Math.floor(index / cols) * (FREE_CARD_H + 20) + 8,
-  };
-}
 
 const EMPTY_FORM = {
   name: "",
@@ -120,7 +97,7 @@ function SubLinkEditor({ subLinks, onChange }) {
             onClick={() => remove(i)}
             aria-label="Remove"
           >
-            ×
+            <CrossIcon />
           </button>
         </div>
       ))}
@@ -215,13 +192,14 @@ function ResourceForm({
 }
 
 // ─── Shared card renderer ────────────────────────────────────────────────────
-function ResourceCard({ link, onEdit, onDelete }) {
+function ResourceCard({ link, onEdit, onDelete, members = [] }) {
   return (
     <EntityCard
       className="resource-sticky"
-      texture={resourceTexture(link.data.category)}
       interactive
     >
+      <div className="resource-folder-cover" style={{ backgroundColor: COVER_COLORS[Array.from(link.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 6] }}><ResourcePreviewImage link={link} /></div>
+      <svg className="resource-folder-outline" viewBox="0 0 260 220" preserveAspectRatio="none" aria-hidden="true"><path d="M2 20 L12 2 H77 L88 14 H258 V218 H2 Z" fill="none" stroke="#000" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg>
       <div className="resource-sticky-actions">
         <IconButton onClick={() => onEdit(link)} title="Edit">
           {EDIT_ICON}
@@ -265,15 +243,16 @@ function ResourceCard({ link, onEdit, onDelete }) {
             </div>
           )}
       </div>
-      <span className="resource-sticky-cat">
-        {normalizeCategory(link.data.category)}
+      <span className="resource-submission">
+        {contributorName(link.data, members) !== "Unknown contributor" && <span>{contributorName(link.data, members)}</span>}
+        <time dateTime={resourceDate(link.data.createdAt)?.toISOString()}>{resourceDate(link.data.createdAt)?.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }) || "Date unavailable"}</time>
       </span>
     </EntityCard>
   );
 }
 
 // ─── Category view ───────────────────────────────────────────────────────────
-function CategoryView({ links, categories, onEdit, onDelete }) {
+function CategoryView({ links, categories, onEdit, onDelete, members }) {
   return (
     <div className="resources-by-category">
       {categories.map((cat) => {
@@ -283,12 +262,13 @@ function CategoryView({ links, categories, onEdit, onDelete }) {
         if (!items.length) return null;
         return (
           <div key={cat} className="resources-cat-section">
-            <h3 className="resources-cat-header">{cat}</h3>
+            <h3 className="resources-cat-header">{cat}<span className="task-scope-count">{items.length}</span></h3>
             <CollectionLayout variant="grid" className="resources-grid">
               {items.map((link) => (
                 <ResourceCard
                   key={link.id}
                   link={link}
+                  members={members}
                   onEdit={onEdit}
                   onDelete={onDelete}
                 />
@@ -301,128 +281,18 @@ function CategoryView({ links, categories, onEdit, onDelete }) {
   );
 }
 
-// ─── Free-arrange board ──────────────────────────────────────────────────────
-const FREE_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 14 14"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="1" y="4" width="6" height="5" rx="1" />
-    <rect x="5" y="1" width="6" height="5" rx="1" />
-    <rect x="3" y="7" width="6" height="5" rx="1" />
-  </svg>
-);
-const CATEGORY_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 14 14"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="1" y1="3" x2="13" y2="3" />
-    <rect x="1" y="5.5" width="12" height="2.5" rx="0.5" />
-    <line x1="1" y1="11" x2="13" y2="11" />
-    <rect x="1" y="5.5" width="12" height="2.5" rx="0.5" />
-    <line x1="3" y1="3" x2="3" y2="1" />
-    <line x1="3" y1="13" x2="3" y2="11" />
-  </svg>
-);
-
-const VIEW_OPTIONS = [
-  { value: "category", title: "Group by category", icon: CATEGORY_ICON },
-  { value: "free", title: "Free arrange", icon: FREE_ICON },
-];
-
-function FreeBoard({ links, positions, onPositionChange, onEdit, onDelete }) {
-  const dragRef = useRef(null);
-  const justDragged = useRef(false);
-
-  const boardHeight = useMemo(
-    () =>
-      Math.max(
-        600,
-        ...links.map((l, i) => {
-          const p = positions[l.id] ?? defaultFreePos(i);
-          return p.y + FREE_CARD_H + 60;
-        }),
-      ),
-    [links, positions],
-  );
-
-  function startDrag(e, link, index) {
-    if (e.button !== 0) return;
-    if (e.target.closest("a, button, input, textarea, select")) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const pos = positions[link.id] ?? defaultFreePos(index);
-    dragRef.current = {
-      id: link.id,
-      startPX: e.clientX,
-      startPY: e.clientY,
-      startX: pos.x,
-      startY: pos.y,
-      moved: false,
-    };
-  }
-
-  function moveDrag(e, link, index) {
-    if (!dragRef.current || dragRef.current.id !== link.id) return;
-    const dx = e.clientX - dragRef.current.startPX;
-    const dy = e.clientY - dragRef.current.startPY;
-    if (!dragRef.current.moved && Math.hypot(dx, dy) < 5) return;
-    dragRef.current.moved = true;
-    onPositionChange(link.id, {
-      x: Math.max(0, dragRef.current.startX + dx),
-      y: Math.max(0, dragRef.current.startY + dy),
-    });
-  }
-
-  function endDrag(e, link) {
-    if (!dragRef.current || dragRef.current.id !== link.id) return;
-    justDragged.current = dragRef.current.moved;
-    dragRef.current = null;
-  }
-
-  function suppressIfDragged(e) {
-    if (justDragged.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      justDragged.current = false;
-    }
-  }
-
-  return (
-    <div className="resources-free-board" style={{ minHeight: boardHeight }}>
-      {links.map((link, i) => {
-        const pos = positions[link.id] ?? defaultFreePos(i);
-        return (
-          <div
-            key={link.id}
-            className="resources-free-card"
-            style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
-            onPointerDown={(e) => startDrag(e, link, i)}
-            onPointerMove={(e) => moveDrag(e, link, i)}
-            onPointerUp={(e) => endDrag(e, link)}
-            onClick={suppressIfDragged}
-          >
-            <ResourceCard link={link} onEdit={onEdit} onDelete={onDelete} />
-          </div>
-        );
-      })}
-    </div>
-  );
+function DateView({ links, onEdit, onDelete, members }) {
+  const groups = new Map();
+  [...links].sort((a, b) => (resourceDate(b.data.createdAt)?.getTime() || 0) - (resourceDate(a.data.createdAt)?.getTime() || 0)).forEach((link) => {
+    const date = resourceDate(link.data.createdAt);
+    const label = date?.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) || "Date unavailable";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(link);
+  });
+  return <div className="resources-by-date">{[...groups].map(([label, items]) => <section key={label} className="resources-cat-section"><h3 className="resources-cat-header">{label}<span className="task-scope-count">{items.length}</span></h3><CollectionLayout variant="grid" className="resources-grid">{items.map((link) => <ResourceCard key={link.id} link={link} members={members} onEdit={onEdit} onDelete={onDelete} />)}</CollectionLayout></section>)}</div>;
 }
 
-export default function ResourcesPage() {
+export default function ResourcesPage({ currentMember, members = [] }) {
   const [links, setLinks] = useState([]);
   const [resourcesLimit, setResourcesLimit] = useState(120);
   const [addOpen, setAddOpen] = useState(false);
@@ -430,17 +300,7 @@ export default function ResourcesPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [pendingDelete, setPendingDelete] = useState(null);
-  const [searchQuery, setSearchQuery] = useUrlState("resourcesSearch", "", { replace: true });
-  const [viewMode, setViewMode] = useUrlState("resourcesView", "category", { allowed: ["category", "free"] });
-  const [positions, setPositions] = useState(() => loadPositions());
-
-  function handlePositionChange(id, pos) {
-    setPositions((prev) => {
-      const next = { ...prev, [id]: pos };
-      savePositions(next);
-      return next;
-    });
-  }
+  const [viewMode, setViewMode] = useUrlState("resourcesView", "category", { allowed: ["category", "date"] });
 
   function handleRequestDelete(link) {
     setPendingDelete({ id: link.id, name: link.data.name || "this resource" });
@@ -465,20 +325,6 @@ export default function ResourcesPage() {
       },
     );
   }, [resourcesLimit]);
-
-  const filteredLinks = useMemo(() => {
-    if (!searchQuery) return links;
-    const q = searchQuery.toLowerCase();
-    return links.filter((l) => {
-      const d = l.data;
-      return (
-        (d.name || "").toLowerCase().includes(q) ||
-        (d.url || "").toLowerCase().includes(q) ||
-        (d.description || "").toLowerCase().includes(q) ||
-        (d.category || "").toLowerCase().includes(q)
-      );
-    });
-  }, [links, searchQuery]);
 
   const categoryOptions = useMemo(() => {
     const existing = links
@@ -520,6 +366,7 @@ export default function ResourcesPage() {
         subLinks: form.subLinks.filter((s) => s.url.trim()),
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        ...(currentMember?.id ? { submittedBy: { id: currentMember.id, name: currentMember.name || "Unnamed member" } } : {}),
       });
       setAddForm(EMPTY_FORM);
       setAddOpen(false);
@@ -571,52 +418,26 @@ export default function ResourcesPage() {
   return (
     <TabPage
       className="resources-page"
-      title="Resources"
-      badge={`${links.length} link${links.length !== 1 ? "s" : ""}`}
-      right={
-        <PageControls compact>
-          <ViewToggle
-            value={viewMode}
-            options={VIEW_OPTIONS}
-            onChange={setViewMode}
-          />
-          <SearchField
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-        </PageControls>
-      }
+      title="Resource"
+      header={<WorkspacePageHero title="Resource" illustration="book-carrier">
+        <label className="task-view-picker"><span>by</span><select className="task-view-selector" aria-label="Resource view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
+          <option value="category">Category</option><option value="date">Date</option>
+        </select></label>
+      </WorkspacePageHero>}
     >
+      <div className="resource-board-controls">
       <CreateBar
         open={false}
         onOpen={() => setAddOpen(true)}
         label="Add a resource…"
         triggerClassName="resource-create-trigger"
       />
+      </div>
 
-      {filteredLinks.length > 0 ? (
-        viewMode === "free" ? (
-          <FreeBoard
-            links={filteredLinks}
-            positions={positions}
-            onPositionChange={handlePositionChange}
-            onEdit={startEdit}
-            onDelete={handleRequestDelete}
-          />
-        ) : (
-          <CategoryView
-            links={filteredLinks}
-            categories={dataCategories}
-            onEdit={startEdit}
-            onDelete={handleRequestDelete}
-          />
-        )
-      ) : (
-        <EmptyState>
-          {searchQuery ? "No results." : "No resources yet. Add one above!"}
-        </EmptyState>
-      )}
+      {links.length > 0 ? (viewMode === "date"
+        ? <DateView links={links} members={members} onEdit={startEdit} onDelete={handleRequestDelete} />
+        : <CategoryView links={links} categories={dataCategories} members={members} onEdit={startEdit} onDelete={handleRequestDelete} />
+      ) : <EmptyState>No resources yet. Add one above!</EmptyState>}
 
       {/* Add / Edit modal */}
       {(addOpen || editingId !== null) && (

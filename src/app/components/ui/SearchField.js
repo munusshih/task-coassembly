@@ -1,5 +1,7 @@
 "use client";
 
+import CrossIcon from "./CrossIcon";
+
 import InputField from "./InputField";
 
 export default function SearchField({
@@ -26,7 +28,7 @@ export default function SearchField({
       />
       {hasValue ? (
         <button type="button" className="search-clear" onClick={onClear} title={clearTitle}>
-          ×
+          <CrossIcon />
         </button>
       ) : null}
     </div>

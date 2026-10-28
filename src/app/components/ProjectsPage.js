@@ -1,5 +1,6 @@
 "use client";
 
+
 import useUrlState from "../hooks/useUrlState";
 import { useEffect, useState, useMemo } from "react";
 import {
@@ -24,7 +25,6 @@ import InputField from "./ui/InputField";
 import SelectField from "./ui/SelectField";
 import ModalShell from "./ui/ModalShell";
 import PageControls from "./ui/PageControls";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SectionBlock from "./ui/SectionBlock";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
@@ -2389,7 +2389,6 @@ export default function ProjectsPage({
           className="project-create-section"
           title="Create project"
           titleTag="h3"
-          texture={SURFACE_TEXTURES.projectCreate}
         >
           <form className="project-add-form" onSubmit={handleAdd}>
             <InputField
@@ -2501,7 +2500,6 @@ export default function ProjectsPage({
           className="project-create-section"
           title="Project access"
           titleTag="h3"
-          texture={SURFACE_TEXTURES.projectCreate}
         >
           <p>You can view projects where you are assigned in staffing.</p>
         </SectionBlock>
@@ -2514,7 +2512,6 @@ export default function ProjectsPage({
           className="project-kanban-section"
           title="Kanban board"
           titleTag="h3"
-          texture={SURFACE_TEXTURES.projectKanban}
         >
           <ProjectKanbanBoard
             projects={visibleProjects}
@@ -2527,7 +2524,6 @@ export default function ProjectsPage({
           className="project-list-section"
           title="Project ledger"
           titleTag="h3"
-          texture={SURFACE_TEXTURES.projectLedger}
         >
           <div className="project-col-headers">
             <span>Name</span>

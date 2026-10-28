@@ -1,5 +1,10 @@
 "use client";
 
+
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import MetadataPill from "./ui/MetadataPill";
+import useUrlState from "../hooks/useUrlState";
+import { SERIES_COLORS } from "./ui/palette";
 import { useEffect, useMemo, useState } from "react";
 import {
   subscribeCollection,
@@ -35,30 +40,11 @@ const MEMBER_TYPE_OPTIONS = [
   { value: "flying-member", label: "Flying member" },
   { value: "external-collaborator", label: "External collaborator" },
 ];
-const PROJECT_KIND_COLORS = [
-  "#0066CC",
-  "#FF7A00",
-  "#2E8B57",
-  "#D7263D",
-  "#7B2CBF",
-  "#00A6A6",
-  "#C0A000",
-  "#8C564B",
-  "#E83E8C",
-  "#1D3557",
-  "#F94144",
-  "#43AA8B",
-];
-const PROJECT_KIND_COLOR_BY_KEY = {
-  commissioned: "#0066CC",
-  "self-funded": "#FF7A00",
-  grant: "#2E8B57",
-  internal: "#D7263D",
-  admin: "#7B2CBF",
-  "pass-through": "#00A6A6",
-  unspecified: "#C0A000",
-  "no-project": "#8C564B",
-};
+const PROJECT_KIND_COLORS = SERIES_COLORS;
+const PROJECT_KIND_COLOR_BY_KEY = Object.fromEntries(
+  ["commissioned", "self-funded", "grant", "internal", "admin", "pass-through", "unspecified", "no-project"]
+    .map((key, index) => [key, SERIES_COLORS[index]]),
+);
 
 function normalizeMemberRole(rawRole) {
   const value = String(rawRole || "")
@@ -321,7 +307,7 @@ function toProjectSegments(timeMap) {
 
 function donutBackground(segments) {
   if (!Array.isArray(segments) || segments.length === 0) {
-    return "conic-gradient(#ececec 0deg 360deg)";
+    return "conic-gradient(#f5f5f5 0deg 360deg)";
   }
 
   let start = 0;
@@ -471,6 +457,7 @@ function taskMetricAnchorTs(taskData) {
 }
 
 export default function MemberDirectoryPage() {
+  const [directoryView, setDirectoryView] = useUrlState("memberView", "role", { allowed: ["role", "weekly", "overall"] });
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -920,255 +907,11 @@ export default function MemberDirectoryPage() {
     });
   }
 
-  const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
-
-  return (
-    <TabPage
-      className="member-directory-page"
-      title="Members"
-      subtitle="Manage member records, meeting ownership roles, and workload/project assignment snapshots."
-    >
-      {notice && (
-        <p
-          className={
-            notice.error
-              ? "member-directory-notice member-directory-notice--error"
-              : "member-directory-notice"
-          }
-        >
-          {notice.text}
-        </p>
-      )}
-
-      <CollectionLayout variant="grid" className="member-directory-top">
-        <SectionBlock
-          className="member-directory-panel member-form-panel"
-          title="Add member"
-          titleTag="h3"
-          bodyClassName="member-form-panel-body"
-          actions={
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setAddMemberOpen((v) => !v)}
-            >
-              {addMemberOpen ? "▴ Close" : "▾ Expand"}
-            </Button>
-          }
-        >
-          {addMemberOpen && (
-            <form className="member-form" onSubmit={handleCreateMember}>
-              <div className="member-form-grid">
-                <label className="member-form-field">
-                  <span>Name</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.name}
-                    onChange={(e) =>
-                      updateNewMemberField("name", e.target.value)
-                    }
-                    placeholder="Member name"
-                  />
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Also known as</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.aliases}
-                    onChange={(e) =>
-                      updateNewMemberField("aliases", e.target.value)
-                    }
-                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Type</span>
-                  <SelectField
-                    className="member-form-input"
-                    value={newMember.role}
-                    onChange={(e) =>
-                      updateNewMemberField("role", e.target.value)
-                    }
-                  >
-                    {MEMBER_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
-                <label className="member-form-field">
-                  <span>Email</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.email}
-                    onChange={(e) =>
-                      updateNewMemberField("email", e.target.value)
-                    }
-                    placeholder="name@example.com"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Timezone</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.timezone}
-                    onChange={(e) =>
-                      updateNewMemberField("timezone", e.target.value)
-                    }
-                    placeholder="America/New_York"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Joined on</span>
-                  <InputField
-                    type="date"
-                    className="member-form-input"
-                    value={newMember.joinedOn}
-                    onChange={(e) =>
-                      updateNewMemberField("joinedOn", e.target.value)
-                    }
-                  />
-                </label>
-                <label className="member-form-field member-form-field--toggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(newMember.active)}
-                    onChange={(e) =>
-                      updateNewMemberField("active", e.target.checked)
-                    }
-                  />
-                  <span>Active member</span>
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Notes</span>
-                  <TextareaField
-                    className="member-form-input member-form-textarea"
-                    value={newMember.notes}
-                    onChange={(e) =>
-                      updateNewMemberField("notes", e.target.value)
-                    }
-                    placeholder="Any context for this member..."
-                  />
-                </label>
-              </div>
-              <div className="member-form-actions">
-                <Button type="submit" disabled={!newMember.name.trim()}>
-                  Save member
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setNewMember(emptyMemberForm())}
-                >
-                  Clear
-                </Button>
-              </div>
-            </form>
-          )}
-        </SectionBlock>
-
-        <SectionBlock
-          className="member-directory-panel"
-          title="Meeting rotation"
-          titleTag="h3"
-          actions={
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setRotationOpen((v) => !v)}
-            >
-              {rotationOpen ? "▴ Close" : "▾ Expand"}
-            </Button>
-          }
-        >
-          {rotationOpen &&
-            (workerOwners.length === 0 ? (
-              <p className="member-directory-empty">
-                No worker-owner members yet.
-              </p>
-            ) : (
-              <div className="rotation-timeline">
-                {rotationMonthKeys.map((monthKey) => {
-                  const monthRotation = rotationByMonth[monthKey] || [];
-                  const isCurrent = monthKey === currentMonthKey;
-                  return (
-                    <section
-                      key={monthKey}
-                      className={
-                        isCurrent
-                          ? "rotation-month rotation-month--current"
-                          : "rotation-month"
-                      }
-                    >
-                      <div className="rotation-month-head">
-                        <div className="rotation-month-title-wrap">
-                          <strong className="rotation-month-title">
-                            {formatMonthKeyLabel(monthKey)}
-                          </strong>
-                          <span className="rotation-month-key">{monthKey}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => handleSwitchRolesForMonth(monthKey)}
-                          disabled={
-                            switchingMonthKey === monthKey ||
-                            monthRotation.length < 2
-                          }
-                        >
-                          {switchingMonthKey === monthKey
-                            ? "Switching..."
-                            : "Switch roles"}
-                        </Button>
-                      </div>
-
-                      <ul className="rotation-list">
-                        {monthRotation.map((entry) => (
-                          <li
-                            key={`${monthKey}-${entry.member.id}`}
-                            className="rotation-item"
-                          >
-                            <div className="rotation-main">
-                              <strong>
-                                {entry.member?.data?.name || entry.member.id}
-                              </strong>
-                              <span
-                                className={`rotation-role rotation-role--${entry.role.replace(/\s+/g, "-").toLowerCase()}`}
-                              >
-                                {entry.role}
-                              </span>
-                            </div>
-                            {isCurrent && (
-                              <label className="rotation-attendance">
-                                <input
-                                  type="checkbox"
-                                  checked={entry.present}
-                                  onChange={(e) =>
-                                    toggleWorkerOwnerPresence(
-                                      entry.member,
-                                      monthKey,
-                                      e.target.checked,
-                                    )
-                                  }
-                                />
-                                <span>present this month</span>
-                              </label>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
-            ))}
-        </SectionBlock>
-      </CollectionLayout>
-
-      <CollectionLayout variant="list" className="member-directory-list">
-        {membersSorted.length === 0 && <EmptyState>No members yet.</EmptyState>}
-
-        {membersSorted.map((member) => {
+  const directoryMembers = [...membersSorted].sort((a, b) => {
+    const key = directoryView === "overall" ? "finishedUnitsTotal" : "finishedUnitsThisWeek";
+    return (memberMetrics[b.id]?.[key] || 0) - (memberMetrics[a.id]?.[key] || 0);
+  });
+  function renderDirectoryMember(member) {
           const metric = memberMetrics[member.id] || {
             totalTaskCount: 0,
             assignedTotalCount: 0,
@@ -1193,13 +936,13 @@ export default function MemberDirectoryPage() {
             thisWeekProjectKindSegments: [],
           };
 
-          const expanded = Boolean(expandedMembers[member.id]);
+          const expanded = directoryView !== "role" || Boolean(expandedMembers[member.id]);
           const latestWeek = metric.weekly[0] || {
             weekKey: currentWeekKey,
             assigned: metric.assignedThisWeekCount,
             completed: metric.completedThisWeekCount,
           };
-          const timeTab = memberTimeTabById[member.id] || "weekly";
+          const timeTab = directoryView === "role" ? memberTimeTabById[member.id] || "weekly" : directoryView;
           const role = normalizeMemberRole(member?.data?.role);
           const meetingRequired = isWorkerOwner(role);
 
@@ -1219,16 +962,8 @@ export default function MemberDirectoryPage() {
                     {member?.data?.name || member.id}
                   </h3>
                   <div className="member-directory-card-badges">
-                    <span
-                      className={`member-role-chip${role ? ` member-role-chip--${role}` : ""}`}
-                    >
-                      {roleLabel(role)}
-                    </span>
-                    {meetingRequired && (
-                      <span className="member-role-chip member-role-chip--required">
-                        meeting required
-                      </span>
-                    )}
+                    <MetadataPill tone={role === "worker-owner" ? "project" : role === "associate" ? "worked" : role === "flying-member" ? "date" : "planned"}>{roleLabel(role)}</MetadataPill>
+
                     {member?.data?.active === false && (
                       <span className="member-role-chip member-role-chip--inactive">
                         inactive
@@ -1278,24 +1013,24 @@ export default function MemberDirectoryPage() {
                     </span>
                   </div>
                   <div className="member-directory-stats">
-                    <span className="member-stat-chip">
+                    <MetadataPill tone="planned" className="member-stat-chip">
                       {metric.totalTaskCount} tracked tasks
-                    </span>
-                    <span className="member-stat-chip">
+                    </MetadataPill>
+                    <MetadataPill tone="planned" className="member-stat-chip">
                       {formatPlannedHoursFromUnits(metric.plannedUnits)} planned
-                    </span>
-                      <span className="member-stat-chip">
+                    </MetadataPill>
+                      <MetadataPill tone="planned" className="member-stat-chip">
                         {formatUnitsAsHours(metric.finishedUnitsThisWeek)} done this week
-                      </span>
-                      <span className="member-stat-chip">
+                      </MetadataPill>
+                      <MetadataPill tone="planned" className="member-stat-chip">
                         {formatUnitsAsHours(metric.finishedUnitsTotal)} done overall
-                      </span>
-                    <span className="member-stat-chip">
+                      </MetadataPill>
+                    <MetadataPill tone="planned" className="member-stat-chip">
                       {metric.currentProjectCount} current projects
-                    </span>
-                    <span className="member-stat-chip">
+                    </MetadataPill>
+                    <MetadataPill tone="planned" className="member-stat-chip">
                       {metric.historicalProjectCount} total projects taken
-                    </span>
+                    </MetadataPill>
                   </div>
                 </button>
 
@@ -1431,12 +1166,9 @@ export default function MemberDirectoryPage() {
                         </span>
                         <div className="member-project-list">
                           {metric.currentProjects.map((project) => (
-                            <span
-                              key={project.id}
-                              className="member-project-chip"
-                            >
+                            <MetadataPill key={project.id} tone="project" className="member-project-chip">
                               {project.name}
-                            </span>
+                            </MetadataPill>
                           ))}
                         </div>
                       </div>
@@ -1455,8 +1187,155 @@ export default function MemberDirectoryPage() {
               </>
             </EntityCard>
           );
-        })}
-      </CollectionLayout>
+
+  }
+
+  const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
+
+  return (
+    <TabPage
+      className={`member-directory-page member-directory-page--${directoryView}`}
+      title="Members"
+      header={<WorkspacePageHero title="Members" illustration="member-team"><label className="task-view-picker"><span>by</span><select className="task-view-selector" aria-label="Member view" value={directoryView} onChange={(event) => setDirectoryView(event.target.value)}><option value="role">Role</option><option value="weekly">Weekly</option><option value="overall">Overall</option></select></label></WorkspacePageHero>}
+    >
+      {notice && (
+        <p
+          className={
+            notice.error
+              ? "member-directory-notice member-directory-notice--error"
+              : "member-directory-notice"
+          }
+        >
+          {notice.text}
+        </p>
+      )}
+
+
+
+      {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : directoryView === "role" ? (
+        <div className="member-role-sections">{MEMBER_TYPE_OPTIONS.map((option) => {
+          const group = membersSorted.filter((member) => normalizeMemberRole(member.data.role) === option.value);
+          return group.length ? <section key={option.value} className="member-role-section"><div className="member-role-heading"><h2>{option.label}s</h2><span className="task-scope-count">{group.length}</span></div><CollectionLayout variant="grid" className="member-directory-list">{group.map(renderDirectoryMember)}</CollectionLayout></section> : null;
+        })}</div>
+      ) : <CollectionLayout variant="grid" className="member-directory-list">{directoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
+
+
+        <SectionBlock
+          className="member-directory-panel member-form-panel"
+          title="Add member"
+          titleTag="h2"
+          bodyClassName="member-form-panel-body"
+
+        >
+
+            <form className="member-form" onSubmit={handleCreateMember}>
+              <div className="member-form-grid">
+                <label className="member-form-field">
+                  <span>Name</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.name}
+                    onChange={(e) =>
+                      updateNewMemberField("name", e.target.value)
+                    }
+                    placeholder="Member name"
+                  />
+                </label>
+                <label className="member-form-field member-form-field--full">
+                  <span>Also known as</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.aliases}
+                    onChange={(e) =>
+                      updateNewMemberField("aliases", e.target.value)
+                    }
+                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Type</span>
+                  <SelectField
+                    className="member-form-input"
+                    value={newMember.role}
+                    onChange={(e) =>
+                      updateNewMemberField("role", e.target.value)
+                    }
+                  >
+                    {MEMBER_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
+                <label className="member-form-field">
+                  <span>Email</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.email}
+                    onChange={(e) =>
+                      updateNewMemberField("email", e.target.value)
+                    }
+                    placeholder="name@example.com"
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Timezone</span>
+                  <InputField
+                    className="member-form-input"
+                    value={newMember.timezone}
+                    onChange={(e) =>
+                      updateNewMemberField("timezone", e.target.value)
+                    }
+                    placeholder="America/New_York"
+                  />
+                </label>
+                <label className="member-form-field">
+                  <span>Joined on</span>
+                  <InputField
+                    type="date"
+                    className="member-form-input"
+                    value={newMember.joinedOn}
+                    onChange={(e) =>
+                      updateNewMemberField("joinedOn", e.target.value)
+                    }
+                  />
+                </label>
+                <label className="member-form-field member-form-field--toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(newMember.active)}
+                    onChange={(e) =>
+                      updateNewMemberField("active", e.target.checked)
+                    }
+                  />
+                  <span>Active member</span>
+                </label>
+                <label className="member-form-field member-form-field--full">
+                  <span>Notes</span>
+                  <TextareaField
+                    className="member-form-input member-form-textarea"
+                    value={newMember.notes}
+                    onChange={(e) =>
+                      updateNewMemberField("notes", e.target.value)
+                    }
+                    placeholder="Any context for this member..."
+                  />
+                </label>
+              </div>
+              <div className="member-form-actions">
+                <Button type="submit" disabled={!newMember.name.trim()}>
+                  Save member
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setNewMember(emptyMemberForm())}
+                >
+                  Clear
+                </Button>
+              </div>
+            </form>
+        </SectionBlock>
 
       {editingMember && (
         <ModalShell
