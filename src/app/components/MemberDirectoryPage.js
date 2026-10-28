@@ -2,7 +2,9 @@
 
 
 import WorkspacePageHero from "./ui/WorkspacePageHero";
-import { memberRoleMetrics } from "./memberRoleMetrics.mjs";
+import TaskClockIcon from "./ui/TaskClockIcon";
+import MemberAvatar from "./ui/MemberAvatar";
+import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
 import useUrlState from "../hooks/useUrlState";
 import { SERIES_COLORS } from "./ui/palette";
@@ -464,6 +466,7 @@ export default function MemberDirectoryPage() {
   const [projects, setProjects] = useState([]);
   const [newMember, setNewMember] = useState(() => emptyMemberForm());
   const [expandedMembers, setExpandedMembers] = useState({});
+  const [profileId, setProfileId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(() => emptyMemberForm());
   const [notice, setNotice] = useState(null);
@@ -956,6 +959,7 @@ export default function MemberDirectoryPage() {
             >
               <div className="member-directory-card-head">
                 <div className="member-directory-card-titles">
+                  <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
                   <h3 className="member-directory-card-name">
                     {member?.data?.name || member.id}
                   </h3>
@@ -1165,32 +1169,33 @@ export default function MemberDirectoryPage() {
     const joined = member.data?.joinedOn;
     return <article key={member.id} className="member-role-row">
       <div className="member-role-identity">
+        <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
         <h3>{name}</h3>
         {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
         <button className="member-joined-edit" type="button" onClick={() => startEdit(member)} aria-label={`Edit join date for ${name}`}>
           Joined {joined ? new Date(`${joined}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'date not set'} <span aria-hidden="true">↗</span>
         </button>
-        <IconButton onClick={() => startEdit(member)} title={`Edit ${name}`}>{EDIT_ICON}</IconButton>
       </div>
       <div className="member-role-projects">
         <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
-        <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone="project">{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
+        <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.data?.kind)}>{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
         <h4>Work mix</h4>
         <div className="member-work-mix" aria-label={`Allocated work mix for ${name}`}>{metric.categories.filter(c => c.percent > 0).map(c => <span key={c.key} style={{ width: `${c.percent}%`, background: `var(--workspace-${c.tone})` }} title={`${c.label}: ${Math.round(c.percent)}%`} />)}</div>
         <div className="member-role-pills">{metric.categories.map(c => <MetadataPill key={c.key} tone={c.tone}>{c.label} {Math.round(c.percent)}%</MetadataPill>)}</div>
         <p className="member-role-caption">Based on allocated time over these four weeks.</p>
       </div>
       <div className="member-role-history">
-        <h4>Last four weeks <MetadataPill tone="planned">{formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
-        <p className="member-role-caption">Current week and the previous three</p>
+        <h4>Last four weeks <MetadataPill tone="planned"><TaskClockIcon /> {formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
+
         {metric.weeks.map(week => <div key={week.key} className="member-role-week">
-          <div className="member-role-week-heading"><span>{formatWeekKeyLabel(week.key)}</span><strong>{formatUnitsAsHours(week.units)}</strong></div>
-          <div className="member-role-pills">{week.projects.length ? week.projects.map(([project, units]) => <MetadataPill key={project} tone="planned">{project} · {formatUnitsAsHours(units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
+          <div className="member-role-week-heading"><span>{formatWeekKeyLabel(week.key)}</span><strong><TaskClockIcon /> {formatUnitsAsHours(week.units)}</strong></div>
+          <div className="member-role-pills">{week.projects.length ? week.projects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.kind)}>{project.name} · {formatUnitsAsHours(project.units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
         </div>)}
       </div>
     </article>;
   }
 
+  const profileMember = membersSorted.find(member => member.id === profileId);
   const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
 
   return (
@@ -1337,6 +1342,15 @@ export default function MemberDirectoryPage() {
               </div>
             </form>
         </SectionBlock>
+
+      {profileMember && <ModalShell title={`${profileMember.data?.name || profileMember.id} · Profile`} onClose={() => setProfileId(null)} footer={<Button onClick={() => { startEdit(profileMember); setProfileId(null); }}>Edit profile</Button>}>
+        <div className="member-profile-details">
+          <MemberAvatar member={profileMember} onClick={() => { startEdit(profileMember); setProfileId(null); }} />
+          <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
+          <dl><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
+          {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
+        </div>
+      </ModalShell>}
 
       {editingMember && (
         <ModalShell

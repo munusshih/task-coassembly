@@ -2,7 +2,7 @@ import { taskWeekKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToPro
 
 export const WORK_CATEGORIES = [
   { key: 'rd', label: 'R&D', tone: 'project' },
-  { key: 'work', label: 'Work · commercial', tone: 'worked' },
+  { key: 'work', label: 'Work', tone: 'worked' },
   { key: 'admin', label: 'Admin', tone: 'date' },
   { key: 'unclassified', label: 'Unclassified', tone: 'neutral' },
 ];
@@ -36,14 +36,20 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now()) {
     const units = Math.max(0, Number(data.timeUnits) || 0);
     const name = project?.data?.name || (data.projectId ? 'Unknown project' : 'No project');
     week.units += units;
-    week.projects.set(name, (week.projects.get(name) || 0) + units);
+    const projectKey = data.projectId || 'no-project';
+    const existing = week.projects.get(projectKey);
+    week.projects.set(projectKey, { id: projectKey, name, kind: project?.data?.kind, units: (existing?.units || 0) + units });
     categories[workCategory(project?.data?.kind)] += units;
   }
   const total = weeks.reduce((sum, w) => sum + w.units, 0);
   return {
     currentProjects: [...current.values()].sort((a, b) => String(a.data?.name || a.id).localeCompare(String(b.data?.name || b.id))),
-    weeks: weeks.map(w => ({ ...w, projects: [...w.projects].filter(([, units]) => units > 0).sort((a, b) => b[1] - a[1]) })),
+    weeks: weeks.map(w => ({ ...w, projects: [...w.projects.values()].filter(project => project.units > 0).sort((a, b) => b.units - a.units) })),
     categories: WORK_CATEGORIES.filter(c => c.key !== 'unclassified' || categories[c.key] > 0).map(c => ({ ...c, units: categories[c.key], percent: total ? categories[c.key] / total * 100 : 0 })),
     total,
   };
+}
+
+export function projectWorkTone(kind) {
+  return WORK_CATEGORIES.find(category => category.key === workCategory(kind)).tone;
 }

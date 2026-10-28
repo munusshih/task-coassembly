@@ -8010,7 +8010,7 @@ sub, sup { font-size: var(--type-body); }
 .members-page .task-scope .member-card-head-main { display: grid; gap: 6px; }
 .members-page .member-week-time { display: flex; align-items: center; gap: 7px; line-height: 1.3; }
 .task-clock-icon { display: inline-block; position: relative; width: 19px; height: 20px; }
-.task-clock-icon img { position: absolute; top: 0; left: 0; transform: scale(.045); transform-origin: top left; }
+.task-clock-icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .members-page .task-scope .todo-item { padding: 12px; }
 .members-page .task-scope .todo-empty { padding: 6px 12px 14px; }
 .members-page .task-scope .notepad-add-trigger { padding: 8px 12px; }
@@ -8577,3 +8577,12 @@ sub, sup { font-size: var(--type-body); }
 @media (max-width: 900px) { .member-role-row { grid-template-columns: .7fr 1.3fr; gap: 24px; } .member-role-history { grid-column: 2; } }
 @media (max-width: 600px) { .member-role-row { grid-template-columns: minmax(0, 1fr); } .member-role-history { grid-column: auto; } }
 .member-role-row .task-scope-count { display: inline-grid; place-items: center; min-width: 25px; height: 25px; padding: 0 6px; border-radius: 50px; background: #000; color: #fff; font-size: 16px; }
+.member-avatar { display: grid; place-items: center; width: 72px; height: 72px; flex: 0 0 72px; border: 0; padding: 0; border-radius: 50%; overflow: hidden; background: var(--workspace-project); color: #000; font: inherit; font-size: 28px; font-weight: 500; cursor: pointer; margin-bottom: 10px; }
+.member-avatar:hover { box-shadow: 0 0 0 2px #000; }
+.member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.member-role-row .task-clock-icon { display: inline-flex; width: 19px; height: 19px; flex-shrink: 0; vertical-align: middle; }
+.member-role-row .task-clock-icon img { width: 100%; height: 100%; object-fit: contain; }
+.member-role-row .member-role-week-heading strong, .member-role-row h4 .metadata-pill { display: inline-flex; align-items: center; gap: 6px; }
+.member-profile-details { display: grid; justify-items: start; gap: 16px; }
+.member-profile-details dl { display: grid; grid-template-columns: auto 1fr; gap: 12px 24px; margin: 0; }
+.member-profile-details dd { margin: 0; overflow-wrap: anywhere; }

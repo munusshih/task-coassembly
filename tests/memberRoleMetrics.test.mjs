@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { memberRoleMetrics, workCategory } from '../src/app/components/memberRoleMetrics.mjs';
+import { memberRoleMetrics, workCategory, projectWorkTone } from '../src/app/components/memberRoleMetrics.mjs';
 const project = (id, kind, extra = {}) => ({ id, data: { name: id, kind, ...extra } });
 const task = (projectId, taskWeek, timeUnits, extra = {}) => ({ data: { type: 'memberTodo', memberId: 'm', projectId, taskWeek, timeUnits, ...extra } });
 test('four-week allocation uses task weeks, includes completed work and does not count edits as new allocation', () => {
@@ -17,4 +17,13 @@ test('missing categories remain explicit rather than being fabricated as R&D or 
  assert.equal(workCategory(''), 'unclassified');
  assert.equal(workCategory('Self-funded'), 'rd');
  assert.equal(workCategory('Pass-through'), 'work');
+});
+
+test('project categories and labels stay consistent in current and historical views', () => {
+ const data = memberRoleMetrics('m', [task('a', '2026-10-26', 8)], [project('a', 'Commissioned')], Date.parse('2026-10-28'));
+ assert.equal(data.categories.find(category => category.key === 'work').label, 'Work');
+ const current = data.currentProjects[0];
+ const history = data.weeks[0].projects[0];
+ assert.equal(projectWorkTone(current.data.kind), projectWorkTone(history.kind));
+ assert.equal(history.units, 8);
 });

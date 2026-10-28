@@ -1,4 +1,5 @@
 "use client";
+import TaskClockIcon from "./ui/TaskClockIcon";
 
 import useUrlState, { isDateKey, updateUrlState } from "../hooks/useUrlState";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -61,10 +62,6 @@ const UNIT_OPTIONS = Array.from({ length: 40 }, (_, i) => i + 1);
 
 const TASK_BOARD_CACHE_KEY = "coassembly-task-board-cache-v1";
 const MEMBER_DRAFT_PREFIX = "coassembly-member-draft-v1";
-
-function TaskClockIcon() {
-  return <span className="task-clock-icon" aria-hidden="true"><img src="/illustrations/clock.svg" alt="" /></span>;
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
 
