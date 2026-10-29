@@ -3,10 +3,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import CloseButton from "./CloseButton";
+import WorkspaceIllustration from "./WorkspaceIllustration";
 import { WORKSPACE_THEME } from "./palette";
 
 // A non-modal workspace composer: the page remains available while drafting.
-export default function BottomComposer({ title, onClose, children, className = "" }) {
+export default function BottomComposer({ title, onClose, children, className = "", illustration = "task-maker" }) {
   const titleId = useId();
   const panel = useRef(null);
   const closeRef = useRef(onClose);
@@ -26,7 +27,7 @@ export default function BottomComposer({ title, onClose, children, className = "
   }, [mounted]);
   if (!mounted) return null;
   return createPortal(<section ref={panel} role="region" aria-labelledby={titleId} className={`bottom-composer ${className}`} style={WORKSPACE_THEME}>
-    <header className="bottom-composer-header"><h2 id={titleId}>{title}</h2><CloseButton label={`Close ${title.toLowerCase()}`} onClick={onClose} /></header>
+    <header className="bottom-composer-header"><div className="bottom-composer-heading"><h2 id={titleId}>{title}</h2><WorkspaceIllustration name={illustration} className="composer-illustration" /></div><CloseButton label={`Close ${title.toLowerCase()}`} onClick={onClose} /></header>
     <div className="bottom-composer-body">{children}</div>
   </section>, document.body);
 }

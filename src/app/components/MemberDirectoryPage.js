@@ -1040,7 +1040,7 @@ export default function MemberDirectoryPage() {
         <MemberForm draft={editingMember ? editDraft : newMember} onChange={editingMember ? updateEditField : updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating={!editingMember} onCancel={closeMemberEditor} onSubmit={event => { event.preventDefault(); if (editingMember) saveEdit(editingMember); else handleCreateMember(event); }} />
       </ModalShell>}
 
-      {addMemberOpen && <BottomComposer title="New member" onClose={closeMemberEditor}>
+      {addMemberOpen && <BottomComposer illustration="member-team" title="New member" onClose={closeMemberEditor}>
         <MemberForm draft={newMember} onChange={updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating onCancel={closeMemberEditor} onSubmit={handleCreateMember} />
       </BottomComposer>}
 

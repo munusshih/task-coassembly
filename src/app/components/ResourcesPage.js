@@ -441,6 +441,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
       {/* Creation shares the workspace composer; existing records retain their editor. */}
       {(addOpen || editingId !== null) && (
         <ResourceFormShell
+          {...(editingId === null ? { illustration: "resource-balancer" } : {})}
           title={editingId ? "Edit resource" : "Add resource"}
           onClose={() => {
             setAddOpen(false);

@@ -1472,7 +1472,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
       <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
       {createOpen && (
-      <BottomComposer title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
+      <BottomComposer illustration="book-carrier" title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
         <div className="note-create-row">
           <div className="note-emoji-picker" title="Note emoji">
             <span className="note-emoji-picker-label">Emoji</span>

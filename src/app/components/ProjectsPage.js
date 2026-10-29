@@ -2361,7 +2361,7 @@ export default function ProjectsPage({
     >
       {!isLimitedViewer ? (
         <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
-        {createOpen && <BottomComposer title="New project" onClose={() => setCreateOpen(false)}>
+        {createOpen && <BottomComposer illustration="projects-team" title="New project" onClose={() => setCreateOpen(false)}>
           <form className="project-add-form" onSubmit={handleAdd}>
             <FormField label="Project name"><InputField
               className="project-field project-field--name"
