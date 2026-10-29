@@ -1,6 +1,7 @@
 "use client";
 
 import CrossIcon from "./ui/CrossIcon";
+import FolderOutline from "./ui/FolderOutline";
 
 
 import useUrlState from "../hooks/useUrlState";
@@ -202,7 +203,7 @@ function ResourceCard({ link, onEdit, onDelete, members = [] }) {
       interactive
     >
       <div className="resource-folder-cover" style={{ backgroundColor: COVER_COLORS[Array.from(link.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 6] }}><ResourcePreviewImage link={link} /></div>
-      <svg className="resource-folder-outline" viewBox="0 0 260 220" preserveAspectRatio="none" aria-hidden="true"><path d="M2 20 L12 2 H77 L88 14 H258 V218 H2 Z" fill="none" stroke="var(--ink)" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg>
+      <FolderOutline/>
       <div className="resource-sticky-actions">
         <IconButton onClick={() => onEdit(link)} title="Edit">
           {EDIT_ICON}

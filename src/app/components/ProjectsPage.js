@@ -7,7 +7,8 @@ import MetadataPill from "./ui/MetadataPill";
 import { projectWorkTone } from "./memberRoleMetrics.mjs";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
-import { groupProjects } from "./workspaceGroups.mjs";
+import ProjectCollection from "./ProjectCollection";
+import CloseButton from "./ui/CloseButton";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import TaskCreateTrigger from "./TaskCreateTrigger";
@@ -1320,7 +1321,7 @@ function ProjectRow({
   }
 
   return (
-    <li data-rationale-anchor={`project-${project.id}`} data-rationale-label={d.name || "Project"} className={"project-row" + (open ? " project-row--open" : "")}>
+    <li data-rationale-anchor={`project-detail-${project.id}`} data-rationale-label={d.name || "Project"} className={"project-row" + (open ? " project-row--open" : "")}>
       {/* Summary row */}
       <div className="project-row-summary" role="button" tabIndex={0} aria-expanded={open} onKeyDown={event => { if(event.target === event.currentTarget && ["Enter"," "].includes(event.key)) { event.preventDefault(); setOpen(value=>!value); } }} onClick={() => setOpen((s) => !s)}>
         <div className="project-row-main">
@@ -1870,140 +1871,6 @@ function ProjectRow({
 
 // ─ ProjectsPage ──────────────────────────────────────────────────────────────────────────────
 
-// ─ Kanban board ────────────────────────────────────────────────────────────────────────────────
-
-function ProjectKanbanCard({ project, allTasks, onComplete }) {
-  const d = project.data;
-  const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
-  const internalOrAdmin = isInternalOrAdminKind(d.kind);
-  const passThrough = isPassThroughKind(d.kind);
-  const donationPct = Number(d.donationPercent) || 0;
-  const donationTWD = donationAmount(budgTWD, donationPct);
-  const companyTaxTWD =
-    d.companyTax && budgTWD != null ? Math.round(budgTWD * 0.05) : null;
-  const effectiveBudgetTWD =
-    budgTWD != null
-      ? Math.max(0, budgTWD - (donationTWD || 0) - (companyTaxTWD || 0))
-      : null;
-  const leadBonusTWD =
-    !internalOrAdmin && !passThrough && effectiveBudgetTWD != null
-      ? Math.round(effectiveBudgetTWD * 0.05)
-      : null;
-  const teamDistributableTWD =
-    effectiveBudgetTWD != null && leadBonusTWD != null
-      ? Math.max(0, effectiveBudgetTWD - leadBonusTWD)
-      : effectiveBudgetTWD;
-  const hourly = internalOrAdmin
-    ? d.projectedHourlyWage != null
-      ? Number(d.projectedHourlyWage)
-      : null
-    : teamDistributableTWD != null && d.maxHours
-      ? Math.round(teamDistributableTWD / Number(d.maxHours))
-      : null;
-  const teamCount = Array.isArray(d.staffing) ? d.staffing.length : 0;
-  const projectTasks = allTasks.filter(
-    (t) => t.data.projectId === project.id && !t.data.archived,
-  );
-  const doneTasks = projectTasks.filter((t) => t.data.completed);
-
-  return (
-    <div className="kanban-card">
-      <div className="kanban-card-name">{d.name || "Unnamed"}</div>
-      {d.kind && (
-        <span
-          className="kanban-card-kind"
-          style={
-            KIND_STYLE[d.kind]
-              ? {
-                  background: KIND_STYLE[d.kind].bg,
-                  color: KIND_STYLE[d.kind].color,
-                }
-              : {}
-          }
-        >
-          {d.kind}
-        </span>
-      )}
-      <div className="kanban-card-meta">
-        {budgTWD != null && (
-          <span className="kanban-card-budget">{fmtTWD(budgTWD)}</span>
-        )}
-        {hourly != null && <span>NT${hourly}/h</span>}
-        {teamCount > 0 && (
-          <span>
-            {teamCount} member{teamCount !== 1 ? "s" : ""}
-          </span>
-        )}
-        {projectTasks.length > 0 && (
-          <span>
-            {doneTasks.length}/{projectTasks.length} tasks
-          </span>
-        )}
-      </div>
-      {onComplete && !isProjectClosed(project) ? (
-        <Button
-          type="button"
-          size="small"
-          variant="secondary"
-          className="kanban-complete-btn"
-          onClick={() => onComplete(project)}
-        >
-          Complete project
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function ProjectKanbanBoard({ projects, allTasks, onComplete }) {
-  const sorted = [...projects].sort(
-    (a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0),
-  );
-  const grouped = {};
-  PROJECT_STATUSES.forEach((s) => {
-    grouped[s] = [];
-  });
-  grouped[""] = [];
-  sorted.forEach((p) => {
-    const s = p.data.status || "";
-    if (grouped[s] !== undefined) grouped[s].push(p);
-    else grouped[""].push(p);
-  });
-  const cols = [
-    ...PROJECT_STATUSES.filter((s) => grouped[s].length > 0),
-    ...(grouped[""].length > 0 ? [""] : []),
-  ];
-  return (
-    <div className="kanban-board">
-      {cols.map((status) => (
-        <div key={status || "__none__"} className="kanban-col">
-          <div className="kanban-col-head">
-            <span
-              className="kanban-col-title"
-              style={
-                STATUS_STYLE[status]
-                  ? { color: STATUS_STYLE[status].color }
-                  : {}
-              }
-            >
-              {status || "No status"}
-            </span>
-            <span className="kanban-col-count">{grouped[status].length}</span>
-          </div>
-          {grouped[status].map((p) => (
-            <ProjectKanbanCard
-              key={p.id}
-              project={p}
-              allTasks={allTasks}
-              onComplete={onComplete}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ProjectsPage({
   viewerMemberId = null,
   viewerRole = "associate",
@@ -2353,6 +2220,12 @@ export default function ProjectsPage({
       ? `NT$${numberFmt.format(totalBudgetTWD)} total · Pool NT$${numberFmt.format(totalCompanyPoolTWD)} · Member budget NT$${numberFmt.format(totalMemberDistributableTWD)}`
       : "Budget, staffing, and delivery capacity overview";
 
+  useEffect(()=>{
+    if(!focusedProject)return;
+    const frame=requestAnimationFrame(()=>document.getElementById("project-selected-detail")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"}));
+    return()=>cancelAnimationFrame(frame);
+  },[focusedProject,visibleProjects.length]);
+
   return (
     <TabPage
       className="projects-page"
@@ -2475,11 +2348,10 @@ export default function ProjectsPage({
         </SectionBlock>
       )}
 
-      {visibleProjects.length === 0 ? <EmptyState>No projects yet.</EmptyState> : <div className="workspace-group-sections">
-        {groupProjects(visibleProjects, ['status','kanban'].includes(viewMode)?'status':'category').map(group => <SectionBlock key={group.id} className="workspace-group-section" title={group.title} badge={group.projects.length}>
-          <CollectionLayout as="ul" variant="grid" className="project-list project-card-grid">{[...group.projects].sort((a,b)=>String(a.data?.name||a.id).localeCompare(String(b.data?.name||b.id))).map(p=><ProjectRow key={p.id} project={p} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete} />)}</CollectionLayout>
-        </SectionBlock>)}
-      </div>}
+      {visibleProjects.length === 0 ? <EmptyState>No projects yet.</EmptyState> : <>
+        <ProjectCollection projects={visibleProjects} tasks={visibleTasks} members={members} mode={['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})}/>
+        {visibleProjects.some(project=>project.id===focusedProject)&&<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid">{visibleProjects.filter(project=>project.id===focusedProject).map(project=><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/>)}</ul></section>}
+      </>}
 
       <StatusStack className="toast-container" ariaLive="polite">
         {toasts.map((t) => (

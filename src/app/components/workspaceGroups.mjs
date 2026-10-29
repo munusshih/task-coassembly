@@ -24,3 +24,12 @@ export function groupWishes(items, projects, mode='project') {
   });
   return [...groups.values()].sort((a,b)=>mode==='date'?b.id.localeCompare(a.id):a.title.localeCompare(b.title));
 }
+
+// Keep every workflow stage visible as a drop target, including empty stages.
+export function projectStatusColumns(projects,statuses) {
+ const columns=statuses.map(status=>({id:status,title:status,projects:[]}));
+ const byStatus=new Map(columns.map(column=>[column.id,column]));
+ for(const project of projects){const status=String(project.data?.status||'');if(!byStatus.has(status)){const column={id:status,title:status||'Not set',projects:[]};columns.push(column);byStatus.set(status,column);}byStatus.get(status).projects.push(project);}
+ for(const column of columns)column.projects.sort((a,b)=>String(a.data?.name||a.id).localeCompare(String(b.data?.name||b.id)));
+ return columns;
+}
