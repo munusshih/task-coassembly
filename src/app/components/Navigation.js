@@ -92,11 +92,11 @@ export default function Navigation({
         <nav ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
           {TABS.filter((tab) => tab.key !== "payouts" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
             <div className="task-navigation-group" key={tab.key}>
-              <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}<WorkspaceIllustration className="navigation-mini-icon" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",finance:"clock",meetingNotes:"book-carrier",resources:"resource-balancer"})[tab.key]} /></a>
-              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests <LockIcon /><img className="navigation-mini-icon" src="/illustrations/clock.svg" alt="" /></a>}
+              {tab.key === "finance" ? <span className="task-navigation-locked" aria-disabled="true">Finance <LockIcon /></span> : <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}<WorkspaceIllustration className="navigation-mini-icon" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",finance:"clock",meetingNotes:"book-carrier",resources:"resource-balancer"})[tab.key]} /></a>}
+              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <span className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span>}
             </div>
           ))}
-          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests <LockIcon /><img className="navigation-mini-icon" src="/illustrations/clock.svg" alt="" /></a></div>}
+          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><span className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span></div>}
 
         </nav>
         <footer className="task-overlay-footer">

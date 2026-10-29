@@ -8923,3 +8923,10 @@ sub, sup { font-size: var(--type-body); }
 .workspace-wish-grid .wish-reactions { padding-left:0; padding-right:0; }
 .workspace-wish-grid .wish-item-text { font-size:22px; }
 .wish-project-tag { margin:8px 0 12px; }
+
+/* The fixed creation dock sits outside the 80% workspace scale. */
+.page-shell.page-shell--workspace { padding-bottom:calc(180px + env(safe-area-inset-bottom)); }
+.workspace-create-dock { padding-bottom:env(safe-area-inset-bottom); }
+.task-overlay-links .task-navigation-locked { display:flex; align-items:center; gap:12px; font-size:clamp(28px,4.2dvh,42px); letter-spacing:-.035em; color:var(--muted); cursor:default; }
+.task-overlay-links .task-navigation-locked.task-navigation-subpage { font-size:22px; }
+.member-week-controls { display:flex; flex-wrap:wrap; align-items:center; gap:24px; margin:0 0 28px; }

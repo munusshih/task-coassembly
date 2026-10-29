@@ -2171,7 +2171,7 @@ export default function MembersPage({
         </div>
         </div>
       </WorkspacePageHero>
-      <TaskTimers tasks={visibleTasks.filter(task => task.data?.memberId === viewerMemberId && !task.data?.archived && !task.data?.completed)} />
+      {memberViewMode === "member" && <TaskTimers tasks={visibleTasks.filter(task => task.data?.memberId === viewerMemberId && !task.data?.archived && !task.data?.completed)} />}
       <WorkspaceCreateDock label="New task" expanded={composerOpen} onClick={() => setComposerOpen(true)} />
       {composerOpen && <BottomComposer title="New task" onClose={() => setComposerOpen(false)}>
         <TaskCreateForm draft={composerDraft} onChange={patch => setComposerDraft(previous => ({...previous,...patch}))} onCancel={() => setComposerOpen(false)} projects={getAssignableProjects(visibleProjects, composerMember)} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} members={visibleMembers} assigneeId={composerMember} onAssigneeChange={id => { setComposerMember(id); setComposerDraft(previous => ({...previous,addProject:""})); }} onSubmit={async () => {

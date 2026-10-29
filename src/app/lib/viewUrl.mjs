@@ -25,6 +25,8 @@ export function isDateKey(value) {
 
 const schema = {
   memberView: { tab: "memberDirectory", query: "view", default: "role", allowed: ["role", "weekly", "overall"] },
+  memberWeek: { tab: "memberDirectory", query: "week", validate: isDateKey },
+  memberEndWeek: { tab: "memberDirectory", query: "endWeek", validate: isDateKey },
   week: { tab: "members", query: "week", validate: isDateKey },
   taskView: { tab: "members", query: "view", default: "member", allowed: ["member", "project", "resources"] },
   project: { tab: "projects", path: true, validate: isDocumentId },

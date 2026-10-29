@@ -9,7 +9,7 @@ const CLOCKS = {
   member: { src: '/illustrations/allocation-clock-team.svg', width: 2252, height: 1687, viewBox: '-40 -40 2332 1767', cx: 1138, cy: 540, radius: 430, labelRadius: 315 },
 };
 
-export default function AllocationClock({ allocations, formatTime, highlightedId, onHighlight, variant = 'project', subject = 'Project', periodLabel = 'This week’s allocation' }) {
+export default function AllocationClock({ allocations, formatTime, highlightedId, onHighlight, variant = 'project', subject = 'Project', periodLabel = 'This week’s allocation', valueMode = 'time' }) {
   const clock = CLOCKS[variant] || CLOCKS.project;
   const point = (angle, radius) => [clock.cx + Math.sin(angle) * radius, clock.cy - Math.cos(angle) * radius];
   const id = useId().replace(/:/g, "");
@@ -51,7 +51,7 @@ export default function AllocationClock({ allocations, formatTime, highlightedId
             <button type="button" className="allocation-row" onPointerEnter={() => onHighlight(project.id)} onFocus={() => onHighlight(project.id)} onBlur={() => onHighlight(null)} onClick={() => onHighlight(active ? null : project.id)} aria-pressed={active}>
               <span className="allocation-key">{letter(index)}</span>
               <span className="allocation-project-name">{project.name}</span>
-              <span className="allocation-hours">{active ? `${Math.round(share)}%` : formatTime(project.units)}</span>
+              <span className="allocation-hours">{(valueMode === "percent" ? !active : active) ? `${Math.round(share)}%` : formatTime(project.units)}</span>
               <span className="allocation-bar" aria-hidden="true"><span style={{ width: `${share}%` }} /></span>
             </button>
           </li>;

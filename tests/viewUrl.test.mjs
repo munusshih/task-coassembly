@@ -81,3 +81,14 @@ test('new project and wish grouping survives shared links and reloads',()=>{
  assert.equal(compact('/wishes?group=date'),'/wishes?group=date');
  assert.equal(compact('/wishes?group=project'),'/wishes');
 });
+
+test('member week ranges survive view changes and remain separate from Task weeks', () => {
+ const url = buildViewUrl(new URL('https://example.test/members?view=weekly'), {memberWeek:'2026-10-12',memberEndWeek:'2026-10-26'});
+ assert.equal(url.searchParams.get('week'),'2026-10-12');
+ assert.equal(readViewUrl(url).memberEndWeek,'2026-10-26');
+ const overall = buildViewUrl(url,{memberView:'overall'});
+ assert.equal(readViewUrl(overall).memberWeek,'2026-10-12');
+ const tasks = buildViewUrl(overall,{tab:'members'});
+ assert.equal(readViewUrl(tasks).week,undefined);
+ assert.equal(tasks.searchParams.has('endWeek'),false);
+});

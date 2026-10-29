@@ -39,3 +39,19 @@ test('weekly and overall allocation share categories but use distinct task-week 
  assert.deepEqual(overall.projectTotals.map(p=>[p.id,p.units]),[['a',20],['b',4]]);
  assert.equal(weekly.categories.find(category=>category.key==='rd').percent,100);
 });
+
+test('selected weekly periods include both boundary weeks and exclude surrounding allocation', () => {
+ const tasks = [task('a','2026-10-26',8),task('a','2026-10-19',12,{completed:true}),task('b','2026-10-12',4),task('b','2026-10-05',100)];
+ const projects = [project('a','Internal'),project('b','Commissioned')];
+ const now = Date.parse('2026-10-29');
+ const range = memberRoleMetrics('m',tasks,projects,now,'weekly',{start:'2026-10-12',end:'2026-10-19'});
+ assert.equal(range.total,16);
+ assert.equal(range.assigned,2);
+ assert.equal(range.completed,1);
+ assert.deepEqual(range.weeks.map(week => week.key),['2026-10-19','2026-10-12']);
+ const single = memberRoleMetrics('m',tasks,projects,now,'weekly',{start:'2026-10-12'});
+ assert.equal(single.total,4);
+ assert.equal(single.categories.find(category => category.key === 'work').percent,100);
+ const overall = memberRoleMetrics('m',tasks,projects,now,'overall',{start:'2026-10-12',end:'2026-10-19'});
+ assert.equal(overall.total,124);
+});

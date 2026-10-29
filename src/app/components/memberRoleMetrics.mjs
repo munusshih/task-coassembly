@@ -17,14 +17,22 @@ export function workCategory(kind) {
 
 // Allocation follows the Task board's Taipei week and never substitutes edits or
 // completion dates for the week the task was actually planned for.
-export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), mode = "role") {
+export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), mode = "role", range = {}) {
   const projectById = new Map(projects.map(p => [p.id, p]));
   const start = weekStartDateForTs(now);
   const recentWeeks = Array.from({ length: mode === "weekly" ? 1 : 4 }, (_, index) => {
     const date = new Date(start); date.setUTCDate(date.getUTCDate() - index * 7);
     return { key: date.toISOString().slice(0, 10), units: 0, projects: new Map() };
   });
-  const weeks = mode === "overall" ? [...new Set(tasks.filter(task => task.data?.type === 'memberTodo' && task.data?.memberId === memberId).map(task => taskWeekKey(task.data)).filter(Boolean))].sort().reverse().map(key => ({key, units:0, projects:new Map()})) : recentWeeks;
+  const rangeWeeks = [];
+  if (mode === "weekly" && /^\d{4}-\d{2}-\d{2}$/.test(range.start || "")) {
+    const first = new Date(`${range.start}T00:00:00Z`);
+    const last = new Date(`${range.end || range.start}T00:00:00Z`);
+    for (let date = new Date(first); date <= last; date.setUTCDate(date.getUTCDate() + 7)) {
+      rangeWeeks.push({ key: date.toISOString().slice(0, 10), units: 0, projects: new Map() });
+    }
+  }
+  const weeks = mode === "weekly" && rangeWeeks.length ? rangeWeeks.reverse() : mode === "overall" ? [...new Set(tasks.filter(task => task.data?.type === 'memberTodo' && task.data?.memberId === memberId).map(task => taskWeekKey(task.data)).filter(Boolean))].sort().reverse().map(key => ({key, units:0, projects:new Map()})) : recentWeeks;
   let assigned = 0, completed = 0;
   const categories = Object.fromEntries(WORK_CATEGORIES.map(c => [c.key, 0]));
   const current = new Map(projects.filter(p => !isProjectClosed(p) && isMemberAssignedToProject(p, memberId)).map(p => [p.id, p]));
