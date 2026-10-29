@@ -27,3 +27,10 @@ test('only upcoming reminders are returned and year counts keep singular units',
  assert.equal(tenureText({joinedOn:'2025-01-01'},'2026-01-01'),'It’s been 1 year since joining');
  assert.equal(tenureText({joinedOn:'2025-01-01',active:false,leftOn:'2026-01-02'}),'Worked with CoA for 1 year and 1 day');
 });
+
+test('compact tenure keeps the same day count and leaving-date behavior', () => {
+ assert.equal(tenureText({joinedOn:'2025-06-03'},'2026-10-29',{compact:true}), '1y 148d with CoA');
+ assert.equal(tenureText({joinedOn:'2025-01-01',active:false,leftOn:'2026-01-02'},'2026-10-29',{compact:true}), '1y 1d at CoA');
+ assert.equal(tenureText({joinedOn:'2025-01-01'},'2026-01-01',{compact:true}), '1y with CoA');
+ assert.equal(tenureText({active:false,joinedOn:'2025-01-01'},'2026-10-29',{compact:true}), 'Not set');
+});

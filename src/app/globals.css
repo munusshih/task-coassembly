@@ -8589,7 +8589,6 @@ sub, sup { font-size: var(--type-body); }
 .member-profile-details dl { display: grid; grid-template-columns: auto 1fr; gap: 12px 24px; margin: 0; }
 .member-profile-details dd { margin: 0; overflow-wrap: anywhere; }
 .member-avatar { width: 160px; height: 160px; flex-basis: 160px; font-size: 60px; margin-bottom: 16px; }
-.member-role-row .member-tenure { font-size: 20px; line-height: 1.35; margin: 4px 0; max-width: 240px; }
 .member-milestones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .member-role-row .member-milestones .metadata-pill { font-size: 16px; line-height: 1.5; }
 .member-milestone--soon { border: 1px dashed var(--ink); }
@@ -8935,15 +8934,10 @@ sub, sup { font-size: var(--type-body); }
 .page-shell--workspace .task-week-control .workspace-week-select select.week-select { appearance:none; width:auto; min-width:0; max-width:100%; min-height:42px; padding:2px 42px 2px 20px !important; border:0; border-radius:100px; background:var(--ink) !important; color:var(--paper); font:inherit; font-size:24px; line-height:1.25; cursor:pointer; }
 .workspace-week-select > svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .page-shell--workspace .task-week-control .workspace-week-select select:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
-.member-allocation-timeline { margin:24px 0 0; color:var(--muted); }
-.member-allocation-timeline figcaption { display:flex; align-items:center; gap:6px; font-size:16px; white-space:nowrap; }
-.member-allocation-timeline figcaption svg { width:18px; height:18px; }
-.member-allocation-timeline-weeks { display:flex; gap:12px; overflow-x:auto; padding:10px 0 4px; }
-.member-allocation-timeline-week { flex:1 0 40px; max-width:80px; min-width:0; text-align:center; }
-.member-allocation-timeline-track { height:38px; display:flex; align-items:flex-end; background:var(--surface-quiet); }
-.member-allocation-timeline-track > span { width:100%; background:var(--subdued); }
-.member-allocation-timeline-week small { display:block; margin-top:5px; font-size:12px; white-space:nowrap; }
 @media(max-width:650px) { .page-shell--workspace .task-week-control .workspace-week-select select.week-select { font-size:18px; min-height:36px; padding-left:12px !important; } }
 .time-button { transition:opacity 160ms, background-color 160ms; }
 .time-button:not(:disabled):hover { opacity:.7; }
 .time-button--quiet:not(:disabled):hover { opacity:1; background:var(--surface-strong); }
+
+.member-tenure { display:inline-flex; align-items:center; gap:6px; width:fit-content; max-width:100%; margin:8px 0; padding:5px 9px; border-radius:100px; background:var(--surface-quiet); color:var(--ink); font-size:15px; line-height:1.25; }
+.member-tenure > svg { width:17px; height:17px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }

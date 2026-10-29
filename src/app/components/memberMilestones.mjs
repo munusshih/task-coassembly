@@ -7,7 +7,7 @@ function dateValue(value) {
   const timestamp = Date.parse(value + 'T00:00:00Z');
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value ? timestamp : null;
 }
-export function tenureText(data, today = calendarDate()) {
+export function tenureText(data, today = calendarDate(), { compact = false } = {}) {
   const start = dateValue(data.joinedOn);
   if (start === null) return 'Not set';
   const end = dateValue(data.active === false ? data.leftOn : today);
@@ -15,6 +15,10 @@ export function tenureText(data, today = calendarDate()) {
   const days = Math.max(0, Math.floor((end - start) / DAY));
   const years = Math.floor(days / 365);
   const remainder = days % 365;
+  if (compact) {
+    const short = years ? `${years}y${remainder ? ` ${remainder}d` : ''}` : `${days}d`;
+    return `${short} ${data.active === false ? 'at' : 'with'} CoA`;
+  }
   const duration = years ? `${years} ${years === 1 ? 'year' : 'years'}${remainder ? ` and ${remainder} ${remainder === 1 ? 'day' : 'days'}` : ''}` : `${days} ${days === 1 ? 'day' : 'days'}`;
   return data.active === false ? `Worked with CoA for ${duration}` : `It’s been ${duration} since joining`;
 }

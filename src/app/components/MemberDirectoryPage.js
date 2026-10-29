@@ -2,6 +2,7 @@
 import WeekSelect from "./ui/WeekSelect";
 
 
+import MemberTenure from "./ui/MemberTenure";
 import MemberWorkRow from "./MemberWorkRow";
 import AllocationClock from "./ui/AllocationClock";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
@@ -15,7 +16,7 @@ import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import TaskClockIcon from "./ui/TaskClockIcon";
 import MemberMilestones from "./ui/MemberMilestones";
-import { calendarDate, tenureText } from "./memberMilestones.mjs";
+import { calendarDate } from "./memberMilestones.mjs";
 import MemberAvatar from "./ui/MemberAvatar";
 import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
@@ -1028,7 +1029,7 @@ export default function MemberDirectoryPage() {
         <div className="member-profile-details">
           <MemberAvatar member={profileMember} onClick={() => { startEdit(profileMember); setProfileId(null); }} />
           <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
-          <p className="member-tenure">{tenureText(profileMember.data || {}, today)}</p>
+          <MemberTenure member={profileMember} today={today}/>
           <MemberMilestones member={profileMember} today={today} />
           <dl><dt>Pronouns</dt><dd>{formatPronouns(profileMember.data?.pronouns) || "Not set"}</dd><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
           {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
