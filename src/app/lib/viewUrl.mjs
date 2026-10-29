@@ -34,7 +34,7 @@ const schema = {
   note: { tab: "meetingNotes", path: true, validate: isDocumentId },
   notesSearch: { tab: "meetingNotes", query: "q" },
   notesGroup: { tab: "meetingNotes", query: "group", default: "date", allowed: ["date", "project"] },
-  notesLayout: { tab: "meetingNotes", query: "layout", default: "grid", allowed: ["grid", "shelf"] },
+  notesLayout: { tab: "meetingNotes", query: "layout", default: "grid", allowed: ["grid", "shelf", "calendar"] },
   financeView: { tab: "finance", query: "view", default: "project", allowed: ["project", "person"] },
   financeCategory: { tab: "finance", query: "category", default: "projects", allowed: ["projects", "non-projects"] },
   year: { tab: "finance", query: "year", default: "overall", validate: (v) => v === "overall" || /^\d{4}$/.test(v) },

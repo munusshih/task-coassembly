@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-import {groupProjects,projectStatusColumns} from './workspaceGroups.mjs';
+import {groupProjects,projectStatusColumns,projectBoardStatus} from './workspaceGroups.mjs';
 import {projectWorkTone} from './memberRoleMetrics.mjs';
 import MetadataPill from './ui/MetadataPill';
 import FolderOutline from './ui/FolderOutline';
@@ -18,12 +18,18 @@ function ProjectCard({project,tasks,members,folder,onOpen,selected,editable,onSt
    <span className="project-preview-hours"><TaskClockIcon/>{timeLabel} allocated<span>{projectTasks.filter(task=>task.data.completed).length}/{projectTasks.length} tasks</span></span>
    {team.length>0&&<span className="project-preview-team">{team.join(' · ')}</span>}
   </button>
-  {!folder&&editable&&<label className="project-card-status"><span>Move to</span><select aria-label={`Move ${data.name||'project'} to status`} value={data.status||''} onChange={event=>onStatusChange(project,event.target.value)}><option value="" disabled>Status…</option>{statuses.map(status=><option key={status}>{status}</option>)}</select></label>}
+
  </li>;
 }
 export default function ProjectCollection({projects,tasks,members,mode,selected,onOpen,editable,onStatusChange,statuses}) {
  const [dropStatus,setDropStatus]=useState(null);
  const card=(project,folder)=> <ProjectCard key={project.id} project={project} tasks={tasks} members={members} folder={folder} selected={selected===project.id} onOpen={onOpen} editable={editable} onStatusChange={onStatusChange} statuses={statuses}/>;
- if(mode==='status')return <div className="project-status-board" aria-label="Projects Kanban board">{projectStatusColumns(projects,statuses).map(group=><section key={group.id} aria-label={`${group.title} projects`} className={`project-status-column${dropStatus===group.id?' project-status-column--drop':''}`} onDragOver={event=>{if(editable&&event.dataTransfer.types.includes('application/x-protocol-project')){event.preventDefault();event.dataTransfer.dropEffect='move';setDropStatus(group.id);}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget))setDropStatus(null);}} onDrop={event=>{event.preventDefault();setDropStatus(null);const project=projects.find(project=>project.id===event.dataTransfer.getData('application/x-protocol-project'));if(editable&&project&&project.data.status!==group.id)onStatusChange(project,group.id);}}><header><h2>{group.title}</h2><span className="task-scope-count">{group.projects.length}</span></header><ul>{group.projects.map(project=>card(project,false))}</ul>{!group.projects.length&&<p className="project-column-empty">No projects yet</p>}</section>)}</div>;
+ const states={Scheduled:{tone:'blue',icon:'clock'},'In Progress':{tone:'worked',icon:'walking-person'},'Waiting for Response':{tone:'planned',icon:'help-hat'},'On Hold':{tone:'neutral',icon:'review-circle'},Completed:{tone:'project',icon:'approve-person'},Cancelled:{tone:'date',icon:'reject-cross'}};
+ const dropHandlers=id=>({onDragOver:event=>{if(editable&&event.dataTransfer.types.includes('application/x-protocol-project')){event.preventDefault();event.dataTransfer.dropEffect='move';setDropStatus(id);}},onDragLeave:event=>{if(!event.currentTarget.contains(event.relatedTarget))setDropStatus(null);},onDrop:event=>{event.preventDefault();setDropStatus(null);const project=projects.find(project=>project.id===event.dataTransfer.getData('application/x-protocol-project'));if(editable&&project&&projectBoardStatus(project.data.status)!==id)onStatusChange(project,id);}});
+ const heading=group=><header><img className="project-state-icon" src={`/illustrations/${states[group.id].icon}.svg`} alt=""/><h2>{group.title}</h2><span className="task-scope-count">{group.projects.length}</span></header>;
+ if(mode==='status'){
+  const groups=projectStatusColumns(projects,statuses),cancelled=groups.find(group=>group.id==='Cancelled');
+  return <><div className="project-status-board" aria-label="Projects Kanban board">{groups.filter(group=>group.id!=='Cancelled').map(group=><section key={group.id} aria-label={`${group.title} projects`} style={{'--project-status-paper':`var(--palette-${states[group.id].tone})`}} className={`project-status-column${dropStatus===group.id?' project-status-column--drop':''}`} {...dropHandlers(group.id)}>{heading(group)}<ul>{group.projects.map(project=>card(project,false))}</ul>{!group.projects.length&&<p className="project-column-empty">No projects yet</p>}</section>)}</div>{cancelled&&<section aria-label="Cancelled projects" className={`project-cancelled-section${dropStatus==='Cancelled'?' project-status-column--drop':''}`} style={{'--project-status-paper':'var(--palette-date)'}} {...dropHandlers('Cancelled')}>{heading(cancelled)}<ul>{cancelled.projects.map(project=>card(project,false))}</ul>{!cancelled.projects.length&&<p className="project-column-empty">No cancelled projects.</p>}</section>}</>;
+ }
  return <div className="project-folder-sections">{groupProjects(projects,'category').map(group=><section key={group.id} className="project-folder-section"><header><h2>{group.title}</h2><span className="task-scope-count">{group.projects.length}</span></header><ul>{[...group.projects].sort((a,b)=>String(a.data.name||a.id).localeCompare(String(b.data.name||b.id))).map(project=>card(project,true))}</ul></section>)}</div>;
 }

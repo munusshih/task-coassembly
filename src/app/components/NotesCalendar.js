@@ -18,7 +18,7 @@ export default function NotesCalendar({ notes, renderNotes, onOpenNote }) {
       {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=><div className="notes-calendar-weekday" key={day}>{day}</div>)}
       {monthDays(month).map(day=><div key={day} className={`notes-calendar-day ${day.startsWith(month)?'':'is-outside'} ${selected===day?'is-selected':''} ${day===today?'is-today':''}`}>
         <button className="notes-calendar-date" aria-label={`${day}, ${(byDay.get(day)||[]).length} notes`} aria-pressed={selected===day} onClick={()=>{setMonth(day.slice(0,7));setSelected(selected===day?null:day);}}><span>{Number(day.slice(-2))}</span>{byDay.has(day)&&<span className="count-badge">{byDay.get(day).length}</span>}</button>
-        <div className="notes-calendar-events">{(byDay.get(day)||[]).slice(0,3).map(note=><button key={note.id} onClick={()=>onOpenNote(note)} title={note.data?.title}>{note.data?.emoji || '↗'} {note.data?.title || 'Untitled'}</button>)}{(byDay.get(day)||[]).length>3&&<button onClick={()=>setSelected(day)}>+{byDay.get(day).length-3} more</button>}</div>
+        <div className="notes-calendar-events">{(byDay.get(day)||[]).slice(0,3).map(note=><button key={note.id} onClick={()=>onOpenNote(note)} title={note.data?.title}>{note.data?.title || 'Untitled'}</button>)}{(byDay.get(day)||[]).length>3&&<button onClick={()=>setSelected(day)}>+{byDay.get(day).length-3} more</button>}</div>
       </div>)}
     </div>
     <div className="notes-calendar-selection" aria-live="polite">{visible.length?renderNotes(selected?new Date(`${selected}T12:00:00`).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):label,visible):<p>No notes {selected?'on this day':'this month'}.</p>}</div>

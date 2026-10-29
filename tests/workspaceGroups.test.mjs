@@ -17,8 +17,8 @@ test('wishes keep archival state and original project membership when grouped by
  assert.ok(byProject.find(group=>group.id==='unassigned'));
 });
 
-test('Kanban columns retain empty stages, unknown statuses and every project exactly once',()=>{
- const columns=projectStatusColumns([...projects,{id:'d',data:{name:'Unset'}}],['Scheduled','Active','Completed']);
- assert.deepEqual(columns.map(column=>[column.title,column.projects.length]),[['Scheduled',0],['Active',2],['Completed',1],['Not set',1]]);
+test('Kanban retains every project, queues missing statuses and separates cancelled work',()=>{
+ const columns=projectStatusColumns([...projects,{id:'d',data:{name:'Unset'}}],['Scheduled','In Progress','Completed','Cancelled']);
+ assert.deepEqual(columns.map(column=>[column.title,column.projects.length]),[['Scheduled',1],['In Progress',2],['Completed',1],['Cancelled',0]]);
  assert.equal(new Set(columns.flatMap(column=>column.projects.map(project=>project.id))).size,4);
 });

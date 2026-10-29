@@ -1017,8 +1017,8 @@ export default function MemberDirectoryPage() {
       </section>
 
       {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">
-        {directoryView === "role" ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-role-list">{activeDirectoryMembers.map(renderRoleMember)}</CollectionLayout>}
-        {renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
+        {["role","weekly"].includes(directoryView) ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-role-list">{activeDirectoryMembers.map(renderRoleMember)}</CollectionLayout>}
+        {directoryView !== "weekly" && renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
       </div>}
 
 

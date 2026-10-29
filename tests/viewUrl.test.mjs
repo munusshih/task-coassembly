@@ -92,3 +92,7 @@ test('member week ranges survive view changes and remain separate from Task week
  assert.equal(readViewUrl(tasks).week,undefined);
  assert.equal(tasks.searchParams.has('endWeek'),false);
 });
+
+test('Notes retains calendar as an explicit layout alongside editorial grid',()=>{
+ assert.equal(readViewUrl(url('/notes?layout=calendar')).notesLayout,'calendar');
+});
