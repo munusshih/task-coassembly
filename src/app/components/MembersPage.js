@@ -1,5 +1,6 @@
 "use client";
 import TaskReviewControls from "./ui/TaskReviewControls";
+import TaskDecisionHistory from "./TaskDecisionHistory";
 import WeekSelect from "./ui/WeekSelect";
 import TaskTimers from "./time/TaskTimers";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
@@ -384,6 +385,7 @@ function ReadOnlyTaskDetails({ todo, keyPrefix }) {
 
 function TaskItem({
   todo,
+  members = [],
   projects,
   assignableProjects,
   editingId,
@@ -642,6 +644,7 @@ function TaskItem({
             </div>
           </details>
 
+          <TaskDecisionHistory data={todo.data} members={members}/>
           <div className="todo-edit-actions">
             <Button
               type="button"
@@ -715,6 +718,7 @@ function TaskItem({
               )}
             </div>
           )}
+          <TaskDecisionHistory data={todo.data} members={members}/>
           {(subtasks.length > 0 || links.length > 0) && (
             <details
               className="todo-inline-details"
@@ -907,6 +911,7 @@ function ProjectGroupCard({
               {memberNameById[mid] || mid}
             </div>
             <MemberCard
+              members={members}
               member={members.find((member) => member.id === mid) || { id: mid, data: { name: memberNameById[mid] || mid } }}
               todos={memberTasks} projects={projects} selectedWeek={selectedWeek}
               showHeader={false} hideCreate allowReview={false} draftScope={`project-${project?.id || "unassigned"}`}
@@ -973,6 +978,7 @@ function ProjectResourcesCard({ project, resources, members }) {
 
 function MemberCard({
   member,
+  members = [],
   todos,
   projects,
   onCreate,
@@ -1179,6 +1185,7 @@ function MemberCard({
             )}
             {[...weekTodos, ...reviewedTodos].map((todo) => (
               <TaskItem
+                members={members}
                 key={todo.id}
                 allowReview={allowReview}
                 readOnly={Boolean(todo.data.reviewed)}
@@ -2028,6 +2035,7 @@ export default function MembersPage({
   function renderMemberCard(member) {
     return (
       <MemberCard
+        members={members}
         key={member.id}
         member={member}
         todos={tasksByMember[member.id] || []}
