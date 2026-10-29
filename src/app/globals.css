@@ -8941,3 +8941,43 @@ sub, sup { font-size: var(--type-body); }
 
 .member-tenure { display:inline-flex; align-items:center; gap:6px; width:fit-content; max-width:100%; margin:8px 0; padding:5px 9px; border-radius:100px; background:var(--surface-quiet); color:var(--ink); font-size:15px; line-height:1.25; }
 .member-tenure > svg { width:17px; height:17px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+/* Compact section actions sit with the scope, rather than inside a task column. */
+.members-page .task-scope-tools { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:16px; margin-left:auto; }
+.task-scope-text-action { padding:4px 0; border:0; background:transparent; color:var(--muted); font:inherit; font-size:14px; line-height:1.3; cursor:pointer; }
+.task-scope-text-action:hover { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+.task-scope-text-action:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.members-page .task-scope .todo-item { grid-template-columns:30px minmax(0,1fr) auto; gap:12px; }
+.task-review-controls { display:flex; flex-direction:column; align-items:center; gap:2px; width:30px; }
+.members-page .task-review-controls .todo-decision-icon { width:30px; height:30px; min-height:30px; padding:0; border:0; background:transparent; }
+.members-page .task-review-controls .todo-decision-icon:hover { background:transparent; opacity:.45; }
+.members-page .task-review-controls .todo-decision-icon:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+.members-page .task-review-controls .task-review-symbol { width:26px; height:26px; }
+.members-page .task-review-controls .task-review-symbol img { transform:scale(.092); }
+/* Portals use the same effective type scale and page gutters as the 80% workspace. */
+.bottom-composer { padding:20px 24px 24px; font-family:var(--font-body); font-size:16px; line-height:1.4; }
+.bottom-composer-header, .bottom-composer-body { max-width:none; }
+.bottom-composer-header { margin-bottom:16px; padding-bottom:14px; gap:16px; }
+.bottom-composer-header h2 { font-size:26px; font-weight:500; letter-spacing:-.03em; }
+.bottom-composer .workspace-form-field { gap:6px; font-size:14px; }
+.bottom-composer input:not([type=checkbox]), .bottom-composer select, .bottom-composer textarea { min-height:42px; padding:9px 12px; border-radius:8px; font-family:var(--font-body); font-size:16px; line-height:1.4; box-sizing:border-box; }
+.bottom-composer .workspace-form-field > input:not([type=checkbox]), .bottom-composer .workspace-form-field > select { height:42px; min-height:42px; }
+.bottom-composer .notepad-add-active, .bottom-composer .notepad-add-main, .bottom-composer .notepad-add-meta, .bottom-composer .notepad-add-fields { gap:12px; }
+.bottom-composer .field-select-wrap > select { padding-left:40px; padding-right:40px; }
+.bottom-composer .notepad-add-sections { display:flex; flex-direction:column; gap:8px; width:100%; margin:4px 0 0; padding:0; }
+.bottom-composer .todo-edit-disclosure { margin:0; padding:0; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
+.bottom-composer .todo-edit-disclosure-summary { display:flex; justify-content:space-between; align-items:center; min-height:42px; gap:12px; padding:6px 12px; font-size:16px; cursor:pointer; }
+.bottom-composer .todo-edit-disclosure-summary:hover { background:var(--surface-quiet); }
+.bottom-composer .todo-edit-section-title { font-size:16px; font-weight:400; }
+.bottom-composer .todo-edit-section { padding:8px 12px 12px; }
+.bottom-composer .todo-edit-row { gap:10px; margin:0; padding:6px 0; }
+.bottom-composer .todo-edit-row-fields { display:flex; flex-direction:column; gap:8px; width:100%; }
+.bottom-composer .todo-edit-disclosure-summary .btn { font-size:14px; min-height:30px; padding:4px 8px; border-radius:6px; }
+.bottom-composer .notepad-add-actions { display:flex; gap:8px; margin-top:4px; padding:0; }
+.bottom-composer .time-button { min-height:36px; padding:7px 14px; font-size:16px; line-height:1.4; }
+@media(max-width:650px) { .bottom-composer { padding:16px; } .members-page .task-scope-tools { gap:10px; } .task-scope-text-action { font-size:12px; } }
+.field-select-wrap--chevron > select { appearance:none; -webkit-appearance:none; background-image:none !important; }
+.field-select-chevron { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.bottom-composer .field-select-wrap > select { padding-left:12px; }
+.bottom-composer .field-select-wrap:has(.field-select-icon) > select { padding-left:40px; }
+.bottom-composer .notepad-add-active, .bottom-composer .notepad-add-main, .bottom-composer .notepad-add-meta { border:0; box-shadow:none; }
+.bottom-composer :is(input,select,textarea):focus-visible { outline:2px solid var(--ink); outline-offset:2px; }

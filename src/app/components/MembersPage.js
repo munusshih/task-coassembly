@@ -1,5 +1,5 @@
 "use client";
-import TimeButton from "./ui/TimeButton";
+import TaskReviewControls from "./ui/TaskReviewControls";
 import WeekSelect from "./ui/WeekSelect";
 import TaskTimers from "./time/TaskTimers";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
@@ -21,7 +21,6 @@ import { splitTaskBoardByViewer } from "./taskBoardScopes.mjs";
 import { hasTaskLink } from "./taskCompletion.mjs";
 import TaskWeekInfo from "./TaskWeekInfo";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
-import CrossIcon from "./ui/CrossIcon";
 import ProjectAllocationClock from "./ProjectAllocationClock";
 import TaskCreateTrigger from "./TaskCreateTrigger";
 import { isWorkerOwner } from "../../authAccess";
@@ -669,13 +668,13 @@ function TaskItem({
   return (
       <li className={`todo-item${focusedTaskId === todo.id ? " todo-item--focused" : ""}`}>
         <div className="todo-checkbox-cell">
-          <input
+          {canTakeDoneDecision ? <TaskReviewControls onReview={() => onReviewDoneTask(todo)} onReject={() => onRejectDoneTask(todo)} /> : <input
             type="checkbox"
             checked={Boolean(completed)}
             disabled={readOnly}
             aria-label={`Mark ${title || "task"} ${completed ? "incomplete" : "complete"}`}
             onChange={(e) => handleCheck(e.target.checked)}
-          />
+          />}
         </div>
         <div
           className="todo-content"
@@ -780,33 +779,7 @@ function TaskItem({
             </details>
           )}
         </div>
-        <div
-          className={
-            canTakeDoneDecision
-              ? "todo-actions todo-actions--decision"
-              : "todo-actions"
-          }
-        >
-          {canTakeDoneDecision ? (
-            <>
-              <button
-                type="button"
-                className="todo-decision-btn todo-decision-icon"
-                aria-label="Review" title="Review task"
-                onClick={() => onReviewDoneTask(todo)}
-              >
-                <span className="task-review-symbol"><img src="/illustrations/review-circle.svg" alt="" /></span>
-              </button>
-              <button
-                type="button"
-                className="todo-decision-btn todo-decision-btn--danger todo-decision-icon"
-                aria-label="Reject" title="Reject task"
-                onClick={() => onRejectDoneTask(todo)}
-              >
-                <CrossIcon />
-              </button>
-            </>
-          ) : null}
+        <div className="todo-actions">
           {!readOnly && !canTakeDoneDecision && canPushNewestWeek ? (
             <IconButton
               type="button"
@@ -1010,7 +983,6 @@ function MemberCard({
   onReviewDoneTask,
   onRejectDoneTask,
   onDelete,
-  onUndoReviewWeek,
   onOvertimeSave,
   onProjectRemaining,
   selectedWeek,
@@ -1243,7 +1215,6 @@ function MemberCard({
             <TaskCreateForm draft={ui} onChange={patchUi} onSubmit={submitAdd} onCancel={cancelAdd} inputRef={addInputRef} projects={assignableProjects} remainingHint={addRemainingHint} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} />
           ))}
 
-          {reviewedTodos.length > 0 && <TimeButton onClick={() => onUndoReviewWeek(member.id)}>Undo review this week</TimeButton>}
 
 
         </Surface>
@@ -2069,7 +2040,6 @@ export default function MembersPage({
         onReviewDoneTask={handleReviewDoneTask}
         onRejectDoneTask={handleRejectDoneTask}
         onDelete={handleDelete}
-        onUndoReviewWeek={requestUndoReviewWeek}
         onOvertimeSave={handleOvertimeSave}
         onProjectRemaining={projectRemainingHint}
         selectedWeek={selectedWeek}
@@ -2217,7 +2187,10 @@ export default function MembersPage({
                     <h3 id={`task-scope-${scope.key}`}>{scope.title}</h3>
                   </div>
                   <span className="task-scope-count" aria-label={`${taskCount} tasks`}>{taskCount}</span>
-                  {scope.key === "personal" && movableUnfinishedCount > 0 ? <Button className="task-move-unfinished" type="button" size="small" variant="ghost" onClick={requestMoveAllUnfinishedToCurrentWeek}>Move unfinished ({movableUnfinishedCount})</Button> : null}
+                  {scope.key === "personal" && <div className="task-scope-tools">
+                    {isEditableWeekKey(selectedWeek) && scope.tasks.some(task => taskWeekKey(task.data) === selectedWeek && task.data.reviewed) && <button className="task-scope-text-action" type="button" onClick={() => requestUndoReviewWeek(viewerMemberId)}>Undo review this week</button>}
+                    {movableUnfinishedCount > 0 && <button className="task-scope-text-action" type="button" onClick={requestMoveAllUnfinishedToCurrentWeek}>Move unfinished ({movableUnfinishedCount})</button>}
+                  </div>}
                 </div>
                 {scope.members.length ? (
                   <CollectionLayout variant="grid" className="members-grid">

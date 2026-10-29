@@ -1,5 +1,7 @@
 "use client";
 
+import FormField from "./ui/FormField";
+import TimeButton from "./ui/TimeButton";
 import TaskClockIcon from "./ui/TaskClockIcon";
 import Button from "./Button";
 import IconButton from "./IconButton";
@@ -46,8 +48,9 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
             <div className="notepad-add-active">
               <div className="notepad-add-main">
                 <span className="notepad-add-plus">+</span>
-                <input
+                <FormField label="Task title"><input
                   ref={inputRef}
+                  aria-label="Task title"
                   autoFocus
                   className="notepad-add-input"
                   value={addTitle}
@@ -56,16 +59,16 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                   onKeyDown={(e) => {
                     if (e.key === "Escape") cancelAdd();
                   }}
-                />
+                /></FormField>
               </div>
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  {members ? <SelectField className="meta-select" aria-label="Task assignee" value={assigneeId} onChange={(event) => onAssigneeChange(event.target.value)} required>
+                  {members ? <FormField label="Assigned to"><SelectField chevron className="meta-select" aria-label="Task assignee" value={assigneeId} onChange={(event) => onAssigneeChange(event.target.value)} required>
                     <option value="">Member…</option>
                     {members.map((member) => <option key={member.id} value={member.id}>{member.data?.name || member.id}</option>)}
-                  </SelectField> : null}
-                  <SelectField
+                  </SelectField></FormField> : null}
+                  <FormField label="Planned time"><SelectField chevron
                     className="meta-select"
                     icon={<TaskClockIcon />}
                     aria-label="Planned time"
@@ -79,8 +82,8 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                         {formatUnitOption(units)}
                       </option>
                     ))}
-                  </SelectField>
-                  <SelectField
+                  </SelectField></FormField>
+                  <FormField label="Project"><SelectField chevron
                     className="meta-select"
                     icon={<IconFolder />}
                     aria-label="Project"
@@ -94,17 +97,17 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                         {p.data.name || p.id}
                       </option>
                     ))}
-                  </SelectField>
+                  </SelectField></FormField>
                   {addRemainingHint ? (
                     <span className="meta-helper-chip">{addRemainingHint}</span>
                   ) : null}
-                  <input
+                  <FormField label="Date"><input
                     type="date"
                     className="meta-date"
                     aria-label="Task date"
                     value={addDeadline}
                     onChange={(e) => patchUi({ addDeadline: e.target.value })}
-                  />
+                  /></FormField>
                 </div>
               </div>
 
@@ -232,22 +235,8 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
               </div>
 
               <div className="notepad-add-actions">
-                <Button
-                  type="button"
-                  size="small"
-                  onClick={submitAdd}
-                  disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}
-                >
-                  Save
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="small"
-                  onClick={cancelAdd}
-                >
-                  Cancel
-                </Button>
+                <TimeButton onClick={submitAdd} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
+                <TimeButton quiet onClick={cancelAdd}>Cancel</TimeButton>
               </div>
             </div>
   );
