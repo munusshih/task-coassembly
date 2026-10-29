@@ -392,9 +392,9 @@ export default function ResourcesPage({ currentMember, members = [] }) {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, reason) {
     try {
-      await deleteDocument("resources", id);
+      await deleteDocument("resources", id, reason);
       setPendingDelete(null);
     } catch (e) {
       console.error("Could not delete link:", e);
@@ -467,7 +467,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
       {pendingDelete && (
         <DeleteConfirmDialog
           label={pendingDelete.name}
-          onConfirm={() => handleDelete(pendingDelete.id)}
+          onConfirm={(reason) => handleDelete(pendingDelete.id, reason)}
           onCancel={() => setPendingDelete(null)}
         />
       )}

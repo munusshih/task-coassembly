@@ -85,7 +85,6 @@ export default function Navigation({
       }}>
         <CloseButton className="task-menu-close" label="Close workspace navigation" onClick={closeNavigation} autoFocus />
         <nav ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
-          <a href={viewHref("homepage")} aria-current={activeTab === "homepage" ? "page" : undefined} onClick={(event) => navigate(event, "homepage")}>Homepage</a>
           {TABS.filter((tab) => tab.key !== "payouts" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
             <div className="task-navigation-group" key={tab.key}>
               <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}>{tab.label}</a>

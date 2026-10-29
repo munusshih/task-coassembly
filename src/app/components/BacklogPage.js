@@ -27,6 +27,7 @@ import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import TabPage from "./ui/TabPage";
 import TextareaField from "./ui/TextareaField";
+import { actionRecord } from "../../lib/actionReason.mjs";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
 import {
@@ -173,7 +174,7 @@ function WishItem({
     return author;
   }
 
-  async function handleDeleteComment(commentId) {
+  async function handleDeleteComment(commentId, reason) {
     if (!sessionChecked) return;
     if (!currentUsername) {
       onSessionExpired?.();
@@ -182,15 +183,15 @@ function WishItem({
     const newComments = comments.filter(
       (c, i) => getCommentId(c, i) !== commentId,
     );
-    await onComment(item, newComments);
+    await onComment(item, newComments, { ...actionRecord("delete-comment", reason, currentUsername), commentId });
   }
 
   function requestDeleteComment(commentId, commentTextValue) {
     setCommentDeleteTarget({
       label: "this comment",
       detail: String(commentTextValue || "").slice(0, 180),
-      onConfirm: async () => {
-        await handleDeleteComment(commentId);
+      onConfirm: async (reason) => {
+        await handleDeleteComment(commentId, reason);
       },
     });
   }
@@ -508,9 +509,9 @@ function WishItem({
         <DeleteConfirmDialog
           label={commentDeleteTarget.label}
           detail={commentDeleteTarget.detail}
-          onConfirm={async () => {
+          onConfirm={async (reason) => {
             try {
-              await commentDeleteTarget.onConfirm();
+              await commentDeleteTarget.onConfirm(reason);
             } finally {
               setCommentDeleteTarget(null);
             }
@@ -874,9 +875,9 @@ export default function BacklogPage({ viewerName = "" }) {
   async function handleDelete({ id, text }) {
     setDeleteTarget({
       label: text || "this item",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("backlogItems", id);
+          await deleteDocument("backlogItems", id, reason);
         } catch (e) {
           console.error("Could not delete wish:", e);
         } finally {
@@ -953,11 +954,12 @@ export default function BacklogPage({ viewerName = "" }) {
     }
   }
 
-  async function handleComment(item, newComments) {
+  async function handleComment(item, newComments, deletion) {
     try {
       await replaceDocument("backlogItems", item.id, {
         ...item.data,
         comments: newComments,
+        ...(deletion ? { commentDeletionHistory: [...(item.data.commentDeletionHistory || []), deletion] } : {}),
       });
     } catch (e) {
       console.error("Could not update comments:", e);

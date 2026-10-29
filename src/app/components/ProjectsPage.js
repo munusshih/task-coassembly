@@ -2188,9 +2188,9 @@ export default function ProjectsPage({
     }
     setDeleteTarget({
       label: project.data?.name || "this project",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("projects", project.id);
+          await deleteDocument("projects", project.id, reason);
           setProjects((prev) => prev.filter((item) => item.id !== project.id));
           addToast("Deleted");
         } catch (err) {

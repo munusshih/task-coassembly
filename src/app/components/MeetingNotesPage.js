@@ -1072,9 +1072,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   async function handleDeleteNote(noteId, noteTitle) {
     setDeleteTarget({
       label: noteTitle || "this note",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("meetingNotes", noteId);
+          await deleteDocument("meetingNotes", noteId, reason);
           if (viewingId === noteId) setViewingId(null);
           if (editingId === noteId) setEditingId(null);
         } catch (error) {

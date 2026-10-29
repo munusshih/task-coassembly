@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -14,7 +13,8 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
+import { actionRecord } from "./lib/actionReason.mjs";
 
 function getDb() {
   if (!db) {
@@ -167,8 +167,16 @@ export async function updateDocumentsAtomically(operations) {
   await batch.commit();
 }
 
-export async function deleteDocument(collectionName, id) {
-  await deleteDoc(doc(getDb(), collectionName, id));
+export async function deleteDocument(collectionName, id, reason) {
+  const entry = actionRecord('delete', reason, auth?.currentUser?.uid);
+  const database = getDb();
+  const target = doc(database, collectionName, id);
+  const batch = writeBatch(database);
+  // Firestore keeps subcollections after their parent is removed. Commit the
+  // reason and deletion atomically so no deletion can silently lose its context.
+  batch.set(doc(collection(target, 'activity')), entry);
+  batch.delete(target);
+  await batch.commit();
 }
 
 export async function deleteDocumentsWhereBefore(
@@ -176,6 +184,7 @@ export async function deleteDocumentsWhereBefore(
   field,
   cutoffTs,
   maxDelete = 100,
+  reason,
 ) {
   const collectionRef = collection(getDb(), collectionName);
   const snapshot = await getDocs(
@@ -188,7 +197,7 @@ export async function deleteDocumentsWhereBefore(
 
   if (snapshot.empty) return 0;
 
-  await Promise.all(snapshot.docs.map((row) => deleteDoc(row.ref)));
+  await Promise.all(snapshot.docs.map((row) => deleteDocument(collectionName, row.id, reason)));
   return snapshot.docs.length;
 }
 

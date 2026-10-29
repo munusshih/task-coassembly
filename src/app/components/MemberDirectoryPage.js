@@ -2,6 +2,8 @@
 
 
 import AllocationClock from "./ui/AllocationClock";
+import MemberEditButton from "./ui/MemberEditButton";
+import SpoonMeter from "./ui/SpoonMeter";
 import MemberForm from "./MemberForm";
 import TaskCreateTrigger from "./TaskCreateTrigger";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
@@ -23,7 +25,7 @@ import {
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
-import { DELETE_ICON, EDIT_ICON } from "./icons";
+import { DELETE_ICON } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
@@ -904,7 +906,7 @@ export default function MemberDirectoryPage() {
     setDeleteTarget({
       label: memberName,
       detail,
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
           const now = Date.now();
           await Promise.all([
@@ -928,7 +930,7 @@ export default function MemberDirectoryPage() {
               });
             }),
           ]);
-          await deleteDocument("members", member.id);
+          await deleteDocument("members", member.id, reason);
           if (editingId === member.id) cancelEdit();
           setNotice({ error: false, text: "Member deleted" });
         } catch (error) {
@@ -1018,9 +1020,7 @@ export default function MemberDirectoryPage() {
                   >
                     {expanded ? "▴" : "▾"}
                   </IconButton>
-                  <IconButton onClick={() => startEdit(member)} title="Edit">
-                    {EDIT_ICON}
-                  </IconButton>
+                  <MemberEditButton name={member.data?.name || member.id} onClick={() => startEdit(member)} />
                   <IconButton
                     variant="delete"
                     onClick={() => handleDeleteMember(member)}
@@ -1216,17 +1216,14 @@ export default function MemberDirectoryPage() {
   function renderRoleMember(member) {
     const metric = roleMetricsById[member.id];
     const name = member.data?.name || member.id;
-    const joined = member.data?.joinedOn;
     const hideEmptyWork = member.data?.active === false && !metric.total && !metric.currentProjects.length;
     return <article key={member.id} className={`member-role-row${hideEmptyWork ? " member-role-row--profile-only" : ""}${highlightedMember && highlightedMember !== member.id ? " member-role-row--dimmed" : ""}${highlightedMember === member.id ? " member-role-row--highlighted" : ""}`}>
       <div className="member-role-identity">
         <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
-        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}</h3>
+        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}<MemberEditButton name={name} onClick={() => startEdit(member)} /></h3>
         {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
         <p className="member-tenure">{tenureText(member.data || {}, today)}</p>
-        <button className="member-joined-edit" type="button" onClick={() => startEdit(member)} aria-label={`Edit join date for ${name}`}>
-          Joined {joined ? new Date(`${joined}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'date not set'} <span aria-hidden="true">↗</span>
-        </button>
+
         <MemberMilestones member={member} today={today} />
       </div>
       {!hideEmptyWork && <>
@@ -1234,7 +1231,7 @@ export default function MemberDirectoryPage() {
         <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
         <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.data?.kind)}>{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
         <h4>Work mix</h4>
-        <div className="member-work-mix-rows">{metric.categories.filter(category => category.key !== "unclassified").map(category => <div key={category.key} className="member-work-mix-row"><span>{category.label}</span><span className="member-work-mix-track"><span style={{ width: `${category.percent}%`, background: `var(--workspace-${category.tone})` }} /></span><strong>{Math.round(category.percent)}%</strong></div>)}</div>
+        <div className="member-work-mix-rows">{metric.categories.filter(category => category.key !== "unclassified").map(category => <div key={category.key} className="member-work-mix-row"><span>{category.label}</span><SpoonMeter percent={category.percent} tone={category.tone} label={category.label} /><strong>{Math.round(category.percent)}%</strong></div>)}</div>
         <p className="member-role-caption">Based on allocated time over these four weeks.{metric.categories.find(category => category.key === "unclassified")?.percent > 0 && ` ${Math.round(metric.categories.find(category => category.key === "unclassified").percent)}% unclassified.`}</p>
       </div>
       <div className="member-role-history">
@@ -1273,7 +1270,6 @@ export default function MemberDirectoryPage() {
 
 
       {directoryView === 'role' && <section className="member-allocation-overview" aria-label="Member allocation over the last four weeks">
-        <p className="member-allocation-period">Last four weeks · by member</p>
         <AllocationClock variant="member" subject="Member" periodLabel="Last four weeks by member" allocations={activeDirectoryMembers.map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total })).sort((a, b) => b.units - a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
       </section>}
 

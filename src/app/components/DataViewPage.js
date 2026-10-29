@@ -8,6 +8,7 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { firebaseReady } from "../../firebase";
+import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import Button from "./Button";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
@@ -29,6 +30,7 @@ const COLLECTION_MAP = {
 
 export default function DataViewPage({ tabKey }) {
   const collectionName = COLLECTION_MAP[tabKey];
+  const [deleting, setDeleting] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState("{}");
@@ -53,6 +55,7 @@ export default function DataViewPage({ tabKey }) {
         });
       } else {
         setSelectedId("");
+        setDeleting(false);
         setDraft("{}");
       }
     });
@@ -87,14 +90,14 @@ export default function DataViewPage({ tabKey }) {
     }
   }
 
-  async function handleDelete() {
+  async function handleDelete(reason) {
     if (!selectedDocument) return;
-    if (!window.confirm(`Delete ${selectedDocument.id}?`)) return;
     try {
       setError("");
-      await deleteDocument(collectionName, selectedDocument.id);
+      await deleteDocument(collectionName, selectedDocument.id, reason);
       setStatus(`Deleted ${selectedDocument.id}`);
       setSelectedId("");
+      setDeleting(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete.");
     }
@@ -142,7 +145,7 @@ export default function DataViewPage({ tabKey }) {
           actions={(
             <div className="button-row">
               <Button onClick={handleSave} disabled={!selectedDocument}>Save</Button>
-              <Button variant="danger" onClick={handleDelete} disabled={!selectedDocument}>Delete</Button>
+              <Button variant="danger" onClick={() => setDeleting(true)} disabled={!selectedDocument}>Delete</Button>
             </div>
           )}
         >
@@ -175,6 +178,7 @@ export default function DataViewPage({ tabKey }) {
         {status ? <p className="message message--ok">{status}</p> : null}
         {error ? <p className="message message--error">{error}</p> : null}
       </StatusStack>
+      {deleting && selectedDocument && <DeleteConfirmDialog label={selectedDocument.id} onConfirm={handleDelete} onCancel={() => setDeleting(false)} />}
     </TabPage>
   );
 }

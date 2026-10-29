@@ -9,6 +9,9 @@ import {
   updateDocument,
 } from "../../firestore";
 import { isWorkerOwner } from "../../authAccess";
+import ReasonDialog from "./ui/ReasonDialog";
+import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import { actionRecord } from "../../lib/actionReason.mjs";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON } from "./icons";
@@ -406,6 +409,8 @@ export default function PayoutsPage({
   viewerRole = "associate",
   sharedMembers = [],
 }) {
+  const [decisionTarget, setDecisionTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [rows, setRows] = useState([]);
   const [loadError, setLoadError] = useState(null);
 
@@ -448,21 +453,20 @@ export default function PayoutsPage({
     });
   }
 
-  async function handleApprove(row) {
-    await updateDocument("reimbursements", row.id, { status: "approved", updatedAt: Date.now() });
-  }
-
-  async function handleReject(row) {
-    await updateDocument("reimbursements", row.id, { status: "rejected", updatedAt: Date.now() });
+  function handleApprove(row) { setDecisionTarget({ row, action: 'approve' }); }
+  function handleReject(row) { setDecisionTarget({ row, action: 'reject' }); }
+  async function confirmDecision(reason) {
+    const { row, action } = decisionTarget;
+    const decision = actionRecord(action, reason, viewerMemberId);
+    await updateDocument("reimbursements", row.id, { status: action === 'approve' ? 'approved' : 'rejected', decisionReason: decision.reason, decisionHistory: [...(Array.isArray(row.data.decisionHistory) ? row.data.decisionHistory : []), decision], updatedAt: Date.now() });
+    setDecisionTarget(null);
   }
 
   async function handleMarkPaid(row) {
     await updateDocument("reimbursements", row.id, { status: "paid", updatedAt: Date.now() });
   }
 
-  async function handleDelete(row) {
-    await deleteDocument("reimbursements", row.id);
-  }
+  function handleDelete(row) { setDeleteTarget(row); }
 
   const visibleMembers = isAdmin
     ? activeMembers
@@ -506,6 +510,8 @@ export default function PayoutsPage({
           ))}
         </CollectionLayout>
       )}
+      {decisionTarget && <ReasonDialog illustration={decisionTarget.action} title={decisionTarget.action === 'approve' ? 'Approve request' : 'Reject request'} message={decisionTarget.row.data?.title} confirmLabel={decisionTarget.action === 'approve' ? 'Approve' : 'Reject'} onConfirm={confirmDecision} onCancel={() => setDecisionTarget(null)} />}
+      {deleteTarget && <DeleteConfirmDialog label={deleteTarget.data?.title || 'this request'} onConfirm={async reason => { await deleteDocument('reimbursements', deleteTarget.id, reason); setDeleteTarget(null); }} onCancel={() => setDeleteTarget(null)} />}
     </TabPage>
   );
 }

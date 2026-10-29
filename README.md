@@ -158,3 +158,7 @@ The added page-title visualizations have been removed from Projects, Members, Wi
 Resource visits register the current resource URL and a stable edit revision in the local, git-ignored `.cache/resource-previews/` directory. Covers are fetched from the site's OG/Twitter image or icon, converted to WebP, and served through the authenticated preview endpoint. Missing images use a deterministic coloured title cover. Unchanged resources, including missing-image results, reuse the disk cache; editing a resource creates a new cache key.
 
 `npm run build` checks the registered covers before compiling. Run `npm run resources:previews` to warm that same cache separately. New resources record the submitting member; older records without authorship display “Unknown contributor.”
+
+### Decision and deletion reasons
+
+Task and request approvals/rejections require a reason and append it, the actor, and timestamp to `decisionHistory`. Deletion dialogs also require a reason. `deleteDocument` commits the reason to `<collection>/<document>/activity/<event>` and removes the parent in the same Firestore batch; the activity subcollection survives the deletion. Existing recursive collection rules apply to these events.

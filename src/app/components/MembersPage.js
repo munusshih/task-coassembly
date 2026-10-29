@@ -37,6 +37,8 @@ import SectionBlock from "./ui/SectionBlock";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import TaskCreateForm, { emptyTaskCreateDraft } from "./TaskCreateForm";
+import ReasonDialog from "./ui/ReasonDialog";
+import { actionRecord } from "../../lib/actionReason.mjs";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import ModalShell from "./ui/ModalShell";
 import {
@@ -401,6 +403,7 @@ function TaskItem({
   onOvertimeSave,
   getProjectRemaining,
   allowReview = true,
+  readOnly = false,
 }) {
   const focusedTaskId = useFocusTask();
   const isEditing = editingId === todo.id;
@@ -428,7 +431,7 @@ function TaskItem({
   const links = normalizeTaskLinkList(todo.data.links);
   const canPushNewestWeek = canPushTaskToNewestWeek(todo.data);
   const canTakeDoneDecision =
-    allowReview && Boolean(completed) && !Boolean(todo.data.reviewed);
+    !readOnly && allowReview && Boolean(completed) && !Boolean(todo.data.reviewed);
 
   async function handleCheck(checked) {
     const updated = await onToggle(todo, checked);
@@ -664,17 +667,18 @@ function TaskItem({
           <input
             type="checkbox"
             checked={Boolean(completed)}
+            disabled={readOnly}
             aria-label={`Mark ${title || "task"} ${completed ? "incomplete" : "complete"}`}
             onChange={(e) => handleCheck(e.target.checked)}
           />
         </div>
         <div
           className="todo-content"
-          onClick={() => !completed && onEditStart(todo)}
+          onClick={() => !readOnly && !completed && onEditStart(todo)}
         >
           <button
             type="button"
-            disabled={Boolean(completed)}
+            disabled={readOnly || Boolean(completed)}
             className={completed ? "todo-text todo-text--done" : "todo-text"}
           >
             <span className="task-title-ink">{title || "Untitled"}</span>
@@ -733,6 +737,7 @@ function TaskItem({
                           type="checkbox"
                           className="todo-subtask-check"
                           checked={Boolean(subtask.completed)}
+                          disabled={readOnly}
                           onChange={(e) =>
                             onToggleSubtask(todo, idx, e.target.checked)
                           }
@@ -797,7 +802,7 @@ function TaskItem({
               </button>
             </>
           ) : null}
-          {!canTakeDoneDecision && canPushNewestWeek ? (
+          {!readOnly && !canTakeDoneDecision && canPushNewestWeek ? (
             <IconButton
               type="button"
               title="Push to newest week"
@@ -806,7 +811,7 @@ function TaskItem({
               <span>{">>"}</span>
             </IconButton>
           ) : null}
-          {!completed ? (
+          {!readOnly && !completed ? (
             <IconButton
               type="button"
               variant="delete"
@@ -1202,13 +1207,14 @@ function MemberCard({
       {isEditableWeek ? (
         <Surface>
           <ul className="todo-list">
-            {weekTodos.length === 0 && (
+            {weekTodos.length === 0 && reviewedTodos.length === 0 && (
               <li className="todo-empty">No tasks yet.</li>
             )}
-            {weekTodos.map((todo) => (
+            {[...weekTodos, ...reviewedTodos].map((todo) => (
               <TaskItem
                 key={todo.id}
                 allowReview={allowReview}
+                readOnly={Boolean(todo.data.reviewed)}
                 todo={todo}
                 projects={projects}
                 assignableProjects={assignableProjects}
@@ -1242,78 +1248,8 @@ function MemberCard({
             <TaskCreateForm draft={ui} onChange={patchUi} onSubmit={submitAdd} onCancel={cancelAdd} inputRef={addInputRef} projects={assignableProjects} remainingHint={addRemainingHint} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} />
           ))}
 
-          {reviewedTodos.length > 0 ? (
-            <div className="reviewed-section">
-              <div className="reviewed-section-head">
-                <p className="meta-label reviewed-section-label">
-                  Reviewed (locked)
-                </p>
-                <Button
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  onClick={() => onUndoReviewWeek(member.id)}
-                >
-                  Undo review this week
-                </Button>
-              </div>
-              <ul className="todo-list reviewed-list">
-                {reviewedTodos.map((todo) => {
-                  const projName = projects.find(
-                    (p) => p.id === todo.data.projectId,
-                  )?.data?.name;
-                  const t = Number(todo.data.timeUnits) || 0;
-                  const ot = Number(todo.data.overtimeUnits) || 0;
-                  return (
-                    <li key={todo.id} className="todo-item">
-                      <div className="todo-checkbox-cell">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(todo.data.completed)}
-                          disabled
-                          tabIndex={-1}
-                        />
-                      </div>
-                      <div
-                        className="todo-content"
-                        style={{ cursor: "default" }}
-                      >
-                        <span
-                          className={
-                            todo.data.completed
-                              ? "todo-text todo-text--done"
-                              : "todo-text"
-                          }
-                        >
-                          <span className="task-title-ink">{todo.data.title || "Untitled"}</span>
-                        </span>
-                        <div className="todo-chips">
-                          {todo.data.trackedSeconds > 0 ? <Pill className="chip--logged">{durationLabel(todo.data.trackedSeconds)} logged</Pill> : null}
-                          {t > 0 ? (
-                            <Pill className="chip--time">
-                              {formatTimeUnits(t)}
-                            </Pill>
-                          ) : null}
-                          {ot > 0 ? (
-                            <Pill className="chip--ot">
-                              +{formatTimeUnits(ot)} OT
-                            </Pill>
-                          ) : null}
-                          {projName ? (
-                            <Pill className="chip--project">{projName}</Pill>
-                          ) : null}
-                        </div>
-                        <ReadOnlyTaskDetails
-                          todo={todo}
-                          keyPrefix="reviewed"
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
+          {reviewedTodos.length > 0 && <Button type="button" size="small" variant="ghost" onClick={() => onUndoReviewWeek(member.id)}>Undo review this week</Button>}
+
 
         </Surface>
       ) : (
@@ -1408,6 +1344,7 @@ export default function MembersPage({
   const [highlightedProject, setHighlightedProject] = useState(null);
   const [memberViewMode, setMemberViewMode] = useUrlState("taskView", "member", { allowed: ["member", "project", "resources"] });
   useEffect(() => { setHighlightedProject(null); }, [memberViewMode, selectedWeek]);
+  const [decisionTarget, setDecisionTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // "member" | "project"
   const [actionConfirm, setActionConfirm] = useState(null);
   const createInFlightRef = useRef(false);
@@ -1794,9 +1731,9 @@ export default function MembersPage({
     }
     setDeleteTarget({
       label: task.data?.title || "this task",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("tasks", task.id);
+          await deleteDocument("tasks", task.id, reason);
           setAllTasks((prev) => prev.filter((item) => item.id !== task.id));
           addToast("Deleted");
         } catch (e) {
@@ -1877,7 +1814,7 @@ export default function MembersPage({
     }
   }
 
-  async function handleReviewDoneTask(task) {
+  async function handleReviewDoneTask(task, reason) {
     const memberId = task?.data?.memberId;
     if (
       !canViewerManageMemberTask({
@@ -1894,10 +1831,14 @@ export default function MembersPage({
       return;
     }
 
+    if (!reason) { setDecisionTarget({ task, action: "approve" }); return; }
+    const decision = actionRecord("approve", reason, viewerMemberId);
     try {
       const now = Date.now();
       const nextData = {
         ...task.data,
+        reviewReason: decision.reason,
+        decisionHistory: [...(Array.isArray(task.data.decisionHistory) ? task.data.decisionHistory : []), decision],
         reviewed: true,
         reviewedAt: now,
         completionState: "completed",
@@ -1909,13 +1850,14 @@ export default function MembersPage({
           item.id === task.id ? { ...item, data: nextData } : item,
         ),
       );
+      setDecisionTarget(null);
       addToast("Task moved to reviewed");
     } catch (e) {
       addToast(e.message || "Could not review task", true);
     }
   }
 
-  async function handleRejectDoneTask(task) {
+  async function handleRejectDoneTask(task, reason) {
     const memberId = task?.data?.memberId;
     if (
       !canViewerManageMemberTask({
@@ -1929,10 +1871,14 @@ export default function MembersPage({
     }
     if (!task?.data?.completed) return;
 
+    if (!reason) { setDecisionTarget({ task, action: "reject" }); return; }
+    const decision = actionRecord("reject", reason, viewerMemberId);
     try {
       const now = Date.now();
       const nextData = {
         ...task.data,
+        rejectionReason: decision.reason,
+        decisionHistory: [...(Array.isArray(task.data.decisionHistory) ? task.data.decisionHistory : []), decision],
         completed: false,
         reviewed: false,
         reviewedAt: null,
@@ -1945,6 +1891,7 @@ export default function MembersPage({
           item.id === task.id ? { ...item, data: nextData } : item,
         ),
       );
+      setDecisionTarget(null);
       addToast("Task rejected and moved back to active");
     } catch (e) {
       addToast(e.message || "Could not reject task", true);
@@ -2294,6 +2241,8 @@ export default function MembersPage({
           </div>
         ))}
       </StatusStack>
+
+      {decisionTarget && <ReasonDialog illustration={decisionTarget.action} title={decisionTarget.action === 'approve' ? 'Approve task' : 'Reject task'} message={decisionTarget.task.data?.title || 'Untitled task'} confirmLabel={decisionTarget.action === 'approve' ? 'Approve' : 'Reject'} onCancel={() => setDecisionTarget(null)} onConfirm={reason => decisionTarget.action === 'approve' ? handleReviewDoneTask(decisionTarget.task, reason) : handleRejectDoneTask(decisionTarget.task, reason)} />}
 
       {deleteTarget && (
         <DeleteConfirmDialog
