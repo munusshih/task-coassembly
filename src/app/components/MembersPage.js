@@ -666,7 +666,7 @@ function TaskItem({
   }
 
   return (
-      <li className={`todo-item${focusedTaskId === todo.id ? " todo-item--focused" : ""}`}>
+      <li data-rationale-anchor={`task-${todo.id}`} data-rationale-label={title} className={`todo-item${focusedTaskId === todo.id ? " todo-item--focused" : ""}`}>
         <div className="todo-checkbox-cell">
           {canTakeDoneDecision ? <TaskReviewControls onReview={() => onReviewDoneTask(todo)} onReject={() => onRejectDoneTask(todo)} /> : <input
             type="checkbox"
@@ -2145,7 +2145,7 @@ export default function MembersPage({
       </WorkspacePageHero>
       {memberViewMode === "member" && <TaskTimers tasks={visibleTasks.filter(task => task.data?.memberId === viewerMemberId && !task.data?.archived && !task.data?.completed)} />}
       <WorkspaceCreateDock label="New task" expanded={composerOpen} onClick={() => setComposerOpen(true)} />
-      {composerOpen && <BottomComposer title="New task" onClose={() => setComposerOpen(false)}>
+      {composerOpen && <BottomComposer illustration="compose-task" title="New task" onClose={() => setComposerOpen(false)}>
         <TaskCreateForm draft={composerDraft} onChange={patch => setComposerDraft(previous => ({...previous,...patch}))} onCancel={() => setComposerOpen(false)} projects={getAssignableProjects(visibleProjects, composerMember)} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} members={visibleMembers} assigneeId={composerMember} onAssigneeChange={id => { setComposerMember(id); setComposerDraft(previous => ({...previous,addProject:""})); }} onSubmit={async () => {
           const draft = composerDraft;
           if (!draft.addTitle.trim() || !draft.addTime || !draft.addProject || !composerMember) return;
@@ -2181,7 +2181,7 @@ export default function MembersPage({
           {taskScopes.map((scope) => {
             const taskCount = scope.tasks.filter((task) => taskWeekKey(task.data) === selectedWeek).length;
             return (
-              <section key={scope.key} className={`task-scope task-scope--${scope.key}`} aria-labelledby={`task-scope-${scope.key}`}>
+              <section data-rationale-anchor={`scope-${scope.key}`} data-rationale-label={scope.title} key={scope.key} className={`task-scope task-scope--${scope.key}`} aria-labelledby={`task-scope-${scope.key}`}>
                 <div className="task-scope-head">
                   <div>
                     <h3 id={`task-scope-${scope.key}`}>{scope.title}</h3>

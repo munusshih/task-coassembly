@@ -29,7 +29,7 @@ export default function TabPage({
             className={headerClassName}
           />
         ))}
-      <div className={bodyClasses}>{children}</div>
+      <div data-rationale-anchor="page-content" data-rationale-label="Page content" className={bodyClasses}>{children}</div>
     </section>
   );
 }

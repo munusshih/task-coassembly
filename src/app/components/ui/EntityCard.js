@@ -6,6 +6,7 @@ export default function EntityCard({
   className = "",
   variant = "surface",
   interactive = false,
+  ...props
 }) {
   const Component = as;
   const classes = [
@@ -17,5 +18,5 @@ export default function EntityCard({
     .filter(Boolean)
     .join(" ");
 
-  return <Component className={classes}>{children}</Component>;
+  return <Component className={classes} {...props}>{children}</Component>;
 }

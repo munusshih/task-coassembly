@@ -23,15 +23,17 @@ function Dial({ now, focus, elapsed = 0, minutes, journal, onSegment, range = "t
   const markerY = 100 + Math.sin(markerAngle) * 94;
   const isTimer = Boolean(focus || minutes);
   const progress = focus ? (focus.mode === "countdown" ? elapsed / focus.durationMs : (elapsed % 3600000) / 3600000) : 0;
+  const handAngle = (isTimer ? Math.min(1, Math.max(0, progress)) : markerPosition) * 360;
   const segments = journal ? historySegments(journal, now, range).filter(entry=>entry.status === "logged" || (entry.source!=="idle" && entry.seconds>=MIN_TRACKED_SECONDS)) : [];
   const recorded = segments.reduce((sum, entry) => sum + entry.seconds, 0);
   const sourceLabel = (entry) => entry.status === "logged" ? "Logged" : entry.source === "idle" ? "Idle" : entry.source === "focus" ? "Focus" : "Activity";
   return <div className={`time-dial ${isTimer ? "time-dial--focus" : ""}`}>
     <svg viewBox="0 0 200 200" aria-label={isTimer ? "Focus progress" : `Current time ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}, with ${range === "today" ? "today’s activity" : "activity over the last hour"}`} role="group">
-      <desc>{isTimer ? "The outer ring shows elapsed session time. Inner segments show focus time by task today; select a segment to choose its task." : `${durationLabel(recorded)} tracked ${range === "today" ? "today" : "over the last hour"}. The selected scale shows the recorded activity for that range. Solid sectors are unlogged; muted sectors are logged. The moving dot marks now.`}</desc>
+      <desc>{isTimer ? "The filled sector shows elapsed session time. Inner segments show focus time by task today; select a segment to choose its task." : `${durationLabel(recorded)} tracked ${range === "today" ? "today" : "over the last hour"}. The selected scale shows the recorded activity for that range. Solid sectors are unlogged; muted sectors are logged. The tapered hand marks now.`}</desc>
       {isTimer ? <circle cx="100" cy="100" r="94" className="time-history-track" aria-hidden="true" /> : <circle cx="100" cy="100" r="94" className="time-orbit-face" aria-hidden="true" />}
+      <g className="time-disc-ticks" aria-hidden="true">{Array.from({length:24},(_,index)=><line key={index} x1="100" y1={index%6===0?"9":"8"} x2="100" y2={index%6===0?"15":"11"} transform={`rotate(${index*15} 100 100)`}/>)}</g>
       {isTimer ? <>
-        {progress > 0 ? <path d={arcPath(0, progress, 94)} className="time-focus-progress" aria-hidden="true" /> : null}
+        {progress > 0 ? <path d={bandPath(0, Math.min(1,progress), 90, 8)} className="time-disc-progress" aria-hidden="true" /> : null}
         {allocations.map((entry) => {
           const task = tasks.find((task) => task.id === entry.taskId);
           const label = `${task?.data.title || "Unavailable task"} · ${durationLabel(entry.seconds)} focus today`;
@@ -41,23 +43,26 @@ function Dial({ now, focus, elapsed = 0, minutes, journal, onSegment, range = "t
         {segments.map((entry) => {
           const canReview = entry.status === "pending" && !entry.live && Boolean(onSegment);
           const label = `${sourceLabel(entry)} · ${durationLabel(entry.seconds)}${canReview ? " · review fragment" : ""}`;
-          return <path key={entry.id} d={bandPath(entry.position, entry.span, 94, 48)} className={`time-orbit-sector time-orbit-sector--${entry.status === "logged" ? "logged" : entry.source} ${canReview ? "is-interactive" : ""}`} role={canReview ? "button" : "img"} aria-hidden={entry.status === "logged" || entry.live ? true : undefined} aria-label={label} tabIndex={canReview ? 0 : undefined} onClick={canReview ? () => onSegment(entry.id) : undefined} onKeyDown={canReview ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSegment(entry.id); } } : undefined}><title>{label}</title></path>;
+          return <path key={entry.id} d={bandPath(entry.position, entry.span, 90, 8)} className={`time-orbit-sector time-orbit-sector--${entry.status === "logged" ? "logged" : entry.source} ${canReview ? "is-interactive" : ""}`} role={canReview ? "button" : "img"} aria-hidden={entry.status === "logged" || entry.live ? true : undefined} aria-label={label} tabIndex={canReview ? 0 : undefined} onClick={canReview ? () => onSegment(entry.id) : undefined} onKeyDown={canReview ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSegment(entry.id); } } : undefined}><title>{label}</title></path>;
         })}
-        {[{x:100,y:21},{x:194,y:104},{x:100,y:187},{x:6,y:104}].map(({x,y}, index) => {
-          const point = new Date(window.start + window.cycle * index / 4);
-          const label = range === "today" ? point.toLocaleTimeString([], { hour:"2-digit", ...(point.getMinutes() ? {minute:"2-digit"} : {}), hourCycle:"h23" }) : ["00","15","30","45"][index];
-          return <text key={index} x={x} y={y} textAnchor={index === 1 ? "end" : index === 3 ? "start" : "middle"} className="time-orbit-scale" aria-hidden="true">{label}</text>;
-        })}
+
       </g>}
       {focus ? <>
-        <text x="100" y="113" className="time-dial-digits" textAnchor="middle">{clockText(focus.mode === "countdown" ? focus.durationMs - elapsed : elapsed)}</text>
+        <text x="100" y="173" className="time-dial-digits" textAnchor="middle">{clockText(focus.mode === "countdown" ? focus.durationMs - elapsed : elapsed)}</text>
       </> : minutes ? <>
-        <text x="100" y="113" className="time-dial-digits" textAnchor="middle">{minutes}</text>
+        <text x="100" y="173" className="time-dial-digits" textAnchor="middle">{minutes}</text>
       </> : <>
-        <circle cx="100" cy="100" r="55" className="time-orbit-face" aria-hidden="true" />
-        <text x="100" y="113" textAnchor="middle" className="time-dial-digits time-orbit-time">{date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</text>
+
+        <text x="100" y="173" textAnchor="middle" className="time-dial-digits time-orbit-time">{date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</text>
         <circle cx={markerX} cy={markerY} r="2.5" className="time-orbit-marker" aria-hidden="true" />
       </>}
+      <g className="time-disc-details" aria-hidden="true">
+        <rect x="34" y="96" width="27" height="8" rx=".8"/><text x="47.5" y="101.5" textAnchor="middle">{isTimer?'FOCUS':'AUTO'}</text>
+        <rect x="64" y="96" width="16" height="8" rx=".8"/><text x="72" y="101.5" textAnchor="middle">{isTimer?'MIN':range==='today'?'24H':'60M'}</text>
+      </g>
+      <g className="time-disc-pointer" aria-hidden="true" transform={`rotate(${handAngle} 100 100)`}><path d="M98 100 L100 19 L107 101 L100 110 Z"/></g>
+      <circle className="time-disc-hub" cx="100" cy="100" r="2.5" aria-hidden="true"/>
+      <image href="/illustrations/asterisk.svg" x="94" y="132" width="12" height="14" aria-hidden="true" pointerEvents="none"/>
     </svg>
   </div>;
 }
@@ -137,19 +142,19 @@ export default function TaskTimers({ tasks }) {
   const completion = journal.completion;
   return <>
     <section className="task-timers" aria-label="Time tracking">
-      <article className="time-panel time-panel--automatic">
+      <article data-rationale-anchor="automatic-clock" data-rationale-label="Automatic clock" className="time-panel time-panel--automatic">
         <div className="time-panel-header">
           <h2>Automatic</h2>
           <select className="time-range" aria-label="Automatic clock range" value={range} onChange={(event) => setRange(event.target.value)}><option value="today">Today</option><option value="hour">Last hour</option></select>
           <details className="time-details" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
             <summary><span className={`time-status-dot ${owner ? "is-tracking" : ""}`} />{!owner ? "Another tab" : focus?.status === "running" ? "In focus" : "Tracking"}</summary>
-            <div className="time-settings-body"><p>Counts while Protocol is open. Blocks under ten minutes and idle time are excluded from your unlogged total. Focus time stays with its selected task.</p><p>The center shows the current local time. Today shows the whole local calendar day; Last hour zooms into 60 minutes. The moving dot marks now. Eligible blocks stay in the list until you log them. Black sectors are unlogged activity; pale sectors are already logged. Select an unlogged sector to review it.</p><p>Unlogged fragments stay on this device until you log them to a task.</p></div>
+            <div className="time-settings-body"><p>Counts while Protocol is open. Blocks under ten minutes and idle time are excluded from your unlogged total. Focus time stays with its selected task.</p><p>The lower readout shows the current local time. The tapered hand marks now. Today shows the whole local calendar day; Last hour zooms into 60 minutes. The tapered hand marks now. Eligible blocks stay in the list until you log them. Black sectors are unlogged activity; pale sectors are already logged. Select an unlogged sector to review it.</p><p>Unlogged fragments stay on this device until you log them to a task.</p></div>
           </details>
         </div>
         <div className="time-panel-dial"><Dial now={now} journal={journal} onSegment={owner ? openReview : null} range={range} /></div>
 
       </article>
-      <article className="time-panel time-panel--focus">
+      <article data-rationale-anchor="focus-clock" data-rationale-label="Focus clock" className="time-panel time-panel--focus">
         <div className="time-panel-header">
           <h2>Focus</h2>
           <details className="time-details time-focus-settings" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
@@ -157,7 +162,7 @@ export default function TaskTimers({ tasks }) {
             <div className="time-settings-body">
               <label className="time-field">Timer<select aria-label="Focus timer mode" value={mode} onChange={(e) => setMode(e.target.value)} disabled={Boolean(focus) || !owner || busy}><option value="countdown">Countdown</option><option value="stopwatch">Stopwatch</option></select></label>
               {mode === "countdown" ? <label className="time-field">Minutes<input aria-label="Focus minutes" type="number" min="1" max="240" value={minutes} onChange={(e) => setMinutes(e.target.value)} disabled={Boolean(focus) || !owner || busy} /></label> : null}
-              <p>The outer ring is this session. Inner segments show today’s focus by task. Choose a segment or use the task menu below.</p>
+              <p>The filled sector is this session. Inner segments show today’s focus by task. Choose a segment or use the task menu below.</p>
               <p>Switching tasks finishes the current session and keeps its time with the original task. Then start the new task.</p>
               <label className="time-auto-log"><input type="checkbox" checked={autoLog} onChange={(e) => setAutoLog(e.target.checked)} disabled={Boolean(focus) || !owner || busy} /> Log when finished</label>
             </div>
@@ -166,7 +171,7 @@ export default function TaskTimers({ tasks }) {
         <div className="time-panel-dial"><Dial now={now} focus={focus} elapsed={elapsed} allocations={allocations} tasks={tasks} onTask={owner && !busy ? selectTask : null} minutes={!focus ? mode === "countdown" ? clockText(Number(minutes || 25) * 60000) : "00:00" : null} />{focus ? <span className="time-focus-readout" role="timer" aria-live="off">{clockText(focus.mode === "countdown" ? focus.durationMs - elapsed : elapsed)} {focus.status === "paused" ? "paused" : focus.mode === "countdown" ? "remaining" : "elapsed"}</span> : null}</div>
         <div className="time-focus-controls">
           <label className="time-field time-task-select"><select aria-label="Focus task" title={focus ? "Choosing another task finishes this session and keeps its time with the original task." : "Choose a task to focus on"} value={selectedTask} onChange={(event) => selectTask(event.target.value)} disabled={!owner || busy}>{focus && !tasks.some((task) => task.id === focus.taskId) ? <option value={focus.taskId}>Current task unavailable — finish or switch</option> : null}{!tasks.length && !focus ? <option value="">No tasks available</option> : tasks.map((task) => <option key={task.id} value={task.id}>{task.data.title}{allocations.find((entry) => entry.taskId === task.id) ? ` · ${durationLabel(allocations.find((entry) => entry.taskId === task.id).seconds)} today` : ""}</option>)}</select></label>
-          {focus?.recovered ? <p className="time-muted">Paused when TASK closed. Resume when ready.</p> : null}
+          {focus?.recovered ? <p className="time-muted">Paused when Protocol closed. Resume when ready.</p> : null}
           <div className="time-actions">{focus ? <><TimeButton quiet onClick={focus.status === "running" ? tracker.pause : tracker.resume} disabled={!owner || busy}>{focus.status === "running" ? "Pause" : "Resume"}</TimeButton><TimeButton onClick={tracker.finish} disabled={!owner || busy}>Finish & {focus.autoLog ? "log" : "review"}</TimeButton></> : <TimeButton disabled={!selectedTask || !owner || busy} onClick={() => tracker.start({ taskId:selectedTask, mode, minutes:Number(minutes), autoLog })}>Start focus</TimeButton>}</div>
         </div>
       </article>

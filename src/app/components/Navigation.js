@@ -33,6 +33,7 @@ export default function Navigation({
   useEffect(()=>setPortalReady(true),[]);
   const navigationRef = useRef(null);
   const overlayRef = useRef(null);
+  const [hoveredTab,setHoveredTab] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuClosing, setMenuClosing] = useState(false);
   const closeTimerRef = useRef(null);
@@ -88,15 +89,16 @@ export default function Navigation({
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX > bounds.right || event.clientX < bounds.left) closeNavigation();
       }}>
+        {hoveredTab && <WorkspaceIllustration className="navigation-background-art" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",meetingNotes:"book-carrier",resources:"resource-balancer"})[hoveredTab]} />}
         <CloseButton className="task-menu-close" label="Close workspace navigation" onClick={closeNavigation} autoFocus />
-        <nav ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
+        <nav onMouseLeave={() => setHoveredTab(null)} onBlur={event => {if(!event.currentTarget.contains(event.relatedTarget))setHoveredTab(null);}} ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
           {TABS.filter((tab) => tab.key !== "payouts" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
             <div className="task-navigation-group" key={tab.key}>
-              {tab.key === "finance" ? <span className="task-navigation-locked" aria-disabled="true">Finance <LockIcon /></span> : <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}<WorkspaceIllustration className="navigation-mini-icon" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",finance:"clock",meetingNotes:"book-carrier",resources:"resource-balancer"})[tab.key]} /></a>}
-              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <span className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span>}
+              {tab.key === "finance" ? <span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-locked" aria-disabled="true">Finance <LockIcon /></span> : <a onMouseEnter={() => setHoveredTab(tab.key)} onFocus={() => setHoveredTab(tab.key)} href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}</a>}
+              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span>}
             </div>
           ))}
-          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><span className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span></div>}
+          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span></div>}
 
         </nav>
         <footer className="task-overlay-footer">

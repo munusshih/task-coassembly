@@ -483,7 +483,7 @@ export default function MemberDirectoryPage() {
   const currentWeek = weekStartDateForTs(Date.now()).toISOString().slice(0, 10);
   const [memberWeek] = useUrlState("memberWeek", currentWeek, { validate: isDateKey });
   const [memberEndWeek] = useUrlState("memberEndWeek", "", { validate: isDateKey });
-  const endWeek = memberEndWeek >= memberWeek ? memberEndWeek : memberWeek;
+  const endWeek = memberEndWeek >= memberWeek ? memberEndWeek : currentWeek >= memberWeek ? currentWeek : memberWeek;
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -1008,9 +1008,9 @@ export default function MemberDirectoryPage() {
 
 
 
-      {directoryView === "weekly" && <div className="member-week-controls" aria-label="Member allocation period">
-        <label className="task-week-control"><span>Week / from</span><WeekSelect aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</WeekSelect></label>
-        <label className="task-week-control"><span>Through</span><WeekSelect aria-label="Member end week" value={memberEndWeek && memberEndWeek >= memberWeek ? memberEndWeek : ""} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}><option value="">Single week</option>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</WeekSelect></label>
+      {directoryView === "weekly" && <div data-rationale-anchor="member-period" data-rationale-label="Member allocation period" className="member-week-controls" aria-label="Member allocation period">
+        <label className="task-week-control"><span>From</span><WeekSelect aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
+        <label className="task-week-control"><span>Through</span><WeekSelect aria-label="Member end week" value={endWeek} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
       </div>}
       <section className="member-allocation-overview" aria-label={`${periodLabel} allocation by ${directoryView === "role" ? "role" : "member"}`}>
         <AllocationClock variant="member" subject={directoryView === "role" ? "Role" : "Member"} valueMode={directoryView === "role" ? "percent" : "time"} periodLabel={periodLabel} allocations={chartAllocations.sort((a,b) => b.units-a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
@@ -1040,7 +1040,7 @@ export default function MemberDirectoryPage() {
         <MemberForm draft={editingMember ? editDraft : newMember} onChange={editingMember ? updateEditField : updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating={!editingMember} onCancel={closeMemberEditor} onSubmit={event => { event.preventDefault(); if (editingMember) saveEdit(editingMember); else handleCreateMember(event); }} />
       </ModalShell>}
 
-      {addMemberOpen && <BottomComposer illustration="member-team" title="New member" onClose={closeMemberEditor}>
+      {addMemberOpen && <BottomComposer illustration="compose-member" title="New member" onClose={closeMemberEditor}>
         <MemberForm draft={newMember} onChange={updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating onCancel={closeMemberEditor} onSubmit={handleCreateMember} />
       </BottomComposer>}
 

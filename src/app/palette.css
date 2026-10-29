@@ -33,3 +33,4 @@
   --workspace-date: var(--palette-date);
   --workspace-neutral: var(--palette-neutral);
 }
+:root { --anchor-ink:#2868e8; --anchor-paper:#eaf2ff; }

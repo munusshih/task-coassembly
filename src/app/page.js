@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceIdentityContext } from "./components/WorkspaceIdentity";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -669,7 +670,7 @@ export default function Home() {
   }
 
   return (
-    <TimeTrackingProvider key={currentMember.id} memberId={currentMember.id} active={activeTab === "members"}>
+    <WorkspaceIdentityContext.Provider value={currentMember}><TimeTrackingProvider key={currentMember.id} memberId={currentMember.id} active={activeTab === "members"}>
     <main style={WORKSPACE_THEME} className={`page-shell page-shell--workspace${activeTab === "members" ? " page-shell--task" : ""}`}>
       <Navigation
         activeTab={activeTab}
@@ -760,6 +761,6 @@ export default function Home() {
         </div>
       </div>
     </main>
-    </TimeTrackingProvider>
+    </TimeTrackingProvider></WorkspaceIdentityContext.Provider>
   );
 }

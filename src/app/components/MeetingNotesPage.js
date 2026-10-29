@@ -1272,6 +1272,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
             return (
               <li
                 key={note.id}
+                data-rationale-anchor={`note-${note.id}`} data-rationale-label={note.data.title || "Note"}
                 className={`note-item${isLinkShortcut ? " note-item--link-shortcut" : ""}`}
                 onClick={() => {
                   if (isLinkShortcut && shortcutHref) {
@@ -1472,7 +1473,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
       <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
       {createOpen && (
-      <BottomComposer illustration="book-carrier" title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
+      <BottomComposer illustration="compose-note" title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
         <div className="note-create-row">
           <div className="note-emoji-picker" title="Note emoji">
             <span className="note-emoji-picker-label">Emoji</span>

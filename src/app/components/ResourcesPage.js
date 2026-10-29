@@ -198,7 +198,7 @@ function ResourceForm({
 function ResourceCard({ link, onEdit, onDelete, members = [] }) {
   return (
     <EntityCard
-      className="resource-sticky"
+      className="resource-sticky" data-rationale-anchor={`resource-${link.id}`} data-rationale-label={link.data.name || "Resource"}
       interactive
     >
       <div className="resource-folder-cover" style={{ backgroundColor: COVER_COLORS[Array.from(link.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 6] }}><ResourcePreviewImage link={link} /></div>
@@ -441,7 +441,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
       {/* Creation shares the workspace composer; existing records retain their editor. */}
       {(addOpen || editingId !== null) && (
         <ResourceFormShell
-          {...(editingId === null ? { illustration: "resource-balancer" } : {})}
+          {...(editingId === null ? { illustration: "compose-resource" } : {})}
           title={editingId ? "Edit resource" : "Add resource"}
           onClose={() => {
             setAddOpen(false);

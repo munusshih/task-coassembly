@@ -1320,7 +1320,7 @@ function ProjectRow({
   }
 
   return (
-    <li className={"project-row" + (open ? " project-row--open" : "")}>
+    <li data-rationale-anchor={`project-${project.id}`} data-rationale-label={d.name || "Project"} className={"project-row" + (open ? " project-row--open" : "")}>
       {/* Summary row */}
       <div className="project-row-summary" role="button" tabIndex={0} aria-expanded={open} onKeyDown={event => { if(event.target === event.currentTarget && ["Enter"," "].includes(event.key)) { event.preventDefault(); setOpen(value=>!value); } }} onClick={() => setOpen((s) => !s)}>
         <div className="project-row-main">
@@ -2361,7 +2361,7 @@ export default function ProjectsPage({
     >
       {!isLimitedViewer ? (
         <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
-        {createOpen && <BottomComposer illustration="projects-team" title="New project" onClose={() => setCreateOpen(false)}>
+        {createOpen && <BottomComposer illustration="compose-project" title="New project" onClose={() => setCreateOpen(false)}>
           <form className="project-add-form" onSubmit={handleAdd}>
             <FormField label="Project name"><InputField
               className="project-field project-field--name"
