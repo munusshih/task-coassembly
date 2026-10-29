@@ -1,4 +1,7 @@
 "use client";
+import TaskTimers from "./time/TaskTimers";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
+import BottomComposer from "./ui/BottomComposer";
 import TaskClockIcon from "./ui/TaskClockIcon";
 
 import useUrlState, { isDateKey, updateUrlState } from "../hooks/useUrlState";
@@ -938,16 +941,6 @@ function ProjectGroupCard({
             />
           </div>
         ))}
-        {isEditableWeek ? (addOpen ? (
-          <TaskCreateForm
-            draft={addDraft} onChange={patchAddDraft} onSubmit={handleAdd} onCancel={cancelAdd}
-            projects={getAssignableProjects(projects, addMemberId)} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption}
-            members={members} assigneeId={addMemberId} onAssigneeChange={(memberId) => {
-              setAddMemberId(memberId);
-              if (!isProjectIdAssignable(projects, memberId, addDraft.addProject)) patchAddDraft({ addProject: "" });
-            }}
-          />
-        ) : <TaskCreateTrigger onClick={() => setAddOpen(true)} />) : null}
       </div>
     </BoardSection>
   );
@@ -1336,6 +1329,9 @@ export default function MembersPage({
   sharedProjects = null,
   sharedTasks = null,
 }) {
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerDraft, setComposerDraft] = useState(emptyTaskCreateDraft);
+  const [composerMember, setComposerMember] = useState(viewerMemberId || "");
   const [members, setMembers] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -2076,6 +2072,7 @@ export default function MembersPage({
         onProjectRemaining={projectRemainingHint}
         selectedWeek={selectedWeek}
         showHeader
+        hideCreate
       />
     );
   }
@@ -2174,6 +2171,16 @@ export default function MembersPage({
         </div>
         </div>
       </WorkspacePageHero>
+      <TaskTimers tasks={visibleTasks.filter(task => task.data?.memberId === viewerMemberId && !task.data?.archived && !task.data?.completed)} />
+      <WorkspaceCreateDock label="New task" expanded={composerOpen} onClick={() => setComposerOpen(true)} />
+      {composerOpen && <BottomComposer title="New task" onClose={() => setComposerOpen(false)}>
+        <TaskCreateForm draft={composerDraft} onChange={patch => setComposerDraft(previous => ({...previous,...patch}))} onCancel={() => setComposerOpen(false)} projects={getAssignableProjects(visibleProjects, composerMember)} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} members={visibleMembers} assigneeId={composerMember} onAssigneeChange={id => { setComposerMember(id); setComposerDraft(previous => ({...previous,addProject:""})); }} onSubmit={async () => {
+          const draft = composerDraft;
+          if (!draft.addTitle.trim() || !draft.addTime || !draft.addProject || !composerMember) return;
+          const created = await handleCreate(composerMember, {title:draft.addTitle.trim(),timeUnits:Number(draft.addTime),projectId:draft.addProject,deadline:draft.addDeadline||null,subtasks:draft.addSubtasks,links:draft.addLinks},selectedWeek);
+          if(created) { setComposerOpen(false); setComposerDraft(emptyTaskCreateDraft()); }
+        }} />
+      </BottomComposer>}
       <div className="task-workspace">
         <div className="task-board-main">
       {visibleMembers.length === 0 && (

@@ -17,13 +17,15 @@ export function workCategory(kind) {
 
 // Allocation follows the Task board's Taipei week and never substitutes edits or
 // completion dates for the week the task was actually planned for.
-export function memberRoleMetrics(memberId, tasks, projects, now = Date.now()) {
+export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), mode = "role") {
   const projectById = new Map(projects.map(p => [p.id, p]));
   const start = weekStartDateForTs(now);
-  const weeks = Array.from({ length: 4 }, (_, index) => {
+  const recentWeeks = Array.from({ length: mode === "weekly" ? 1 : 4 }, (_, index) => {
     const date = new Date(start); date.setUTCDate(date.getUTCDate() - index * 7);
     return { key: date.toISOString().slice(0, 10), units: 0, projects: new Map() };
   });
+  const weeks = mode === "overall" ? [...new Set(tasks.filter(task => task.data?.type === 'memberTodo' && task.data?.memberId === memberId).map(task => taskWeekKey(task.data)).filter(Boolean))].sort().reverse().map(key => ({key, units:0, projects:new Map()})) : recentWeeks;
+  let assigned = 0, completed = 0;
   const categories = Object.fromEntries(WORK_CATEGORIES.map(c => [c.key, 0]));
   const current = new Map(projects.filter(p => !isProjectClosed(p) && isMemberAssignedToProject(p, memberId)).map(p => [p.id, p]));
   for (const task of tasks) {
@@ -33,6 +35,8 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now()) {
     if (project && !isProjectClosed(project) && !data.archived && !data.completed) current.set(project.id, project);
     const week = weeks.find(w => w.key === taskWeekKey(data));
     if (!week) continue;
+    assigned += 1;
+    if (data.completed) completed += 1;
     const units = Math.max(0, Number(data.timeUnits) || 0);
     const name = project?.data?.name || (data.projectId ? 'Unknown project' : 'No project');
     week.units += units;
@@ -42,7 +46,11 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now()) {
     categories[workCategory(project?.data?.kind)] += units;
   }
   const total = weeks.reduce((sum, w) => sum + w.units, 0);
+  const totals = new Map();
+  weeks.forEach(week => week.projects.forEach(project => totals.set(project.id, {...project, units:(totals.get(project.id)?.units || 0) + project.units})));
   return {
+    assigned, completed, mode,
+    projectTotals:[...totals.values()].filter(project => project.units > 0).sort((a,b) => b.units-a.units),
     currentProjects: [...current.values()].sort((a, b) => String(a.data?.name || a.id).localeCompare(String(b.data?.name || b.id))),
     weeks: weeks.map(w => ({ ...w, projects: [...w.projects.values()].filter(project => project.units > 0).sort((a, b) => b.units - a.units) })),
     categories: WORK_CATEGORIES.filter(c => c.key !== 'unclassified' || categories[c.key] > 0).map(c => ({ ...c, units: categories[c.key], percent: total ? categories[c.key] / total * 100 : 0 })),

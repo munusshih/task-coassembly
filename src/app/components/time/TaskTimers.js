@@ -1,10 +1,11 @@
 "use client";
 
+import UnloggedTimeList from "./UnloggedTimeList";
 import CrossIcon from "../ui/CrossIcon";
 
 import { useEffect, useRef, useState } from "react";
 import { useTaskTime } from "./TimeTrackingProvider";
-import { durationLabel, focusElapsed, REMINDER_MS } from "./trackingModel.mjs";
+import { durationLabel, focusElapsed, eligibleTimeFragments, MIN_TRACKED_SECONDS } from "./trackingModel.mjs";
 import { historySegments, arcPath, bandPath, historyWindow, focusAllocation } from "./dialModel.mjs";
 
 const clockText = (ms) => {
@@ -21,7 +22,7 @@ function Dial({ now, focus, elapsed = 0, minutes, journal, onSegment, range = "t
   const markerY = 100 + Math.sin(markerAngle) * 94;
   const isTimer = Boolean(focus || minutes);
   const progress = focus ? (focus.mode === "countdown" ? elapsed / focus.durationMs : (elapsed % 3600000) / 3600000) : 0;
-  const segments = journal ? historySegments(journal, now, range) : [];
+  const segments = journal ? historySegments(journal, now, range).filter(entry=>entry.status === "logged" || (entry.source!=="idle" && entry.seconds>=MIN_TRACKED_SECONDS)) : [];
   const recorded = segments.reduce((sum, entry) => sum + entry.seconds, 0);
   const sourceLabel = (entry) => entry.status === "logged" ? "Logged" : entry.source === "idle" ? "Idle" : entry.source === "focus" ? "Focus" : "Activity";
   return <div className={`time-dial ${isTimer ? "time-dial--focus" : ""}`}>
@@ -64,7 +65,7 @@ function ReviewTime({ tracker, tasks, initial, onClose }) {
   const [selected, setSelected] = useState(() => initial.filter((f) => f.explicit || f.source !== "idle").slice(0, 100).map((f) => f.id));
   const [taskId, setTaskId] = useState(() => initial.find((f) => f.taskId)?.taskId || tasks[0]?.id || "");
   const dialogRef = useRef(null);
-  const fragments = tracker.journal.fragments.filter((f) => f.status === "pending");
+  const fragments = eligibleTimeFragments(tracker.journal.fragments);
   const chosen = fragments.filter((f) => selected.includes(f.id));
   const incompatible = chosen.some((f) => f.taskId && f.taskId !== taskId);
   useEffect(() => {
@@ -88,7 +89,7 @@ function ReviewTime({ tracker, tasks, initial, onClose }) {
     <div className="edit-modal time-review" role="dialog" aria-modal="true" aria-labelledby="time-review-title" ref={dialogRef}>
       <div className="edit-modal-header"><span className="edit-modal-title" id="time-review-title">Review your time</span><button className="edit-modal-close" onClick={onClose} aria-label="Close time review" disabled={tracker.busy}><CrossIcon /></button></div>
       <div className="edit-modal-body">
-        <p className="time-muted">Select worked time. Idle is optional; focus time stays with its task.</p>
+        <p className="time-muted">Select worked blocks of at least ten minutes. Focus time stays with its task.</p>
         <label className="time-field">Log to task<select value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={tracker.busy}><option value="">Choose a task</option>{tasks.map((t) => <option key={t.id} value={t.id}>{t.data.title}</option>)}</select></label>
         <div className="time-fragments">
           {fragments.length ? fragments.map((f) => <label className={`time-fragment ${f.source === "idle" ? "time-fragment--idle" : ""}`} key={f.id}>
@@ -121,8 +122,9 @@ export default function TaskTimers({ tasks }) {
   const { journal, now, owner, busy } = tracker;
   const focus = journal.focus;
   const elapsed = focusElapsed(focus, now);
-  const pending = journal.fragments.filter((f) => f.status === "pending");
-  const total = pending.reduce((sum, f) => sum + f.seconds, 0) + (journal.auto ? Math.floor((now - journal.auto.start) / 1000) : 0);
+  const pending = eligibleTimeFragments(journal.fragments);
+  const liveSeconds = journal.auto?.kind === "activity" ? Math.floor((now-journal.auto.start)/1000) : 0;
+  const total = pending.reduce((sum,f)=>sum+f.seconds,0);
   const selectedTask = focus?.taskId || taskId || tasks[0]?.id || "";
   const allocations = focusAllocation(journal, now);
   const selectTask = (id) => {
@@ -131,7 +133,6 @@ export default function TaskTimers({ tasks }) {
     setTaskId(id);
   };
   const openReview = (id) => { const entries = tracker.checkpoint(); setReview(typeof id === "string" ? entries.filter((entry) => entry.id === id).map((entry) => ({ ...entry, explicit: true })) : entries); tracker.snooze(); };
-  const reminder = owner && !focus && total * 1000 >= REMINDER_MS && now >= (journal.nextReminderAt || 0);
   const completion = journal.completion;
   return <>
     <section className="task-timers" aria-label="Time tracking">
@@ -141,11 +142,11 @@ export default function TaskTimers({ tasks }) {
           <select className="time-range" aria-label="Automatic clock range" value={range} onChange={(event) => setRange(event.target.value)}><option value="today">Today</option><option value="hour">Last hour</option></select>
           <details className="time-details" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
             <summary><span className={`time-status-dot ${owner ? "is-tracking" : ""}`} />{!owner ? "Another tab" : focus?.status === "running" ? "In focus" : "Tracking"}</summary>
-            <div className="time-settings-body"><p>Counts while TASK is open, including background tabs. Idle stretches after 5 minutes are kept separate for review. Focus time is counted by the focus clock.</p><p>The center shows the current local time. Today shows the whole local calendar day; Last hour zooms into 60 minutes. The moving dot marks now. All older fragments remain available in Review time. Gold is unlogged activity, lilac is focus, stone is idle, and pale sectors are already logged. Select an unlogged sector to review it.</p><p>Unlogged fragments stay on this device until you log them to a task.</p></div>
+            <div className="time-settings-body"><p>Counts while Protocol is open. Blocks under ten minutes and idle time are excluded from your unlogged total. Focus time stays with its selected task.</p><p>The center shows the current local time. Today shows the whole local calendar day; Last hour zooms into 60 minutes. The moving dot marks now. Eligible blocks stay in the list until you log them. Black sectors are unlogged activity; pale sectors are already logged. Select an unlogged sector to review it.</p><p>Unlogged fragments stay on this device until you log them to a task.</p></div>
           </details>
         </div>
         <div className="time-panel-dial"><Dial now={now} journal={journal} onSegment={owner ? openReview : null} range={range} /></div>
-        <div className="time-panel-footer"><span className="time-unlogged"><strong>{durationLabel(total)}</strong> unlogged</span><button className="time-button time-button--quiet" onClick={openReview} disabled={!owner || busy}>Review time</button></div>
+
       </article>
       <article className="time-panel time-panel--focus">
         <div className="time-panel-header">
@@ -168,10 +169,10 @@ export default function TaskTimers({ tasks }) {
           <div className="time-actions">{focus ? <><button className="time-button time-button--quiet" onClick={focus.status === "running" ? tracker.pause : tracker.resume} disabled={!owner || busy}>{focus.status === "running" ? "Pause" : "Resume"}</button><button className="time-button" onClick={tracker.finish} disabled={!owner || busy}>Finish & {focus.autoLog ? "log" : "review"}</button></> : <button className="time-button" disabled={!selectedTask || !owner || busy} onClick={() => tracker.start({ taskId:selectedTask, mode, minutes:Number(minutes), autoLog })}>Start focus</button>}</div>
         </div>
       </article>
+      <UnloggedTimeList tracker={tracker} tasks={tasks} fragments={pending} total={total} liveSeconds={liveSeconds} onRefresh={() => tracker.checkpoint()} />
     </section>
     {tracker.error && !review ? <p className="time-error" role="alert">{tracker.error}</p> : null}
-    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : completion.status === "empty" ? "— no time to log." : busy ? "— saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <button className="time-button time-button--quiet" disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</button> : null}{completion.status === "pending" ? <button className="time-button time-button--quiet" onClick={openReview} disabled={!owner || busy}>Review & log</button> : null}<button className="time-button time-button--quiet" onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</button></div></div> : null}
-    {reminder && !completion ? <div className="time-notice" role="status"><span>You have {durationLabel(total)} of unlogged time. Anything to add to a task?</span><div className="time-actions"><button className="time-button time-button--quiet" onClick={openReview}>Review time</button><button className="time-button time-button--quiet" onClick={tracker.snooze}>Later</button></div></div> : null}
+    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : ["empty","too-short"].includes(completion.status) ? "— no blocks of ten minutes to count." : busy ? "— saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <button className="time-button time-button--quiet" disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</button> : null}{completion.status === "pending" ? <button className="time-button time-button--quiet" onClick={openReview} disabled={!owner || busy}>Review & log</button> : null}<button className="time-button time-button--quiet" onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</button></div></div> : null}
     {review ? <ReviewTime tracker={tracker} tasks={tasks} initial={review} onClose={() => setReview(null)} /> : null}
   </>;
 }

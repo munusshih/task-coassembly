@@ -15,7 +15,7 @@ test("defaults are omitted, dates stay pinned, and legacy links normalize", () =
 });
 test("switching tabs discards irrelevant filters", () => {
   assert.equal(compact("/tasks?week=2026-10-12&view=project", { tab: "meetingNotes" }), "/notes");
-  assert.equal(compact("/?tab=projects&week=2026-10-12&notesSearch=hello&projectView=kanban"), "/projects?view=kanban");
+  assert.equal(compact("/?tab=projects&week=2026-10-12&notesSearch=hello&projectView=kanban"), "/projects?view=status");
   assert.equal(compact("/finance?year=2026&view=person", { tab: "members" }), "/tasks");
 });
 test("document paths keep complete stable IDs and drop note list controls", () => {
@@ -44,7 +44,7 @@ test("invalid values and paths are rejected", () => {
   assert.equal(isDateKey("2025-02-29"), false);
 });
 test("normalization is idempotent and preserves unrelated params and hashes", () => {
-  for (const path of ["/?tab=members&week=2026-10-12&taskView=project", "/notes/id", "/projects?view=kanban", "/finance?year=2026&view=person"]) {
+  for (const path of ["/?tab=members&week=2026-10-12&taskView=project", "/notes/id", "/projects?view=status", "/finance?year=2026&view=person"]) {
     const once = compact(path);
     assert.equal(compact(once), once);
   }
@@ -73,4 +73,11 @@ test("Members supports shareable role, weekly and overall views", () => {
   assert.equal(compact("/members?view=role"), "/members");
   assert.equal(compact("/members?view=rotation"), "/members");
   assert.equal(compact("/members?view=weekly", { tab: "resources" }), "/resources");
+});
+
+test('new project and wish grouping survives shared links and reloads',()=>{
+ assert.equal(compact('/projects?view=status'),'/projects?view=status');
+ assert.equal(compact('/projects?view=category'),'/projects');
+ assert.equal(compact('/wishes?group=date'),'/wishes?group=date');
+ assert.equal(compact('/wishes?group=project'),'/wishes');
 });

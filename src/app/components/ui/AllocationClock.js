@@ -37,8 +37,8 @@ export default function AllocationClock({ allocations, formatTime, highlightedId
               if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onHighlight(active ? null : project.id); }
               if (event.key === "Escape") onHighlight(null);
             }}>
-            {path ? <path d={path} fill="#fff" fillOpacity={dimmed ? .78 : active ? .16 : 0} stroke="#fff" strokeWidth="4" /> : <circle cx={clock.cx} cy={clock.cy} r={clock.radius} fill="#fff" fillOpacity={active ? .16 : 0} />}
-            {<text pointerEvents="none" opacity={dimmed ? .25 : 1} x={label[0]} y={label[1]} textAnchor="middle" dominantBaseline="central" fontSize={variant === "member" ? 48 : 58} fontWeight="700" fill="#fff">{letter(index)}</text>}
+            {path ? <path d={path} fill="var(--paper)" fillOpacity={dimmed ? .78 : active ? .16 : 0} stroke="var(--paper)" strokeWidth="4" /> : <circle cx={clock.cx} cy={clock.cy} r={clock.radius} fill="var(--paper)" fillOpacity={active ? .16 : 0} />}
+            {<text pointerEvents="none" opacity={dimmed ? .25 : 1} x={label[0]} y={label[1]} textAnchor="middle" dominantBaseline="central" fontSize={variant === "member" ? 48 : 58} fontWeight="700" fill="var(--paper)">{letter(index)}</text>}
           </g>;
         })}
       </svg>

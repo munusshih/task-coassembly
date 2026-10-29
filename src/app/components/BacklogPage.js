@@ -1,5 +1,10 @@
 "use client";
 
+import MetadataPill from "./ui/MetadataPill";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import { groupWishes } from "./workspaceGroups.mjs";
 import BottomComposer from "./ui/BottomComposer";
 
 import CrossIcon from "./ui/CrossIcon";
@@ -83,6 +88,7 @@ function formatCommentTime(ts) {
 
 function WishItem({
   item,
+  projectLabel,
   assignableMembers,
   currentUsername,
   sessionChecked,
@@ -339,6 +345,7 @@ function WishItem({
         </div>
       </div>
 
+      {projectLabel && <div className="wish-project-tag"><MetadataPill tone="project">{projectLabel}</MetadataPill></div>}
       <div className="wish-reactions">
         {REACTION_OPTIONS.map((option) => {
           const count = Number(reactions[option.key]) || 0;
@@ -527,6 +534,8 @@ function WishItem({
 
 function ProjectSection({
   project,
+  sectionTitle,
+  projectNames,
   items,
   archivedItems = [],
   members,
@@ -539,8 +548,6 @@ function ProjectSection({
   onReact,
   onComment,
 }) {
-  const [addText, setAddText] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
@@ -568,17 +575,10 @@ function ProjectSection({
   const visibleItems = showAll ? sortedItems : sortedItems.slice(0, SHOW_LIMIT);
   const hiddenCount = sortedItems.length - SHOW_LIMIT;
 
-  async function handleAdd() {
-    const text = addText.trim();
-    if (!text) return;
-    await onAdd(text, project?.id || null);
-    setAddText("");
-    setAddOpen(false);
-  }
 
   return (
     <BoardSection
-      title={project?.data?.name || "Unassigned"}
+      title={sectionTitle || project?.data?.name || "Unassigned"}
       badge={String(items.length)}
     >
       <Surface
@@ -590,6 +590,7 @@ function ProjectSection({
               <WishItem
                 key={item.id}
                 item={item}
+                projectLabel={projectNames ? (projectNames[item.data?.projectId] || "Unassigned") : null}
                 assignableMembers={assignableMembers}
                 currentUsername={currentUsername}
                 sessionChecked={sessionChecked}
@@ -639,6 +640,7 @@ function ProjectSection({
                   <WishItem
                     key={item.id}
                     item={item}
+                projectLabel={projectNames ? (projectNames[item.data?.projectId] || "Unassigned") : null}
                     assignableMembers={assignableMembers}
                     currentUsername={currentUsername}
                     sessionChecked={sessionChecked}
@@ -654,49 +656,18 @@ function ProjectSection({
           </div>
         )}
 
-        <CreateBar
-          open={false}
-          onOpen={() => setAddOpen(true)}
-          label="Add wish"
-          inset
-          triggerClassName="backlog-create-trigger"
-          rowClassName="backlog-add-row"
-        />
-        {addOpen && <BottomComposer title={`New wish · ${project?.data?.name || "Unassigned"}`} onClose={() => setAddOpen(false)}>
-          <InputField
-            className="backlog-add-input"
-            type="text"
-            placeholder="Describe the wish or idea…"
-            value={addText}
-            autoFocus
-            onChange={(e) => setAddText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setAddOpen(false);
-                setAddText("");
-              }
-            }}
-          />
-          <Button size="small" onClick={handleAdd} disabled={!addText.trim()}>
-            Add
-          </Button>
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              setAddOpen(false);
-              setAddText("");
-            }}
-          >
-            Cancel
-          </Button>
-        </BottomComposer>}
       </Surface>
     </BoardSection>
   );
 }
 
 export default function BacklogPage({ viewerName = "" }) {
+  const [composerOpen,setComposerOpen] = useState(false);
+  const [wishText,setWishText] = useState("");
+  const [wishProject,setWishProject] = useState("");
+  const [wishSaving,setWishSaving] = useState(false);
+  const [wishError,setWishError] = useState("");
+  const [groupMode,setGroupMode] = useUrlState("wishGroup","project",{allowed:["project","date"]});
   const [wishItems, setWishItems] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -790,30 +761,6 @@ export default function BacklogPage({ viewerName = "" }) {
     );
   }, [wishItems, searchQuery]);
 
-  const groupedActiveItems = useMemo(() => {
-    const map = {};
-    filteredItems
-      .filter((item) => !item?.data?.archived)
-      .forEach((item) => {
-        const pid = item.data.projectId || "__none__";
-        if (!map[pid]) map[pid] = [];
-        map[pid].push(item);
-      });
-    return map;
-  }, [filteredItems]);
-
-  const groupedArchivedItems = useMemo(() => {
-    const map = {};
-    filteredItems
-      .filter((item) => Boolean(item?.data?.archived))
-      .forEach((item) => {
-        const pid = item.data.projectId || "__none__";
-        if (!map[pid]) map[pid] = [];
-        map[pid].push(item);
-      });
-    return map;
-  }, [filteredItems]);
-
   useEffect(() => {
     if (!wishItems.length || !tasks.length) return;
 
@@ -872,6 +819,7 @@ export default function BacklogPage({ viewerName = "" }) {
       });
     } catch (e) {
       console.error("Could not add wish:", e);
+      throw e;
     }
   }
 
@@ -969,7 +917,6 @@ export default function BacklogPage({ viewerName = "" }) {
     }
   }
 
-  const totalItems = wishItems.length;
 
   if (loadError) {
     return (
@@ -987,51 +934,18 @@ export default function BacklogPage({ viewerName = "" }) {
     <TabPage
       className="backlog-page"
       title="Wishes"
-      badge={`${totalItems} wish${totalItems !== 1 ? "es" : ""}`}
-      right={
-        <PageControls compact>
-          <SearchField
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-        </PageControls>
-      }
+      header={<WorkspacePageHero title="Wishes" illustration="wishes-catcher"><WorkspaceViewPicker label="Wish grouping" value={groupMode} onChange={setGroupMode} options={[{value:'project',label:'Projects'},{value:'date',label:'Date'}]} /></WorkspacePageHero>}
     >
-      <CollectionLayout variant="board" className="backlog-grid">
-        {sortedProjects.map((project) => (
-          <ProjectSection
-            key={project.id}
-            project={project}
-            items={groupedActiveItems[project.id] || []}
-            archivedItems={groupedArchivedItems[project.id] || []}
-            members={members}
-            currentUsername={currentUsername}
-            sessionChecked={sessionChecked}
-            onSessionExpired={handleSessionExpired}
-            onAdd={handleAdd}
-            onDelete={handleDelete}
-            onPush={handlePush}
-            onReact={handleReact}
-            onComment={handleComment}
-          />
-        ))}
-        <ProjectSection
-          key="__none__"
-          project={null}
-          items={groupedActiveItems["__none__"] || []}
-          archivedItems={groupedArchivedItems["__none__"] || []}
-          members={members}
-          currentUsername={currentUsername}
-          sessionChecked={sessionChecked}
-          onSessionExpired={handleSessionExpired}
-          onAdd={handleAdd}
-          onDelete={handleDelete}
-          onPush={handlePush}
-          onReact={handleReact}
-          onComment={handleComment}
-        />
+      <WorkspaceCreateDock label="New wish" expanded={composerOpen} onClick={()=>setComposerOpen(true)} />
+      <div className="workspace-search"><SearchField ariaLabel="Search wishes" placeholder="Find a wish…" value={searchQuery} onChange={event=>setSearchQuery(event.target.value)} onClear={()=>setSearchQuery("")} /></div>
+      {composerOpen && <BottomComposer title="New wish" onClose={()=>setComposerOpen(false)}><form className="workspace-compose-form" onSubmit={async event=>{
+        event.preventDefault(); if(!wishText.trim() || wishSaving) return;setWishSaving(true);setWishError("");
+        try { await handleAdd(wishText.trim(),wishProject);setComposerOpen(false);setWishText("");setWishProject(""); } catch(error) {setWishError(error.message||"Could not save this wish. Try again.");} finally {setWishSaving(false);}
+      }}><label><span>What would you like to do?</span><InputField value={wishText} onChange={event=>setWishText(event.target.value)} placeholder="An idea, a possibility, a next step…" required /></label><label><span>Project</span><SelectField value={wishProject} onChange={event=>setWishProject(event.target.value)}><option value="">Unassigned</option>{sortedProjects.map(project=><option key={project.id} value={project.id}>{project.data?.name||project.id}</option>)}</SelectField></label>{wishError&&<p role="alert">{wishError}</p>}<div className="workspace-compose-actions"><Button type="submit" disabled={wishSaving||!wishText.trim()}>{wishSaving?'Saving…':'Add wish'}</Button><Button type="button" variant="ghost" onClick={()=>setComposerOpen(false)}>Cancel</Button></div></form></BottomComposer>}
+      <CollectionLayout variant="board" className="backlog-grid workspace-wish-grid">
+        {groupWishes(filteredItems,projects,groupMode).map(group=><ProjectSection key={`${groupMode}-${group.id}`} sectionTitle={group.title} projectNames={groupMode === "date" ? Object.fromEntries(projects.map(project=>[project.id,project.data?.name||project.id])) : null} project={group.project} items={group.items} archivedItems={group.archivedItems} members={members} currentUsername={currentUsername} sessionChecked={sessionChecked} onSessionExpired={handleSessionExpired} onAdd={handleAdd} onDelete={handleDelete} onPush={handlePush} onReact={handleReact} onComment={handleComment} />)}
       </CollectionLayout>
+      {!filteredItems.length && <p className="workspace-empty">{searchQuery?'No wishes match your search.':'Nothing here yet. Add your first wish below.'}</p>}
 
       {deleteTarget && (
         <DeleteConfirmDialog

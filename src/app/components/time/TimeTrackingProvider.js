@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { logTaskTime } from "../../../lib/taskTime";
 import {
   emptyJournal, recoverJournal, advanceJournal, closeAuto, pauseFocus,
-  startFocus, resumeFocus, finishFocus, IDLE_MS,
+  startFocus, resumeFocus, finishFocus, IDLE_MS, eligibleTimeFragments, recordLoggedFragments,
 } from "./trackingModel.mjs";
 
 const TimeContext = createContext(null);
@@ -157,12 +157,10 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
     if (!owner.current || busyRef.current) return false;
     busyRef.current = true; setBusy(true); setError("");
     try {
-      const fragments = journal.current.fragments.filter((f) => ids.includes(f.id) && f.status === "pending");
-      if (!fragments.length) throw new Error("Choose at least one time fragment.");
+      const fragments = eligibleTimeFragments(journal.current.fragments, true).filter((f) => ids.includes(f.id));
+      if (!fragments.length) throw new Error("Choose a time block of at least 10 minutes.");
       await logTaskTime(memberId, taskId, fragments);
-      const selected = new Set(fragments.map((f) => f.id));
-      const next = { ...journal.current, fragments: journal.current.fragments.map((f) => selected.has(f.id) ? { ...f, status: "logged", loggedTaskId: taskId } : f) };
-      if (next.completion && !next.fragments.some((f) => f.sessionId === next.completion.id && f.status === "pending")) next.completion = { ...next.completion, status: "logged" };
+      const next = recordLoggedFragments(journal.current,fragments,taskId);
       save(next); return true;
     } catch (failure) { setError(failure.message || "Time could not be logged. Your fragments are still saved for retry."); return false; }
     finally { busyRef.current = false; setBusy(false); }
@@ -179,14 +177,15 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
   useEffect(() => {
     if (!state.owner || !completion?.autoLog || completion.status !== "pending" || attempted.current.has(completion.id)) return;
     attempted.current.add(completion.id);
-    const ids = journal.current.fragments.filter((f) => f.sessionId === completion.id && f.status === "pending").map((f) => f.id);
+    const ids = eligibleTimeFragments(journal.current.fragments).filter(f => f.sessionId === completion.id).map(f=>f.id);
+    if (!ids.length) save({...journal.current, completion:{...completion,status:"too-short"}});
     if (ids.length) log(ids, completion.taskId);
   }, [completion?.id, state.owner]);
 
   const value = { ...state, busy, error,
     start: (options) => change((j, now) => startFocus(j, now, options)),
     pause: () => change(pauseFocus), resume: () => change(resumeFocus), finish: () => change(finishFocus),
-    checkpoint: () => { change(closeAuto); return journal.current.fragments.filter((f) => f.status === "pending"); },
+    checkpoint: () => { change(closeAuto); return eligibleTimeFragments(journal.current.fragments); },
     dismiss: () => change((j) => ({ ...j, completion: null })),
     snooze: () => change((j, now) => ({ ...j, nextReminderAt: now + 15 * 60000 })),
     discard: (ids) => change((j) => ({ ...j, fragments: j.fragments.map((f) => ids.includes(f.id) && f.status === "pending" ? { ...f, status: "discarded" } : f) })),

@@ -27,3 +27,15 @@ test('project categories and labels stay consistent in current and historical vi
  assert.equal(projectWorkTone(current.data.kind), projectWorkTone(history.kind));
  assert.equal(history.units, 8);
 });
+
+test('weekly and overall allocation share categories but use distinct task-week windows',()=>{
+ const tasks=[task('a','2026-10-26',8,{completed:true}),task('b','2026-10-19',4),task('a','2026-04-20',12)];
+ const projects=[project('a','Internal'),project('b','Commissioned')];
+ const now=Date.parse('2026-10-28');
+ const weekly=memberRoleMetrics('m',tasks,projects,now,'weekly');
+ const overall=memberRoleMetrics('m',tasks,projects,now,'overall');
+ assert.equal(weekly.total,8);assert.equal(weekly.assigned,1);assert.equal(weekly.completed,1);
+ assert.equal(overall.total,24);assert.equal(overall.assigned,3);assert.equal(overall.completed,1);
+ assert.deepEqual(overall.projectTotals.map(p=>[p.id,p.units]),[['a',20],['b',4]]);
+ assert.equal(weekly.categories.find(category=>category.key==='rd').percent,100);
+});

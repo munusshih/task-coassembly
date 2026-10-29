@@ -32,6 +32,7 @@ import TimeTrackingProvider from "./components/time/TimeTrackingProvider";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
 import ProjectsPage from "./components/ProjectsPage";
+import LockedPage from "./components/LockedPage";
 import FinancePage from "./components/FinancePage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
@@ -650,17 +651,8 @@ export default function Home() {
     if (activeTab === "backlog") {
       return <BacklogPage viewerName={currentMember.name || ""} />;
     }
-    if (activeTab === "finance") {
-      return <FinancePage />;
-    }
-    if (activeTab === "payouts") {
-      return (
-        <PayoutsPage
-          viewerMemberId={currentMember.id}
-          viewerRole={effectiveRole}
-          sharedMembers={sharedMembers}
-        />
-      );
+    if (activeTab === "finance" || activeTab === "payouts") {
+      return <LockedPage title={activeTab === "finance" ? "Finance" : "Requests"} />;
     }
     if (activeTab === "meetingNotes") {
       return <MeetingNotesPage viewerName={currentMember.name || ""} />;

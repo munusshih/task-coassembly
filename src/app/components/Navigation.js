@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import TaskWeekInfo from "./TaskWeekInfo";
+import { createPortal } from "react-dom";
+import WorkspaceIllustration from "./ui/WorkspaceIllustration";
+import LockIcon from "./ui/LockIcon";
 import CloseButton from "./ui/CloseButton";
 import { viewHref } from "../lib/viewUrl.mjs";
 import { signOut } from "firebase/auth";
@@ -26,6 +29,8 @@ export default function Navigation({
   isAdmin = false,
   allowedTabs = [],
 }) {
+  const [portalReady,setPortalReady] = useState(false);
+  useEffect(()=>setPortalReady(true),[]);
   const navigationRef = useRef(null);
   const overlayRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -78,7 +83,7 @@ export default function Navigation({
     <header className="task-navigation">
       {activeTab !== "members" && <div className="task-week-toolbar"><TaskWeekInfo pageKey={activeTab} /></div>}
       <button type="button" className="task-menu-trigger" aria-label="Open workspace navigation" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><span /><span /><span /></button>
-      <dialog ref={overlayRef} className={`task-navigation-overlay${menuClosing ? " task-navigation-overlay--closing" : ""}`} aria-label="Workspace navigation" onCancel={(event) => { event.preventDefault(); closeNavigation(); }} onClose={() => setMenuOpen(false)} onClick={(event) => {
+      {portalReady && createPortal(<dialog ref={overlayRef} className={`task-navigation-overlay${menuClosing ? " task-navigation-overlay--closing" : ""}`} aria-label="Workspace navigation" onCancel={(event) => { event.preventDefault(); closeNavigation(); }} onClose={() => setMenuOpen(false)} onClick={(event) => {
         if (event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX > bounds.right || event.clientX < bounds.left) closeNavigation();
@@ -87,18 +92,18 @@ export default function Navigation({
         <nav ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
           {TABS.filter((tab) => tab.key !== "payouts" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
             <div className="task-navigation-group" key={tab.key}>
-              <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}>{tab.label}</a>
-              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests</a>}
+              <a href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}<WorkspaceIllustration className="navigation-mini-icon" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",finance:"clock",meetingNotes:"book-carrier",resources:"resource-balancer"})[tab.key]} /></a>
+              {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests <LockIcon /><img className="navigation-mini-icon" src="/illustrations/clock.svg" alt="" /></a>}
             </div>
           ))}
-          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests</a></div>}
+          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><a className="task-navigation-subpage" aria-current={activeTab === "payouts" ? "page" : undefined} href={viewHref("payouts")} onClick={(event) => navigate(event, "payouts")}>Requests <LockIcon /><img className="navigation-mini-icon" src="/illustrations/clock.svg" alt="" /></a></div>}
 
         </nav>
         <footer className="task-overlay-footer">
           <a href={viewHref("settings")} aria-current={activeTab === "settings" ? "page" : undefined} onClick={(event) => navigate(event, "settings")}>Settings</a>
           <button type="button" className="task-logout" onClick={handleSignOut}>Log out</button>
         </footer>
-      </dialog>
+      </dialog>, document.body)}
     </header>
   );
 

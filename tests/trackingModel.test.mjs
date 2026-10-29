@@ -65,10 +65,10 @@ test('recovering a running focus session pauses at its last heartbeat',()=>{
  assert.equal(j.focus.recovered,true);
  assert.equal(focusElapsed(j.focus,999999),20000);
 });
-const fragment={id:'f',start:1000,end:61000,seconds:999,source:'activity'};
+const fragment={id:'f',start:1000,end:601000,seconds:999,source:'activity'};
 const task={id:'a',memberId:'me'};
 test('logging recomputes duration, deduplicates selections and makes retries idempotent',()=>{
- assert.equal(planTimeLog(task,{},[fragment,fragment],'me').seconds,60);
+ assert.equal(planTimeLog(task,{},[fragment,fragment],'me').seconds,600);
  assert.equal(planTimeLog(task,{f:{taskId:'a'}},[fragment],'me').seconds,0);
 });
 test('logging rejects cross-task retries, other members, archived tasks and mismatched focus fragments',()=>{
@@ -88,4 +88,25 @@ test('actual logged time is shown without adding the planning estimate twice',()
  assert.equal(workedTaskSeconds({trackedSeconds:65,timeUnits:8,completed:false}),65);
  assert.equal(workedTaskSeconds({timeUnits:8,overtimeUnits:1,completed:true}),8100);
  assert.equal(workedTaskSeconds({timeUnits:8,completed:false}),0);
+});
+
+test('unlogged blocks require ten actual minutes; idle and short blocks do not inflate totals',async()=>{
+ const { eligibleTimeFragments }=await import('../src/app/components/time/trackingModel.mjs');
+ const entries=[{id:'short',start:0,end:599000,seconds:9999,status:'pending',source:'activity'},{id:'ready',start:0,end:600000,status:'pending',source:'activity'},{id:'idle',start:0,end:900000,status:'pending',source:'idle'},{id:'logged',start:0,end:900000,status:'logged',source:'activity'}];
+ assert.deepEqual(eligibleTimeFragments(entries).map(entry=>[entry.id,entry.seconds]),[['ready',600]]);
+ assert.deepEqual(eligibleTimeFragments(entries,true).map(entry=>entry.id),['ready','idle']);
+ assert.equal(planTimeLog(task,{},[entries[0]],'me').seconds,0);
+ assert.equal(planTimeLog(task,{},[entries[1]],'me').seconds,600);
+});
+
+test('completion reports only logged blocks and ignores short or unrelated fragments',async()=>{
+ const { recordLoggedFragments }=await import('../src/app/components/time/trackingModel.mjs');
+ const focus={id:'focus',sessionId:'session',source:'focus',start:0,end:900000,seconds:900,status:'pending'};
+ const short={...focus,id:'short',start:900000,end:1000000,seconds:100};
+ const activity={...focus,id:'activity',sessionId:undefined,source:'activity'};
+ const journal={...emptyJournal(),fragments:[focus,short,activity],completion:{id:'session',status:'pending',seconds:1000}};
+ const logged=recordLoggedFragments(journal,[focus],'a');
+ assert.equal(logged.completion.status,'logged');assert.equal(logged.completion.seconds,900);
+ assert.equal(logged.fragments.find(f=>f.id==='short').status,'pending');
+ assert.equal(recordLoggedFragments(journal,[activity],'a').completion.status,'pending');
 });

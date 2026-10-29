@@ -1,3 +1,7 @@
+export const MIN_TRACKED_SECONDS = 10 * 60;
+export function eligibleTimeFragments(fragments, includeIdle = false) {
+  return fragments.filter(fragment => fragment.status === 'pending' && (includeIdle || fragment.source !== 'idle') && secondsBetween(fragment.start,fragment.end) >= MIN_TRACKED_SECONDS).map(fragment => ({...fragment, seconds:secondsBetween(fragment.start,fragment.end)}));
+}
 export const IDLE_MS = 5 * 60 * 1000;
 export const FRAGMENT_MS = 15 * 60 * 1000;
 export const REMINDER_MS = 15 * 60 * 1000;
@@ -103,10 +107,19 @@ export function planTimeLog(task, existingEntries, fragments, memberId) {
     if (previous && previous.taskId !== task.id) throw new Error("This time fragment is already logged to another task.");
     if (!previous) unique.set(fragment.id, { ...fragment, seconds: secondsBetween(fragment.start, fragment.end) });
   }
-  const entries = [...unique.values()].filter((entry) => entry.seconds > 0);
+  const entries = [...unique.values()].filter((entry) => entry.seconds >= MIN_TRACKED_SECONDS);
   return { entries, seconds: entries.reduce((sum, entry) => sum + entry.seconds, 0) };
 }
 export function workedTaskSeconds(data) {
   if (Number(data?.trackedSeconds) > 0) return Number(data.trackedSeconds);
   return data?.completed ? ((Number(data.timeUnits) || 0) + (Number(data.overtimeUnits) || 0)) * 900 : 0;
+}
+
+export function recordLoggedFragments(journal, fragments, taskId) {
+  const selected = new Set(fragments.map(fragment => fragment.id));
+  const next = {...journal, fragments: journal.fragments.map(fragment => selected.has(fragment.id) ? {...fragment,seconds:secondsBetween(fragment.start,fragment.end),status:'logged',loggedTaskId:taskId} : fragment)};
+  if (next.completion && fragments.some(fragment=>fragment.sessionId===next.completion.id) && !eligibleTimeFragments(next.fragments).some(fragment=>fragment.sessionId===next.completion.id)) {
+    next.completion = {...next.completion,status:'logged',seconds:next.fragments.filter(fragment=>fragment.sessionId===next.completion.id && fragment.status==='logged').reduce((sum,fragment)=>sum+fragment.seconds,0)};
+  }
+  return next;
 }

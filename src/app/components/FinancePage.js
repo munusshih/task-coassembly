@@ -940,10 +940,10 @@ function computeProjectPanels(values, selectedYear = "overall") {
 const RING_CHART_COLORS = SERIES_COLORS;
 
 const RING_LABEL_COLOR_MAP = {
-  公司池: "#786591",
-  Underpaid: "#a65b42",
-  Overpaid: "#b68531",
-  Matched: "#55735f",
+  公司池: "var(--series-1)",
+  Underpaid: "var(--series-5)",
+  Overpaid: "var(--series-3)",
+  Matched: "var(--series-2)",
 };
 
 function ringColorForLabel(label, index) {
@@ -1713,7 +1713,7 @@ function FinanceDashboard({ data }) {
               <h5 className="finance-split-title">By category (分類)</h5>
               <CategoryBars
                 rows={expenseRows}
-                accent="#525252"
+                accent="var(--ink)"
                 max={expenseMax}
                 formatter={formatTWD}
               />
@@ -1724,7 +1724,7 @@ function FinanceDashboard({ data }) {
               </h5>
               <CategoryBars
                 rows={expenseDescriptionRows}
-                accent="#525252"
+                accent="var(--ink)"
                 max={expenseDescMax}
                 formatter={formatTWD}
                 limit={10}
@@ -1746,7 +1746,7 @@ function FinanceDashboard({ data }) {
               <h5 className="finance-split-title">By category (分類)</h5>
               <CategoryBars
                 rows={incomeRows}
-                accent="#525252"
+                accent="var(--ink)"
                 max={incomeMax}
                 formatter={formatTWD}
               />
@@ -1757,7 +1757,7 @@ function FinanceDashboard({ data }) {
               </h5>
               <CategoryBars
                 rows={incomeDescriptionRows}
-                accent="#525252"
+                accent="var(--ink)"
                 max={incomeDescMax}
                 formatter={formatTWD}
                 limit={10}

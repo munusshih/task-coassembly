@@ -2,6 +2,13 @@
 
 
 import useUrlState from "../hooks/useUrlState";
+import FormField from "./ui/FormField";
+import MetadataPill from "./ui/MetadataPill";
+import { projectWorkTone } from "./memberRoleMetrics.mjs";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import { groupProjects } from "./workspaceGroups.mjs";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import TaskCreateTrigger from "./TaskCreateTrigger";
 import { useEffect, useState, useMemo } from "react";
@@ -55,21 +62,21 @@ const PROJECT_STATUSES = [
 ];
 
 const STATUS_STYLE = {
-  Scheduled: { bg: "#e8f0fe", color: "#3367d6" },
-  "In Progress": { bg: "#e6f4ea", color: "#1e8e3e" },
-  "Waiting for Response": { bg: "#fef7e0", color: "#b06000" },
-  "On Hold": { bg: "#f0f0f0", color: "#888" },
-  Completed: { bg: "#e8f5e9", color: "#2e7d32" },
-  Cancelled: { bg: "#fce8e6", color: "#c5221f" },
+  Scheduled: { bg: "var(--surface-quiet)", color: "var(--ink)" },
+  "In Progress": { bg: "var(--surface-strong)", color: "var(--ink)" },
+  "Waiting for Response": { bg: "var(--palette-planned)", color: "var(--ink)" },
+  "On Hold": { bg: "var(--surface-strong)", color: "var(--muted)" },
+  Completed: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Cancelled: { bg: "var(--surface-strong)", color: "var(--ink)" },
 };
 
 const KIND_STYLE = {
-  Commissioned: { bg: "#e3f0ff", color: "#1a5fcc" },
-  "Self-funded": { bg: "#f0e8ff", color: "#6b21a8" },
-  Grant: { bg: "#e0f7e9", color: "#1a7a3c" },
-  Internal: { bg: "#f0f0ee", color: "#555" },
-  Admin: { bg: "#fff3e0", color: "#a05000" },
-  "Pass-through": { bg: "#e0f5f7", color: "#0f6e7a" },
+  Commissioned: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  "Self-funded": { bg: "var(--surface-quiet)", color: "var(--ink)" },
+  Grant: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Internal: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Admin: { bg: "var(--palette-planned)", color: "var(--ink)" },
+  "Pass-through": { bg: "var(--surface-strong)", color: "var(--ink)" },
 };
 
 // Staffing roles available per team member on a project
@@ -1315,34 +1322,10 @@ function ProjectRow({
   return (
     <li className={"project-row" + (open ? " project-row--open" : "")}>
       {/* Summary row */}
-      <div className="project-row-summary" onClick={() => setOpen((s) => !s)}>
+      <div className="project-row-summary" role="button" tabIndex={0} aria-expanded={open} onKeyDown={event => { if(event.target === event.currentTarget && ["Enter"," "].includes(event.key)) { event.preventDefault(); setOpen(value=>!value); } }} onClick={() => setOpen((s) => !s)}>
         <div className="project-row-main">
           <span className="project-row-name">{d.name || "Unnamed"}</span>
-          <div className="project-row-badges">
-            {d.status && (
-              <span
-                className="project-row-status"
-                style={{ background: statusSt.bg, color: statusSt.color }}
-              >
-                {d.status}
-              </span>
-            )}
-            {d.kind && (
-              <span
-                className="project-row-kind"
-                style={
-                  KIND_STYLE[d.kind]
-                    ? {
-                        background: KIND_STYLE[d.kind].bg,
-                        color: KIND_STYLE[d.kind].color,
-                      }
-                    : {}
-                }
-              >
-                {d.kind}
-              </span>
-            )}
-          </div>
+          <div className="project-row-badges">{d.status && <MetadataPill>{d.status}</MetadataPill>}{d.kind && <MetadataPill tone={projectWorkTone(d.kind)}>{d.kind}</MetadataPill>}</div>
         </div>
 
         <div className="project-row-budget-cell">
@@ -2036,7 +2019,7 @@ export default function ProjectsPage({
   const [createOpen, setCreateOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [focusedProject, setFocusedProject] = useUrlState("project", "");
-  const [viewMode, setViewMode] = useUrlState("projectView", "list", { allowed: ["list", "kanban"] });
+  const [viewMode, setViewMode] = useUrlState("projectView", "category", { allowed: ["category", "status", "list", "kanban"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [completeTarget, setCompleteTarget] = useState(null);
   const [completingProjectId, setCompletingProjectId] = useState(null);
@@ -2374,33 +2357,21 @@ export default function ProjectsPage({
     <TabPage
       className="projects-page"
       title="Projects"
-      badge={`${visibleProjects.length} project${visibleProjects.length !== 1 ? "s" : ""}`}
-      subtitle={projectSubtitle}
-      right={
-        <PageControls compact>
-          <ViewToggle
-            className="projects-view-toggle"
-            value={viewMode}
-            onChange={setViewMode}
-            options={projectViewOptions}
-            ariaLabel="Project view"
-          />
-        </PageControls>
-      }
+      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'}]} /></WorkspacePageHero>}
     >
       {!isLimitedViewer ? (
-        <><div className="workspace-create-toolbar"><TaskCreateTrigger label="New project…" onClick={() => setCreateOpen(true)} /></div>
+        <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
         {createOpen && <BottomComposer title="New project" onClose={() => setCreateOpen(false)}>
           <form className="project-add-form" onSubmit={handleAdd}>
-            <InputField
+            <FormField label="Project name"><InputField
               className="project-field project-field--name"
               type="text"
               placeholder="Project name *"
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
               required
-            />
-            <SelectField
+            /></FormField>
+            <FormField label="Category"><SelectField
               className="project-field project-field--kind"
               value={form.kind}
               onChange={(e) => setField("kind", e.target.value)}
@@ -2411,8 +2382,8 @@ export default function ProjectsPage({
                   {k}
                 </option>
               ))}
-            </SelectField>
-            <SelectField
+            </SelectField></FormField>
+            <FormField label="Status"><SelectField
               className="project-field project-field--status"
               value={form.status}
               onChange={(e) => setField("status", e.target.value)}
@@ -2423,9 +2394,9 @@ export default function ProjectsPage({
                   {s}
                 </option>
               ))}
-            </SelectField>
+            </SelectField></FormField>
             <div className="project-budget-group">
-              <InputField
+              <FormField label="Budget"><InputField
                 className="project-field project-field--budget"
                 type="number"
                 placeholder="Budget"
@@ -2434,8 +2405,8 @@ export default function ProjectsPage({
                 value={form.budget}
                 onChange={(e) => setField("budget", e.target.value)}
                 disabled={form.kind === "Self-funded"}
-              />
-              <SelectField
+              /></FormField>
+              <FormField label="Currency"><SelectField
                 className="project-field project-field--currency"
                 value={form.budgetCurrency}
                 onChange={(e) => setField("budgetCurrency", e.target.value)}
@@ -2443,10 +2414,10 @@ export default function ProjectsPage({
               >
                 <option value="TWD">TWD</option>
                 <option value="USD">USD</option>
-              </SelectField>
+              </SelectField></FormField>
             </div>
             {form.kind !== "Self-funded" ? (
-              <SelectField
+              <FormField label="Company contribution"><SelectField
                 className="project-field project-field--donation"
                 value={form.donationPercent}
                 onChange={(e) => setField("donationPercent", e.target.value)}
@@ -2457,28 +2428,28 @@ export default function ProjectsPage({
                     {pct}% donation
                   </option>
                 ))}
-              </SelectField>
+              </SelectField></FormField>
             ) : (
               <span className="finance-section-note">
                 Budget comes from self funding. Donation is disabled.
               </span>
             )}
-            <InputField
+            <FormField label="Start date"><InputField
               className="project-field"
               type="date"
               value={form.startDate}
               onChange={(e) => setField("startDate", e.target.value)}
               title="Project start date"
-            />
-            <InputField
+            /></FormField>
+            <FormField label="End date"><InputField
               className="project-field"
               type="date"
               value={form.endDate}
               onChange={(e) => setField("endDate", e.target.value)}
               title="Project end date"
-            />
+            /></FormField>
             {isInternalOrAdminKind(form.kind) && (
-              <InputField
+              <FormField label="Projected hourly rate (TWD)"><InputField
                 className="project-field"
                 type="number"
                 placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
@@ -2489,11 +2460,9 @@ export default function ProjectsPage({
                   setField("projectedHourlyWage", e.target.value)
                 }
                 title="Projected hourly wage for Internal/Admin projects (TWD)"
-              />
+              /></FormField>
             )}
-            <Button type="submit" disabled={saving || !form.name.trim()}>
-              Add project
-            </Button>
+            <div className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></div>
           </form>
         </BottomComposer>}</>
       ) : (
@@ -2506,58 +2475,11 @@ export default function ProjectsPage({
         </SectionBlock>
       )}
 
-      {visibleProjects.length === 0 ? (
-        <EmptyState>No projects yet.</EmptyState>
-      ) : viewMode === "kanban" ? (
-        <SectionBlock
-          className="project-kanban-section"
-          title="Kanban board"
-          titleTag="h3"
-        >
-          <ProjectKanbanBoard
-            projects={visibleProjects}
-            allTasks={visibleTasks}
-            onComplete={isLimitedViewer ? null : requestCompleteProject}
-          />
-        </SectionBlock>
-      ) : (
-        <SectionBlock
-          className="project-list-section"
-          title="Project ledger"
-          titleTag="h3"
-        >
-          <div className="project-col-headers">
-            <span>Name</span>
-            <span>Budget</span>
-            <span>Hours</span>
-            <span>Hourly Rate (TWD)</span>
-            <span />
-          </div>
-          <CollectionLayout as="ul" variant="list" className="project-list">
-            {[...visibleProjects]
-              .sort(
-                (a, b) =>
-                  (Number(b.data.createdAt) || 0) -
-                  (Number(a.data.createdAt) || 0),
-              )
-              .map((p) => (
-                <ProjectRow
-                  key={p.id}
-                  project={p}
-                  focusedProject={focusedProject}
-                  onFocusProject={setFocusedProject}
-                  allTasks={visibleTasks}
-                  members={members}
-                  onSave={handleSave}
-                  onComplete={
-                    isLimitedViewer ? null : requestCompleteProject
-                  }
-                  onDelete={handleDelete}
-                />
-              ))}
-          </CollectionLayout>
-        </SectionBlock>
-      )}
+      {visibleProjects.length === 0 ? <EmptyState>No projects yet.</EmptyState> : <div className="workspace-group-sections">
+        {groupProjects(visibleProjects, ['status','kanban'].includes(viewMode)?'status':'category').map(group => <SectionBlock key={group.id} className="workspace-group-section" title={group.title} badge={group.projects.length}>
+          <CollectionLayout as="ul" variant="grid" className="project-list project-card-grid">{[...group.projects].sort((a,b)=>String(a.data?.name||a.id).localeCompare(String(b.data?.name||b.id))).map(p=><ProjectRow key={p.id} project={p} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete} />)}</CollectionLayout>
+        </SectionBlock>)}
+      </div>}
 
       <StatusStack className="toast-container" ariaLive="polite">
         {toasts.map((t) => (

@@ -20,6 +20,8 @@ import CreateBar from "./ui/CreateBar";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
 import InputField from "./ui/InputField";
+import FormField from "./ui/FormField";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import ModalShell from "./ui/ModalShell";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
@@ -125,22 +127,22 @@ function ResourceForm({
   return (
     <div className="resource-form">
       <div className="resource-form-main">
-        <InputField
+        <FormField label="Name"><InputField
           className="resource-input"
           type="text"
           placeholder="Name *"
           value={form.name}
           autoFocus
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-        <InputField
+        /></FormField>
+        <FormField label="URL"><InputField
           className="resource-input"
           type="url"
           placeholder="URL * (https://…)"
           value={form.url}
           onChange={(e) => setForm({ ...form, url: e.target.value })}
-        />
-        <SelectField
+        /></FormField>
+        <FormField label="Category"><SelectField
           className="resource-input"
           value={form.category}
           onChange={(e) =>
@@ -152,24 +154,24 @@ function ResourceForm({
               {cat}
             </option>
           ))}
-        </SelectField>
+        </SelectField></FormField>
       </div>
       {form.category === "others" && (
-        <InputField
+        <FormField label="New category"><InputField
           className="resource-input"
           type="text"
           placeholder="New category name"
           value={form.customCategory}
           onChange={(e) => setForm({ ...form, customCategory: e.target.value })}
-        />
+        /></FormField>
       )}
-      <InputField
+      <FormField label="Description"><InputField
         className="resource-input"
         type="text"
         placeholder="Description (optional)"
         value={form.description}
         onChange={(e) => setForm({ ...form, description: e.target.value })}
-      />
+      /></FormField>
       <div className="resource-form-sublinks-label">Sub-links</div>
       <SubLinkEditor
         subLinks={form.subLinks}
@@ -200,7 +202,7 @@ function ResourceCard({ link, onEdit, onDelete, members = [] }) {
       interactive
     >
       <div className="resource-folder-cover" style={{ backgroundColor: COVER_COLORS[Array.from(link.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 6] }}><ResourcePreviewImage link={link} /></div>
-      <svg className="resource-folder-outline" viewBox="0 0 260 220" preserveAspectRatio="none" aria-hidden="true"><path d="M2 20 L12 2 H77 L88 14 H258 V218 H2 Z" fill="none" stroke="#000" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg>
+      <svg className="resource-folder-outline" viewBox="0 0 260 220" preserveAspectRatio="none" aria-hidden="true"><path d="M2 20 L12 2 H77 L88 14 H258 V218 H2 Z" fill="none" stroke="var(--ink)" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg>
       <div className="resource-sticky-actions">
         <IconButton onClick={() => onEdit(link)} title="Edit">
           {EDIT_ICON}
@@ -421,19 +423,14 @@ export default function ResourcesPage({ currentMember, members = [] }) {
     <TabPage
       className="resources-page"
       title="Resource"
-      header={<WorkspacePageHero title="Resource" illustration="book-carrier">
+      header={<WorkspacePageHero title="Resource" illustration="resource-balancer">
         <label className="task-view-picker"><span>by</span><select className="task-view-selector" aria-label="Resource view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
           <option value="category">Category</option><option value="date">Date</option>
         </select></label>
       </WorkspacePageHero>}
     >
       <div className="resource-board-controls">
-      <CreateBar
-        open={false}
-        onOpen={() => setAddOpen(true)}
-        label="Add a resource…"
-        triggerClassName="resource-create-trigger"
-      />
+      <WorkspaceCreateDock label="New resource" expanded={addOpen} onClick={() => setAddOpen(true)} />
       </div>
 
       {links.length > 0 ? (viewMode === "date"

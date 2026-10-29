@@ -584,7 +584,7 @@ export default function PageGuide({ tabKey, className = "", icon, iconOnly = fal
     const pageDriver = driver({
       animate: false,
       allowClose: true,
-      overlayColor: "#171717",
+      overlayColor: "var(--ink)",
       overlayOpacity: 0.55,
       showProgress: true,
       showButtons: ["next", "previous", "close"],

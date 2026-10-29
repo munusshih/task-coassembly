@@ -1,0 +1,35 @@
+/* Protocol's palette. Change this file to theme the whole workspace. */
+:root {
+  --ink: #000000;
+  --paper: #ffffff;
+  --muted: #777777;
+  --subdued: #aaaaaa;
+  --line: #dddddd;
+  --surface-strong: #eeeeee;
+  --surface-quiet: #f7f7f7;
+  --palette-project: #e9e0f1;
+  --palette-worked: #e2ecdc;
+  --palette-planned: #eeebdf;
+  --palette-date: #f6e5d9;
+  --palette-neutral: #f1f1ef;
+  --palette-blue: #dce8ef;
+  --series-1: #786591;
+  --series-2: #55735f;
+  --series-3: #b68531;
+  --series-4: #527c92;
+  --series-5: #a65b42;
+  --series-6: #9e6d89;
+  --series-7: #6f7660;
+  --series-8: #44484d;
+  --cover-1: #e9ad79;
+  --cover-2: #e0dc7b;
+  --cover-3: #b8c9ae;
+  --cover-4: #c3bbdf;
+  --cover-5: #e5b8ce;
+  --cover-6: #b9ced9;
+  --workspace-project: var(--palette-project);
+  --workspace-worked: var(--palette-worked);
+  --workspace-planned: var(--palette-planned);
+  --workspace-date: var(--palette-date);
+  --workspace-neutral: var(--palette-neutral);
+}

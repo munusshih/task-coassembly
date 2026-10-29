@@ -1,6 +1,8 @@
 "use client";
 
 
+import FormField from "./ui/FormField";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import NotesCalendar from "./NotesCalendar";
 import { fuzzyMatch } from "../lib/noteSearch.mjs";
@@ -223,7 +225,7 @@ function colorFromTextSeed(value) {
     hash = (hash << 5) - hash + text.charCodeAt(index);
     hash |= 0;
   }
-  const palette = ["#404040", "#404040", "#525252", "#525252", "#404040"];
+  const palette = ["var(--ink)", "var(--ink)", "var(--ink)", "var(--ink)", "var(--ink)"];
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -1467,10 +1469,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       title="Notes"
       header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker value={groupMode} onChange={setGroupMode} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker prefix="in" value={notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},{value:"shelf",label:"List"}]} label="Notes layout" /></div></WorkspacePageHero>}
     >
-      <div className="notes-toolbar">
-        <TaskCreateTrigger label="New note…" onClick={() => setCreateOpen(open => !open)} />
-
-      </div>
+      <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
       <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
       {createOpen && (
       <BottomComposer title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
@@ -1502,23 +1501,23 @@ export default function MeetingNotesPage({ viewerName = "" }) {
               </div>
             )}
           </div>
-          <InputField
+          <FormField label="Title"><InputField
             type="text"
             placeholder="New note title…"
             aria-label="Note title"
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
             className="new-note-input"
-          />
-          <InputField
+          /></FormField>
+          <FormField label="Link (optional)"><InputField
             type="url"
             placeholder="Link URL (optional)"
             aria-label="Note link URL"
             value={newLinkUrl}
             onChange={(event) => setNewLinkUrl(event.target.value)}
             className="note-meta-input"
-          />
-          <SelectField
+          /></FormField>
+          <FormField label="Organize by"><SelectField
             className="note-meta-input"
             aria-label="Note type"
             value={newScopeType}
@@ -1541,9 +1540,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           >
             <option value={NOTE_SCOPE_DATE}>Date-based</option>
             <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-          </SelectField>
+          </SelectField></FormField>
           {newScopeType === NOTE_SCOPE_PROJECT && (
-            <SelectField
+            <FormField label="Project"><SelectField
               className="note-meta-input"
               aria-label="Note project"
               value={newProjectId}
@@ -1567,7 +1566,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   {project?.data?.name || project.id}
                 </option>
               ))}
-            </SelectField>
+            </SelectField></FormField>
           )}
           <Button onClick={handleCreateNote} disabled={!newTitle.trim()}>
             Create

@@ -1,7 +1,9 @@
 "use client";
 
 
+import MemberWorkRow from "./MemberWorkRow";
 import AllocationClock from "./ui/AllocationClock";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import { formatPronouns, pronounsForInput } from "../lib/pronouns.mjs";
 import MemberEditButton from "./ui/MemberEditButton";
@@ -316,7 +318,7 @@ function toProjectSegments(timeMap) {
 
 function donutBackground(segments) {
   if (!Array.isArray(segments) || segments.length === 0) {
-    return "conic-gradient(#f5f5f5 0deg 360deg)";
+    return "conic-gradient(var(--surface-quiet) 0deg 360deg)";
   }
 
   let start = 0;
@@ -327,7 +329,7 @@ function donutBackground(segments) {
     start = end;
   }
   if (start < 360) {
-    parts.push(`rgba(0,0,0,0.08) ${start.toFixed(2)}deg 360deg`);
+    parts.push(`color-mix(in srgb, var(--ink) 8%, transparent) ${start.toFixed(2)}deg 360deg`);
   }
   return `conic-gradient(${parts.join(", ")})`;
 }
@@ -947,261 +949,8 @@ export default function MemberDirectoryPage() {
     });
   }
 
-  const directoryMembers = [...membersSorted].sort((a, b) => {
-    const key = directoryView === "overall" ? "finishedUnitsTotal" : "finishedUnitsThisWeek";
-    return (memberMetrics[b.id]?.[key] || 0) - (memberMetrics[a.id]?.[key] || 0);
-  });
-  function renderDirectoryMember(member) {
-          const metric = memberMetrics[member.id] || {
-            totalTaskCount: 0,
-            assignedTotalCount: 0,
-            completedTotalCount: 0,
-            finishedUnitsTotal: 0,
-            assignedThisWeekCount: 0,
-            completedThisWeekCount: 0,
-            finishedUnitsThisWeek: 0,
-            plannedUnits: 0,
-            weekly: recentWeekKeys.map((weekKey) => ({
-              weekKey,
-              assigned: 0,
-              completed: 0,
-              finishedUnits: 0,
-            })),
-            currentProjectCount: 0,
-            historicalProjectCount: 0,
-            currentProjects: [],
-            projectSegments: [],
-            thisWeekProjectSegments: [],
-            projectKindSegments: [],
-            thisWeekProjectKindSegments: [],
-          };
-
-          const expanded = directoryView !== "role" || Boolean(expandedMembers[member.id]);
-          const latestWeek = metric.weekly[0] || {
-            weekKey: currentWeekKey,
-            assigned: metric.assignedThisWeekCount,
-            completed: metric.completedThisWeekCount,
-          };
-          const timeTab = directoryView;
-          const role = normalizeMemberRole(member?.data?.role);
-          const meetingRequired = isWorkerOwner(role);
-
-          return (
-            <EntityCard
-              key={member.id}
-              as="article"
-              className={
-                expanded
-                  ? "member-directory-card member-directory-card--open"
-                  : "member-directory-card"
-              }
-            >
-              <div className="member-directory-card-head">
-                <div className="member-directory-card-titles">
-                  <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
-                  <h3 className="member-directory-card-name">
-                    {member?.data?.name || member.id}
-                    {member.data?.pronouns && <span className="member-pronouns">{formatPronouns(member.data.pronouns)}</span>}
-                  </h3>
-                  <div className="member-directory-card-badges">
-                    <MetadataPill tone={role === "worker-owner" ? "project" : role === "associate" ? "worked" : role === "flying-member" ? "date" : "planned"}>{roleLabel(role)}</MetadataPill>
-
-                    {member?.data?.active === false && (
-                      <span className="member-role-chip member-role-chip--inactive">
-                        inactive
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="member-directory-card-actions">
-                  <IconButton
-                    onClick={() => toggleMemberExpanded(member.id)}
-                    title={expanded ? "Collapse details" : "Expand details"}
-                    aria-expanded={expanded}
-                  >
-                    {expanded ? "▴" : "▾"}
-                  </IconButton>
-                  <MemberEditButton name={member.data?.name || member.id} onClick={() => startEdit(member)} />
-                  <IconButton
-                    variant="delete"
-                    onClick={() => handleDeleteMember(member)}
-                    title="Delete"
-                  >
-                    {DELETE_ICON}
-                  </IconButton>
-                </div>
-              </div>
-
-              <>
-                <button
-                  type="button"
-                  className="member-directory-card-condensed"
-                  onClick={() => toggleMemberExpanded(member.id)}
-                  aria-expanded={expanded}
-                >
-                  <div className="member-directory-card-condensed-head">
-                    <span className="member-directory-meta-label">
-                      Week{" "}
-                      {latestWeek?.weekKey
-                        ? formatWeekKeyLabel(latestWeek.weekKey)
-                        : "—"}
-                    </span>
-                    <span className="member-directory-condensed-week">
-                      {latestWeek.assigned} assigned · {latestWeek.completed}{" "}
-                      done
-                    </span>
-                  </div>
-                  <div className="member-directory-stats">
-                    <MetadataPill tone="planned" className="member-stat-chip">
-                      {metric.totalTaskCount} tracked tasks
-                    </MetadataPill>
-                    <MetadataPill tone="planned" className="member-stat-chip">
-                      {formatPlannedHoursFromUnits(metric.plannedUnits)} planned
-                    </MetadataPill>
-                      <MetadataPill tone="planned" className="member-stat-chip">
-                        {formatUnitsAsHours(metric.finishedUnitsThisWeek)} done this week
-                      </MetadataPill>
-                      <MetadataPill tone="planned" className="member-stat-chip">
-                        {formatUnitsAsHours(metric.finishedUnitsTotal)} done overall
-                      </MetadataPill>
-                    <MetadataPill tone="planned" className="member-stat-chip">
-                      {metric.currentProjectCount} current projects
-                    </MetadataPill>
-                    <MetadataPill tone="planned" className="member-stat-chip">
-                      {metric.historicalProjectCount} total projects taken
-                    </MetadataPill>
-                  </div>
-                </button>
-
-                {expanded && (
-                  <div className="member-directory-card-details">
-                    <div className="member-directory-meta">
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Email
-                        </span>
-                        <span>{member?.data?.email || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Timezone
-                        </span>
-                        <span>{member?.data?.timezone || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Joined
-                        </span>
-                        <span>{member?.data?.joinedOn || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Weekly planned time
-                        </span>
-                        <span>
-                          {formatPlannedHoursFromUnits(metric.plannedUnits)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="member-chart-section">
-                      {timeTab === "weekly" ? (
-                        <>
-                          <span className="member-directory-meta-label">This week</span>
-                          <div className="member-kind-charts">
-                            <TimeDonutChart
-                              label="Time by project"
-                              segments={metric.thisWeekProjectSegments}
-                              emptyText="No finished project time this week."
-                              ariaLabel={`project-time-week-${member.id}`}
-                            />
-                            <TimeDonutChart
-                              label="Time by project type"
-                              segments={metric.thisWeekProjectKindSegments}
-                              emptyText="No finished project-type time this week."
-                              ariaLabel={`project-kind-time-week-${member.id}`}
-                            />
-                          </div>
-
-                          <div className="member-weekly-board">
-                            {metric.weekly.map((weekly) => (
-                              <div
-                                key={`${member.id}-${weekly.weekKey}`}
-                                className="member-weekly-item"
-                              >
-                                <span className="member-weekly-week">
-                                  {formatWeekKeyLabel(weekly.weekKey)}
-                                </span>
-                                <span className="member-weekly-values">
-                                  {weekly.assigned} assigned · {weekly.completed} done · {formatUnitsAsHours(weekly.finishedUnits)} finished
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="member-directory-meta-label">Overall</span>
-                          <div className="member-kind-charts">
-                            <TimeDonutChart
-                              label="Time by project"
-                              segments={metric.projectSegments}
-                              emptyText="No finished project time yet."
-                              ariaLabel={`project-time-all-${member.id}`}
-                            />
-                            <TimeDonutChart
-                              label="Time by project type"
-                              segments={metric.projectKindSegments}
-                              emptyText="No finished project-type time yet."
-                              ariaLabel={`project-kind-time-all-${member.id}`}
-                            />
-                          </div>
-
-                          <div className="member-overall-board">
-                            <div className="member-weekly-item">
-                              <span className="member-weekly-week">Overall</span>
-                              <span className="member-weekly-values">
-                                {metric.assignedTotalCount} assigned · {metric.completedTotalCount} done · {formatUnitsAsHours(metric.finishedUnitsTotal)} finished
-                              </span>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {metric.currentProjects.length > 0 && (
-                      <div className="member-current-projects">
-                        <span className="member-directory-meta-label">
-                          Current projects
-                        </span>
-                        <div className="member-project-list">
-                          {metric.currentProjects.map((project) => (
-                            <MetadataPill key={project.id} tone="project" className="member-project-chip">
-                              {project.name}
-                            </MetadataPill>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {member?.data?.notes && (
-                      <p className="member-notes">
-                        {renderTextWithLinks(
-                          member.data.notes,
-                          `member-note-${member.id}`,
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </>
-            </EntityCard>
-          );
-
-  }
-
-  const roleMetricsById = useMemo(() => Object.fromEntries(membersSorted.map(member => [member.id, memberRoleMetrics(member.id, tasks, projects)])), [membersSorted, tasks, projects, today]);
+  const roleMetricsById = useMemo(() => Object.fromEntries(membersSorted.map(member => [member.id, memberRoleMetrics(member.id, tasks, projects, Date.now(), directoryView)])), [membersSorted, tasks, projects, today, directoryView]);
+  const directoryMembers = [...membersSorted].sort((a,b) => directoryView === "role" ? 0 : roleMetricsById[b.id].total-roleMetricsById[a.id].total);
   const activeDirectoryMembers = directoryMembers.filter(member => member.data?.active !== false);
   const inactiveDirectoryMembers = directoryMembers.filter(member => member.data?.active === false);
 
@@ -1211,41 +960,12 @@ export default function MemberDirectoryPage() {
       <div className="member-role-heading"><h2>{title}</h2><span className="task-scope-count">{group.length}</span>
 
       </div>
-      <CollectionLayout variant="grid" className={directoryView === 'role' ? 'member-role-list' : 'member-directory-list'}>{group.map(member => directoryView === 'role' || (member.data?.active === false && !roleMetricsById[member.id].total && !roleMetricsById[member.id].currentProjects.length) ? renderRoleMember(member) : renderDirectoryMember(member))}</CollectionLayout>
+      <CollectionLayout variant="grid" className="member-role-list">{group.map(renderRoleMember)}</CollectionLayout>
     </section>;
   }
 
   function renderRoleMember(member) {
-    const metric = roleMetricsById[member.id];
-    const name = member.data?.name || member.id;
-    const hideEmptyWork = member.data?.active === false && !metric.total && !metric.currentProjects.length;
-    return <article key={member.id} className={`member-role-row${hideEmptyWork ? " member-role-row--profile-only" : ""}${highlightedMember && highlightedMember !== member.id ? " member-role-row--dimmed" : ""}${highlightedMember === member.id ? " member-role-row--highlighted" : ""}`}>
-      <div className="member-role-identity">
-        <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
-        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{formatPronouns(member.data.pronouns)}</span>}<MemberEditButton name={name} onClick={() => startEdit(member)} /></h3>
-        {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
-        <p className="member-tenure">{tenureText(member.data || {}, today)}</p>
-
-        <MemberMilestones member={member} today={today} />
-      </div>
-      {!hideEmptyWork && <>
-      <div className="member-role-projects">
-        <h4>Current projects <span className="task-scope-count">{metric.currentProjects.length}</span></h4>
-        <div className="member-role-pills">{metric.currentProjects.length ? metric.currentProjects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.data?.kind)}>{project.data?.name || project.id}</MetadataPill>) : <p>No current projects.</p>}</div>
-        <h4>Work mix</h4>
-        <div className="member-work-mix-rows">{metric.categories.filter(category => category.key !== "unclassified").map(category => <div key={category.key} className="member-work-mix-row"><span>{category.label}</span><SpoonMeter percent={category.percent} tone={category.tone} label={category.label} /><strong>{Math.round(category.percent)}%</strong></div>)}</div>
-        <p className="member-role-caption">Based on allocated time over these four weeks.{metric.categories.find(category => category.key === "unclassified")?.percent > 0 && ` ${Math.round(metric.categories.find(category => category.key === "unclassified").percent)}% unclassified.`}</p>
-      </div>
-      <div className="member-role-history">
-        <h4>Last four weeks <MetadataPill tone="planned"><TaskClockIcon /> {formatUnitsAsHours(metric.total)} allocated</MetadataPill></h4>
-
-        {metric.weeks.map((week, index) => <div key={week.key} className="member-role-week">
-          <div className="member-role-week-heading"><span title={formatWeekKeyLabel(week.key)}>{index === 0 ? "This week" : index === 1 ? "Last week" : formatWeekKeyLabel(week.key)}</span><strong><TaskClockIcon /> {formatUnitsAsHours(week.units)}</strong></div>
-          <div className="member-role-pills">{week.projects.length ? week.projects.map(project => <MetadataPill key={project.id} tone={projectWorkTone(project.kind)}>{project.name} · {formatUnitsAsHours(project.units)}</MetadataPill>) : <span className="member-role-caption">No time allocated</span>}</div>
-        </div>)}
-      </div>
-      </>}
-    </article>;
+    return <MemberWorkRow key={member.id} member={member} metric={roleMetricsById[member.id]} mode={directoryView} roleTitle={roleLabel(member.data?.role)} today={today} formatTime={formatUnitsAsHours} weekLabel={formatWeekKeyLabel} onProfile={() => setProfileId(member.id)} onEdit={() => startEdit(member)} highlighted={highlightedMember===member.id} dimmed={highlightedMember && highlightedMember!==member.id} />;
   }
 
   const profileMember = membersSorted.find(member => member.id === profileId);
@@ -1257,7 +977,7 @@ export default function MemberDirectoryPage() {
       title="Members"
       header={<WorkspacePageHero title="Members" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }, { value: "overall", label: "Overall" }]} /></WorkspacePageHero>}
     >
-      <div className="workspace-create-toolbar"><TaskCreateTrigger label="New member…" onClick={() => setAddMemberOpen(true)} /></div>
+      <WorkspaceCreateDock label="New member" expanded={addMemberOpen} onClick={() => setAddMemberOpen(true)} />
       {notice && (
         <p
           className={
@@ -1272,12 +992,12 @@ export default function MemberDirectoryPage() {
 
 
 
-      {directoryView === 'role' && <section className="member-allocation-overview" aria-label="Member allocation over the last four weeks">
-        <AllocationClock variant="member" subject="Member" periodLabel="Last four weeks by member" allocations={activeDirectoryMembers.map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total })).sort((a, b) => b.units - a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
+      {<section className="member-allocation-overview" aria-label="Member allocation over the last four weeks">
+        <AllocationClock variant="member" subject="Member" periodLabel={directoryView === "overall" ? "Overall allocation by member" : directoryView === "weekly" ? "This week by member" : "Last four weeks by member"} allocations={activeDirectoryMembers.map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total })).sort((a, b) => b.units - a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
       </section>}
 
       {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">
-        {directoryView === "role" ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-directory-list">{activeDirectoryMembers.map(renderDirectoryMember)}</CollectionLayout>}
+        {directoryView === "role" ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-role-list">{activeDirectoryMembers.map(renderRoleMember)}</CollectionLayout>}
         {renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
       </div>}
 

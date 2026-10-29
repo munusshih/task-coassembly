@@ -1,8 +1,5 @@
 // Shared categorical colors. Every chart also retains text labels and values.
-export const SERIES_COLORS = [
-  "#786591", "#55735f", "#b68531", "#527c92",
-  "#a65b42", "#9e6d89", "#6f7660", "#44484d",
-];
+export const SERIES_COLORS = Array.from({length:8},(_,index)=>`var(--series-${index+1})`);
 
 export function seriesColorForKey(value) {
   let hash = 0;
@@ -11,8 +8,6 @@ export function seriesColorForKey(value) {
   return cursorColors[Math.abs(hash) % cursorColors.length];
 }
 
-export const WORKSPACE_COLORS = {
-  project: "#e9e0f1", worked: "#e2ecdc", planned: "#eeebdf", date: "#f6e5d9", neutral: "#f1f1ef",
-};
+export const WORKSPACE_COLORS = Object.fromEntries(['project','worked','planned','date','neutral'].map(key=>[key,`var(--palette-${key})`]));
 export const WORKSPACE_THEME = Object.fromEntries(Object.entries(WORKSPACE_COLORS).map(([key, value]) => [`--workspace-${key}`, value]));
-export const COVER_COLORS = ["#e9ad79", "#e0dc7b", "#b8c9ae", "#c3bbdf", "#e5b8ce", "#b9ced9"];
+export const COVER_COLORS = Array.from({length:6},(_,index)=>`var(--cover-${index+1})`);

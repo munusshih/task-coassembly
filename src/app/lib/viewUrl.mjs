@@ -28,7 +28,7 @@ const schema = {
   week: { tab: "members", query: "week", validate: isDateKey },
   taskView: { tab: "members", query: "view", default: "member", allowed: ["member", "project", "resources"] },
   project: { tab: "projects", path: true, validate: isDocumentId },
-  projectView: { tab: "projects", query: "view", default: "list", allowed: ["list", "kanban"] },
+  projectView: { tab: "projects", query: "view", default: "category", allowed: ["category", "status", "list", "kanban"] },
   note: { tab: "meetingNotes", path: true, validate: isDocumentId },
   notesSearch: { tab: "meetingNotes", query: "q" },
   notesGroup: { tab: "meetingNotes", query: "group", default: "date", allowed: ["date", "project"] },
@@ -38,6 +38,7 @@ const schema = {
   year: { tab: "finance", query: "year", default: "overall", validate: (v) => v === "overall" || /^\d{4}$/.test(v) },
   quarter: { tab: "finance", query: "quarter", default: "overall", validate: (v) => v === "overall" || /^\d{4}-Q[1-4]$/.test(v) },
   resourcesView: { tab: "resources", query: "view", default: "category", allowed: ["category", "date"] },
+  wishGroup: { tab: "backlog", query: "group", default: "project", allowed: ["project", "date"] },
   wishesSearch: { tab: "backlog", query: "q" },
 };
 const ownedQueries = new Set(["tab", "resourcesSearch", ...Object.keys(schema), ...Object.values(schema).map((s) => s.query).filter(Boolean)]);
@@ -65,6 +66,7 @@ export function readViewUrl(url) {
     if (spec.tab !== tab) continue;
     let value = spec.path && parts[1] ? safeDecode(parts[1]) :
       url.searchParams.get(spec.query || key) ?? url.searchParams.get(key);
+    if (key === "projectView") value = value === "list" ? "category" : value === "kanban" ? "status" : value;
     // Previous links could contain several expanded rows. The final row becomes the focus.
     if (key === "project" && value?.includes(",")) value = value.split(",").filter(Boolean).at(-1);
     if (valid(spec, value)) state[key] = value;
