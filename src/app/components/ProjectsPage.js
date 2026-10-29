@@ -8,6 +8,8 @@ import { projectWorkTone } from "./memberRoleMetrics.mjs";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import ProjectCollection from "./ProjectCollection";
+import {filterProjectScope} from "./workspaceGroups.mjs";
+import TimeButton from "./ui/TimeButton";
 import CloseButton from "./ui/CloseButton";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
@@ -1884,6 +1886,7 @@ export default function ProjectsPage({
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [showClosedProjects,setShowClosedProjects]=useState(false);
   const [toasts, setToasts] = useState([]);
   const [focusedProject, setFocusedProject] = useUrlState("project", "");
   const [viewMode, setViewMode] = useUrlState("projectView", "category", { allowed: ["category", "status", "list", "kanban"] });
@@ -2156,6 +2159,10 @@ export default function ProjectsPage({
     );
   }, [isLimitedViewer, projects, viewerMemberId]);
 
+  const activeProjects=filterProjectScope(visibleProjects);
+  const collectionProjects=showClosedProjects?visibleProjects:activeProjects;
+  const closedProjectCount=visibleProjects.length-activeProjects.length;
+
   const visibleTasks = useMemo(() => {
     if (!isLimitedViewer) return allTasks;
     const visibleProjectIds = new Set(
@@ -2348,8 +2355,9 @@ export default function ProjectsPage({
         </SectionBlock>
       )}
 
-      {visibleProjects.length === 0 ? <EmptyState>No projects yet.</EmptyState> : <>
-        <ProjectCollection projects={visibleProjects} tasks={visibleTasks} members={members} mode={['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})}/>
+      <div className="project-collection-controls"><span>{showClosedProjects?'All projects':'Active projects'} <span className="task-scope-count">{collectionProjects.length}</span></span>{closedProjectCount>0&&<TimeButton quiet aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?'Hide closed projects':`Show closed projects (${closedProjectCount})`}</TimeButton>}</div>
+      {collectionProjects.length === 0 ? <EmptyState>{visibleProjects.length?'No active projects.':'No projects yet.'}</EmptyState> : <>
+        <ProjectCollection projects={collectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})}/>
         {visibleProjects.some(project=>project.id===focusedProject)&&<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid">{visibleProjects.filter(project=>project.id===focusedProject).map(project=><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/>)}</ul></section>}
       </>}
 

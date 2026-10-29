@@ -27,9 +27,9 @@ export function groupWishes(items, projects, mode='project') {
 
 // Empty/legacy statuses stay visible in the queue without inventing a "Not set" lane.
 export function projectBoardStatus(raw) {
- const status=String(raw||'').trim();
- const aliases={Active:'In Progress',Done:'Completed',Canceled:'Cancelled'};
- return ['Scheduled','In Progress','Waiting for Response','On Hold','Completed','Cancelled'].includes(status)?status:aliases[status]||'Scheduled';
+ const normalized=String(raw||'').trim().toLowerCase();
+ const aliases={active:'In Progress',done:'Completed',canceled:'Cancelled'};
+ return ['Scheduled','In Progress','Waiting for Response','On Hold','Completed','Cancelled'].find(status=>status.toLowerCase()===normalized)||aliases[normalized]||'Scheduled';
 }
 export function projectStatusColumns(projects,statuses) {
  const columns=statuses.map(status=>({id:status,title:status,projects:[]}));
@@ -37,4 +37,8 @@ export function projectStatusColumns(projects,statuses) {
  for(const project of projects){const status=projectBoardStatus(project.data?.status);const target=byStatus.get(status)||columns[0];if(target)target.projects.push(project);}
  for(const column of columns)column.projects.sort((a,b)=>String(a.data?.name||a.id).localeCompare(String(b.data?.name||b.id)));
  return columns;
+}
+
+export function filterProjectScope(projects,showClosed=false) {
+ return showClosed?projects:projects.filter(project=>!['Completed','Cancelled'].includes(projectBoardStatus(project.data?.status)));
 }

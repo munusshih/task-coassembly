@@ -9341,3 +9341,7 @@ sub, sup { font-size: var(--type-body); }
 .notes-page .notes-sections { grid-template-columns:minmax(0,1fr); }
 .notes-page .notes-editorial-section .section-block-body { display:block; min-width:0; }
 .notes-editorial-list { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }
+
+.project-collection-controls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:22px; color:var(--muted); font-size:var(--type-caption); }
+.project-collection-controls > span { display:inline-flex; align-items:center; gap:8px; }
+.project-collection-controls .time-button { font-size:var(--type-caption); min-height:32px; padding:5px 8px; }

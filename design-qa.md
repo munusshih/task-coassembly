@@ -35,7 +35,7 @@ This is the requested adaptation (“a little more like this”), not a clone of
 - Search still indexes note contents and metadata; links and existing note actions retain their behaviors.
 - Timer mode/duration and select-all/clear were checked without starting sessions or logging work.
 - Weekly members show active people under role headings, with no inactive section.
-- Project Kanban renders all 19 available projects. Columns have max-height none and visible list overflow; Cancelled is separate, missing statuses stay in Scheduled, and Move-to selectors are absent.
+- After clarification, Projects defaults to 13 active projects; a Show closed projects toggle exposes the remaining 6. Both Category and Status views were checked. Columns have max-height none and visible list overflow; Cancelled is separate, missing statuses stay in Scheduled, and Move-to selectors are absent.
 
 ## Findings
 
@@ -43,4 +43,4 @@ No remaining actionable P0/P1/P2 findings within this adaptation. Residual limit
 
 ## Validation
 
-82 automated tests passed. Production build passed. Browser console checked: earlier transient HMR parse errors were corrected; there are no errors after the corrected build. Desktop browser interactions and screenshots inspected. No live notes were created, edited, deleted, or archived for these checks.
+83 automated tests passed. Production build passed. Browser console checked: earlier transient HMR parse errors were corrected; there are no errors after the corrected build. Desktop browser interactions and screenshots inspected. No live notes were created, edited, deleted, or archived for these checks.
