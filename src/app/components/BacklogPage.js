@@ -1,5 +1,7 @@
 "use client";
 
+import BottomComposer from "./ui/BottomComposer";
+
 import CrossIcon from "./ui/CrossIcon";
 
 
@@ -653,13 +655,14 @@ function ProjectSection({
         )}
 
         <CreateBar
-          open={addOpen}
+          open={false}
           onOpen={() => setAddOpen(true)}
           label="Add wish"
           inset
           triggerClassName="backlog-create-trigger"
           rowClassName="backlog-add-row"
-        >
+        />
+        {addOpen && <BottomComposer title={`New wish · ${project?.data?.name || "Unassigned"}`} onClose={() => setAddOpen(false)}>
           <InputField
             className="backlog-add-input"
             type="text"
@@ -687,7 +690,7 @@ function ProjectSection({
           >
             Cancel
           </Button>
-        </CreateBar>
+        </BottomComposer>}
       </Surface>
     </BoardSection>
   );

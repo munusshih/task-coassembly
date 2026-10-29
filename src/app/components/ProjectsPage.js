@@ -2,6 +2,8 @@
 
 
 import useUrlState from "../hooks/useUrlState";
+import BottomComposer from "./ui/BottomComposer";
+import TaskCreateTrigger from "./TaskCreateTrigger";
 import { useEffect, useState, useMemo } from "react";
 import {
   subscribeCollection,
@@ -2031,6 +2033,7 @@ export default function ProjectsPage({
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [focusedProject, setFocusedProject] = useUrlState("project", "");
   const [viewMode, setViewMode] = useUrlState("projectView", "list", { allowed: ["list", "kanban"] });
@@ -2146,6 +2149,7 @@ export default function ProjectsPage({
         return [{ id, data: created }, ...prev];
       });
       setForm(EMPTY_FORM);
+      setCreateOpen(false);
       addToast("Project added");
     } catch (err) {
       addToast(err.message || "Could not add project", true);
@@ -2385,11 +2389,8 @@ export default function ProjectsPage({
       }
     >
       {!isLimitedViewer ? (
-        <SectionBlock
-          className="project-create-section"
-          title="Create project"
-          titleTag="h3"
-        >
+        <><div className="workspace-create-toolbar"><TaskCreateTrigger label="New project…" onClick={() => setCreateOpen(true)} /></div>
+        {createOpen && <BottomComposer title="New project" onClose={() => setCreateOpen(false)}>
           <form className="project-add-form" onSubmit={handleAdd}>
             <InputField
               className="project-field project-field--name"
@@ -2494,7 +2495,7 @@ export default function ProjectsPage({
               Add project
             </Button>
           </form>
-        </SectionBlock>
+        </BottomComposer>}</>
       ) : (
         <SectionBlock
           className="project-create-section"

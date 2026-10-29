@@ -1,12 +1,15 @@
 "use client";
 
 
+import BottomComposer from "./ui/BottomComposer";
+import NotesCalendar from "./NotesCalendar";
+import { fuzzyMatch } from "../lib/noteSearch.mjs";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import TaskCreateTrigger from "./TaskCreateTrigger";
 import ShareViewButton from "./ShareViewButton";
 import useUrlState, { isDocumentId } from "../hooks/useUrlState";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   onDisconnect,
@@ -32,20 +35,16 @@ import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
 import {
-  KANBAN_VIEW_ICON,
-  LIST_VIEW_ICON,
   DELETE_ICON,
   EDIT_ICON,
 } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
-import PageControls from "./ui/PageControls";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
-import ViewToggle from "./ui/ViewToggle";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import ModalShell from "./ui/ModalShell";
 
@@ -458,46 +457,11 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     });
   }, [defaultMeetingRoles]);
 
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes.map((n) => ({ ...n, matchType: null }));
-
-    const query = searchQuery.toLowerCase();
-    return notes
-      .filter((note) => {
-        const title = (note?.data?.title || "").toLowerCase();
-        const content = (note?.data?.content || "").toLowerCase();
-        const linkUrl = normalizeExternalUrl(
-          note?.data?.linkUrl || "",
-        ).toLowerCase();
-        const scopeType = normalizeScopeType(note?.data?.scopeType);
-        const scopeLabel =
-          scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based";
-        const projectName = note?.data?.projectId
-          ? (projectNameById[note.data.projectId] || "").toLowerCase()
-          : "";
-        const roleNames = ROLE_FIELDS.map((field) =>
-          (memberNameById[note?.data?.[field.key]] || "").toLowerCase(),
-        ).join(" ");
-
-        const haystack = `${title} ${content} ${linkUrl} ${scopeLabel} ${projectName} ${roleNames}`;
-        return haystack.includes(query);
-      })
-      .map((note) => {
-        const title = (note?.data?.title || "").toLowerCase();
-        const content = (note?.data?.content || "").toLowerCase();
-        const linkUrl = normalizeExternalUrl(
-          note?.data?.linkUrl || "",
-        ).toLowerCase();
-        const projectName = note?.data?.projectId
-          ? (projectNameById[note.data.projectId] || "").toLowerCase()
-          : "";
-        let matchType = "content";
-        if (title.includes(query)) matchType = "title";
-        else if (linkUrl.includes(query)) matchType = "link";
-        else if (projectName.includes(query)) matchType = "project";
-        return { ...note, matchType };
-      });
-  }, [notes, searchQuery, memberNameById, projectNameById]);
+  const deferredSearch = useDeferredValue(searchQuery);
+  const filteredNotes = useMemo(() => notes.map(note => {
+    const match = fuzzyMatch({ title: note.data?.title, content: note.data?.content, link: note.data?.linkUrl, project: projectNameById[note.data?.projectId], people: ROLE_FIELDS.map(field => memberNameById[note.data?.[field.key]] || '').join(' ') }, deferredSearch);
+    return match ? { ...note, ...match } : null;
+  }).filter(Boolean).sort((a,b) => b.score-a.score), [notes, deferredSearch, memberNameById, projectNameById]);
 
   const groupedNotesByDate = useMemo(() => {
     const today = new Date();
@@ -1495,30 +1459,21 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     Boolean(normalizeExternalUrl(editMeta.linkUrl)) &&
     !Boolean(String(editContent || "").trim());
 
-  const layoutOptions = [
-    { value: "grid", title: "Grid view", icon: KANBAN_VIEW_ICON },
-    { value: "shelf", title: "List view", icon: LIST_VIEW_ICON },
-  ];
+
 
   return (
     <TabPage
       className="notes-page"
       title="Notes"
-      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><WorkspaceViewPicker value={groupMode} onChange={setGroupMode} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /></WorkspacePageHero>}
+      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker value={groupMode} onChange={setGroupMode} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker prefix="in" value={notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},{value:"shelf",label:"List"}]} label="Notes layout" /></div></WorkspacePageHero>}
     >
       <div className="notes-toolbar">
         <TaskCreateTrigger label="New note…" onClick={() => setCreateOpen(open => !open)} />
-        <PageControls compact><SearchField ariaLabel="Search notes" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /><ViewToggle value={notesLayout} onChange={setNotesLayout} options={layoutOptions} ariaLabel="Notes layout" /></PageControls>
-      </div>
-      {createOpen && (
-      <SectionBlock
-        className="note-create-section"
-        title="New note"
-        titleTag="h3"
-        actions={<Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>}
 
-        bodyClassName="note-create-area"
-      >
+      </div>
+      <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
+      {createOpen && (
+      <BottomComposer title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
         <div className="note-create-row">
           <div className="note-emoji-picker" title="Note emoji">
             <span className="note-emoji-picker-label">Emoji</span>
@@ -1643,12 +1598,12 @@ export default function MeetingNotesPage({ viewerName = "" }) {
             </div>
           </details>
         )}
-      </SectionBlock>
+      </BottomComposer>
 
       )}
 
       <CollectionLayout variant="list" className="notes-sections">
-        {groupMode === "date" ? (
+        {searchQuery.trim() ? renderNoteSection("Search results", filteredNotes) : groupMode === "date" && notesLayout === "grid" ? <NotesCalendar notes={filteredNotes} renderNotes={renderNoteSection} onOpenNote={note => { const href=normalizeExternalUrl(note.data?.linkUrl); if(isLinkOnlyNote(note.data) && href) window.open(href,"_blank","noopener,noreferrer"); else openNote(note.id); }} /> : groupMode === "date" ? (
           <>
             {renderNoteSection("Today", groupedNotesByDate.today)}
             {renderNoteSection("Yesterday", groupedNotesByDate.yesterday)}

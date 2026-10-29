@@ -20,6 +20,7 @@ import CreateBar from "./ui/CreateBar";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
 import InputField from "./ui/InputField";
+import BottomComposer from "./ui/BottomComposer";
 import ModalShell from "./ui/ModalShell";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import SelectField from "./ui/SelectField";
@@ -415,6 +416,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
     setPendingDelete(null);
   }
 
+  const ResourceFormShell = editingId !== null ? ModalShell : BottomComposer;
   return (
     <TabPage
       className="resources-page"
@@ -439,9 +441,9 @@ export default function ResourcesPage({ currentMember, members = [] }) {
         : <CategoryView links={links} categories={dataCategories} members={members} onEdit={startEdit} onDelete={handleRequestDelete} />
       ) : <EmptyState>No resources yet. Add one above!</EmptyState>}
 
-      {/* Add / Edit modal */}
+      {/* Creation shares the workspace composer; existing records retain their editor. */}
       {(addOpen || editingId !== null) && (
-        <ModalShell
+        <ResourceFormShell
           title={editingId ? "Edit resource" : "Add resource"}
           onClose={() => {
             setAddOpen(false);
@@ -461,7 +463,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
             }}
             saveLabel={editingId ? "Save" : "Add resource"}
           />
-        </ModalShell>
+        </ResourceFormShell>
       )}
 
       {pendingDelete && (

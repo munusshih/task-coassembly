@@ -2,6 +2,8 @@
 
 
 import AllocationClock from "./ui/AllocationClock";
+import BottomComposer from "./ui/BottomComposer";
+import { formatPronouns, pronounsForInput } from "../lib/pronouns.mjs";
 import MemberEditButton from "./ui/MemberEditButton";
 import SpoonMeter from "./ui/SpoonMeter";
 import MemberForm from "./MemberForm";
@@ -31,7 +33,6 @@ import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
 import ModalShell from "./ui/ModalShell";
-import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
@@ -454,7 +455,7 @@ function buildFormFromMember(memberData) {
       typeof memberData.timezone === "string" ? memberData.timezone : "",
     joinedOn:
       typeof memberData.joinedOn === "string" ? memberData.joinedOn : "",
-    pronouns: memberData.pronouns || "",
+    pronouns: pronounsForInput(memberData.pronouns),
     birthday: memberData.birthday || "",
     leftOn: memberData.leftOn || "",
     photoURL: memberData.photoURL || "",
@@ -1000,7 +1001,7 @@ export default function MemberDirectoryPage() {
                   <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
                   <h3 className="member-directory-card-name">
                     {member?.data?.name || member.id}
-                    {member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}
+                    {member.data?.pronouns && <span className="member-pronouns">{formatPronouns(member.data.pronouns)}</span>}
                   </h3>
                   <div className="member-directory-card-badges">
                     <MetadataPill tone={role === "worker-owner" ? "project" : role === "associate" ? "worked" : role === "flying-member" ? "date" : "planned"}>{roleLabel(role)}</MetadataPill>
@@ -1221,7 +1222,7 @@ export default function MemberDirectoryPage() {
     return <article key={member.id} className={`member-role-row${hideEmptyWork ? " member-role-row--profile-only" : ""}${highlightedMember && highlightedMember !== member.id ? " member-role-row--dimmed" : ""}${highlightedMember === member.id ? " member-role-row--highlighted" : ""}`}>
       <div className="member-role-identity">
         <MemberAvatar member={member} onClick={() => setProfileId(member.id)} />
-        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{member.data.pronouns}</span>}<MemberEditButton name={name} onClick={() => startEdit(member)} /></h3>
+        <h3>{name}{member.data?.pronouns && <span className="member-pronouns">{formatPronouns(member.data.pronouns)}</span>}<MemberEditButton name={name} onClick={() => startEdit(member)} /></h3>
         {member.data?.active === false && <MetadataPill>Inactive</MetadataPill>}
         <p className="member-tenure">{tenureText(member.data || {}, today)}</p>
 
@@ -1256,6 +1257,7 @@ export default function MemberDirectoryPage() {
       title="Members"
       header={<WorkspacePageHero title="Members" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }, { value: "overall", label: "Overall" }]} /></WorkspacePageHero>}
     >
+      <div className="workspace-create-toolbar"><TaskCreateTrigger label="New member…" onClick={() => setAddMemberOpen(true)} /></div>
       {notice && (
         <p
           className={
@@ -1281,9 +1283,7 @@ export default function MemberDirectoryPage() {
 
 
 
-        <SectionBlock className="member-directory-panel member-form-panel" title="Add member" titleTag="h2">
-          <TaskCreateTrigger label="New member…" onClick={() => setAddMemberOpen(true)} />
-        </SectionBlock>
+
 
       {profileMember && <ModalShell title={`${profileMember.data?.name || profileMember.id} · Profile`} onClose={() => setProfileId(null)} footer={<Button onClick={() => { startEdit(profileMember); setProfileId(null); }}>Edit profile</Button>}>
         <div className="member-profile-details">
@@ -1291,14 +1291,18 @@ export default function MemberDirectoryPage() {
           <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
           <p className="member-tenure">{tenureText(profileMember.data || {}, today)}</p>
           <MemberMilestones member={profileMember} today={today} />
-          <dl><dt>Pronouns</dt><dd>{profileMember.data?.pronouns || "Not set"}</dd><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
+          <dl><dt>Pronouns</dt><dd>{formatPronouns(profileMember.data?.pronouns) || "Not set"}</dd><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
           {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
         </div>
       </ModalShell>}
 
-      {(editingMember || addMemberOpen) && <ModalShell className="member-editor-modal" title={editingMember ? `Edit ${editingMember.data?.name || 'member'}` : 'New member'} onClose={closeMemberEditor}>
+      {editingMember && <ModalShell className="member-editor-modal" title={editingMember ? `Edit ${editingMember.data?.name || 'member'}` : 'New member'} onClose={closeMemberEditor}>
         <MemberForm draft={editingMember ? editDraft : newMember} onChange={editingMember ? updateEditField : updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating={!editingMember} onCancel={closeMemberEditor} onSubmit={event => { event.preventDefault(); if (editingMember) saveEdit(editingMember); else handleCreateMember(event); }} />
       </ModalShell>}
+
+      {addMemberOpen && <BottomComposer title="New member" onClose={closeMemberEditor}>
+        <MemberForm draft={newMember} onChange={updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating onCancel={closeMemberEditor} onSubmit={handleCreateMember} />
+      </BottomComposer>}
 
       {deleteTarget && (
         <DeleteConfirmDialog

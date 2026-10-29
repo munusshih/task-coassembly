@@ -1,5 +1,7 @@
 "use client";
 
+import BottomComposer from "./ui/BottomComposer";
+
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -318,7 +320,7 @@ function MemberRequestCard({
 
         {(isOwn || isAdmin) && (
           addOpen ? (
-            <div className="req-add-form">
+            <BottomComposer title={`New request · ${member.data?.name || member.id}`} onClose={() => setAddOpen(false)}><div className="req-add-form">
               <div className="req-add-row">
                 <SelectField
                   className="meta-select"
@@ -389,7 +391,7 @@ function MemberRequestCard({
                   Cancel
                 </Button>
               </div>
-            </div>
+            </div></BottomComposer>
           ) : (
             <button className="notepad-add-trigger" onClick={() => setAddOpen(true)}>
               <span className="notepad-add-plus">+</span>
