@@ -1,4 +1,5 @@
 "use client";
+import TimeButton from "../ui/TimeButton";
 
 import UnloggedTimeList from "./UnloggedTimeList";
 import CrossIcon from "../ui/CrossIcon";
@@ -103,8 +104,8 @@ function ReviewTime({ tracker, tasks, initial, onClose }) {
         <p className="time-muted">Unlogged time stays on this device.</p>
       </div>
       <div className="edit-modal-footer time-review-footer">
-        <button className="time-button time-button--quiet" disabled={!chosen.length || tracker.busy || !tracker.owner} onClick={() => { tracker.discard(selected); setSelected([]); }}>Discard selected</button>
-        <button className="time-button" disabled={!chosen.length || chosen.length > 100 || !taskId || incompatible || tracker.busy || !tracker.owner} onClick={async () => { if (await tracker.log(selected, taskId)) onClose(); }}>{tracker.busy ? "Saving…" : `Log ${durationLabel(chosen.reduce((n, f) => n + f.seconds, 0))}`}</button>
+        <TimeButton quiet disabled={!chosen.length || tracker.busy || !tracker.owner} onClick={() => { tracker.discard(selected); setSelected([]); }}>Discard selected</TimeButton>
+        <TimeButton disabled={!chosen.length || chosen.length > 100 || !taskId || incompatible || tracker.busy || !tracker.owner} onClick={async () => { if (await tracker.log(selected, taskId)) onClose(); }}>{tracker.busy ? "Saving…" : `Log ${durationLabel(chosen.reduce((n, f) => n + f.seconds, 0))}`}</TimeButton>
       </div>
     </div>
   </div>;
@@ -166,13 +167,13 @@ export default function TaskTimers({ tasks }) {
         <div className="time-focus-controls">
           <label className="time-field time-task-select"><select aria-label="Focus task" title={focus ? "Choosing another task finishes this session and keeps its time with the original task." : "Choose a task to focus on"} value={selectedTask} onChange={(event) => selectTask(event.target.value)} disabled={!owner || busy}>{focus && !tasks.some((task) => task.id === focus.taskId) ? <option value={focus.taskId}>Current task unavailable — finish or switch</option> : null}{!tasks.length && !focus ? <option value="">No tasks available</option> : tasks.map((task) => <option key={task.id} value={task.id}>{task.data.title}{allocations.find((entry) => entry.taskId === task.id) ? ` · ${durationLabel(allocations.find((entry) => entry.taskId === task.id).seconds)} today` : ""}</option>)}</select></label>
           {focus?.recovered ? <p className="time-muted">Paused when TASK closed. Resume when ready.</p> : null}
-          <div className="time-actions">{focus ? <><button className="time-button time-button--quiet" onClick={focus.status === "running" ? tracker.pause : tracker.resume} disabled={!owner || busy}>{focus.status === "running" ? "Pause" : "Resume"}</button><button className="time-button" onClick={tracker.finish} disabled={!owner || busy}>Finish & {focus.autoLog ? "log" : "review"}</button></> : <button className="time-button" disabled={!selectedTask || !owner || busy} onClick={() => tracker.start({ taskId:selectedTask, mode, minutes:Number(minutes), autoLog })}>Start focus</button>}</div>
+          <div className="time-actions">{focus ? <><TimeButton quiet onClick={focus.status === "running" ? tracker.pause : tracker.resume} disabled={!owner || busy}>{focus.status === "running" ? "Pause" : "Resume"}</TimeButton><TimeButton onClick={tracker.finish} disabled={!owner || busy}>Finish & {focus.autoLog ? "log" : "review"}</TimeButton></> : <TimeButton disabled={!selectedTask || !owner || busy} onClick={() => tracker.start({ taskId:selectedTask, mode, minutes:Number(minutes), autoLog })}>Start focus</TimeButton>}</div>
         </div>
       </article>
       <UnloggedTimeList tracker={tracker} tasks={tasks} fragments={pending} total={total} liveSeconds={liveSeconds} onRefresh={() => tracker.checkpoint()} />
     </section>
     {tracker.error && !review ? <p className="time-error" role="alert">{tracker.error}</p> : null}
-    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : ["empty","too-short"].includes(completion.status) ? "— no blocks of ten minutes to count." : busy ? "— saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <button className="time-button time-button--quiet" disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</button> : null}{completion.status === "pending" ? <button className="time-button time-button--quiet" onClick={openReview} disabled={!owner || busy}>Review & log</button> : null}<button className="time-button time-button--quiet" onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</button></div></div> : null}
+    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : ["empty","too-short"].includes(completion.status) ? "— no blocks of ten minutes to count." : busy ? "— saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <TimeButton quiet disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</TimeButton> : null}{completion.status === "pending" ? <TimeButton quiet onClick={openReview} disabled={!owner || busy}>Review & log</TimeButton> : null}<TimeButton quiet onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</TimeButton></div></div> : null}
     {review ? <ReviewTime tracker={tracker} tasks={tasks} initial={review} onClose={() => setReview(null)} /> : null}
   </>;
 }

@@ -1,4 +1,5 @@
 "use client";
+import TimeButton from "./ui/TimeButton";
 import WeekSelect from "./ui/WeekSelect";
 import TaskTimers from "./time/TaskTimers";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
@@ -1242,7 +1243,7 @@ function MemberCard({
             <TaskCreateForm draft={ui} onChange={patchUi} onSubmit={submitAdd} onCancel={cancelAdd} inputRef={addInputRef} projects={assignableProjects} remainingHint={addRemainingHint} unitOptions={UNIT_OPTIONS} formatUnitOption={formatUnitOption} />
           ))}
 
-          {reviewedTodos.length > 0 && <Button type="button" size="small" variant="ghost" onClick={() => onUndoReviewWeek(member.id)}>Undo review this week</Button>}
+          {reviewedTodos.length > 0 && <TimeButton onClick={() => onUndoReviewWeek(member.id)}>Undo review this week</TimeButton>}
 
 
         </Surface>

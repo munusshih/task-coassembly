@@ -8944,3 +8944,6 @@ sub, sup { font-size: var(--type-body); }
 .member-allocation-timeline-track > span { width:100%; background:var(--subdued); }
 .member-allocation-timeline-week small { display:block; margin-top:5px; font-size:12px; white-space:nowrap; }
 @media(max-width:650px) { .page-shell--workspace .task-week-control .workspace-week-select select.week-select { font-size:18px; min-height:36px; padding-left:12px !important; } }
+.time-button { transition:opacity 160ms, background-color 160ms; }
+.time-button:not(:disabled):hover { opacity:.7; }
+.time-button--quiet:not(:disabled):hover { opacity:1; background:var(--surface-strong); }
