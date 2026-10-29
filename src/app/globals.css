@@ -8930,3 +8930,17 @@ sub, sup { font-size: var(--type-body); }
 .task-overlay-links .task-navigation-locked { display:flex; align-items:center; gap:12px; font-size:clamp(28px,4.2dvh,42px); letter-spacing:-.035em; color:var(--muted); cursor:default; }
 .task-overlay-links .task-navigation-locked.task-navigation-subpage { font-size:22px; }
 .member-week-controls { display:flex; flex-wrap:wrap; align-items:center; gap:24px; margin:0 0 28px; }
+.project-allocation-clock .allocation-hours { white-space:nowrap; }
+.workspace-week-select { position:relative; display:inline-flex; min-width:0; max-width:100%; color:var(--paper); }
+.page-shell--workspace .task-week-control .workspace-week-select select.week-select { appearance:none; width:auto; min-width:0; max-width:100%; min-height:42px; padding:2px 42px 2px 20px !important; border:0; border-radius:100px; background:var(--ink) !important; color:var(--paper); font:inherit; font-size:24px; line-height:1.25; cursor:pointer; }
+.workspace-week-select > svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.page-shell--workspace .task-week-control .workspace-week-select select:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.member-allocation-timeline { margin:24px 0 0; color:var(--muted); }
+.member-allocation-timeline figcaption { display:flex; align-items:center; gap:6px; font-size:16px; white-space:nowrap; }
+.member-allocation-timeline figcaption svg { width:18px; height:18px; }
+.member-allocation-timeline-weeks { display:flex; gap:12px; overflow-x:auto; padding:10px 0 4px; }
+.member-allocation-timeline-week { flex:1 0 40px; max-width:80px; min-width:0; text-align:center; }
+.member-allocation-timeline-track { height:38px; display:flex; align-items:flex-end; background:var(--surface-quiet); }
+.member-allocation-timeline-track > span { width:100%; background:var(--subdued); }
+.member-allocation-timeline-week small { display:block; margin-top:5px; font-size:12px; white-space:nowrap; }
+@media(max-width:650px) { .page-shell--workspace .task-week-control .workspace-week-select select.week-select { font-size:18px; min-height:36px; padding-left:12px !important; } }

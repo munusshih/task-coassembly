@@ -1,4 +1,5 @@
 "use client";
+import WeekSelect from "./ui/WeekSelect";
 import TaskTimers from "./time/TaskTimers";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
@@ -2163,7 +2164,7 @@ export default function MembersPage({
       <WorkspacePageHero title="Task" illustration="task-maker" className="task-page-hero">
         <div className="task-board-tools" aria-label="Task board controls">
         <div className="task-week-toolbar">
-          <label className="task-week-control"><span>Weeks</span><SelectField className="week-select" aria-label="Task week" value={selectedWeek} onChange={(event) => setSelectedWeek(event.target.value)}>{availableWeeks.map((week) => <option key={week} value={week}>{weekLabel(new Date(week + "T00:00:00"))}</option>)}</SelectField></label>
+          <label className="task-week-control"><span>Weeks</span><WeekSelect aria-label="Task week" value={selectedWeek} onChange={(event) => setSelectedWeek(event.target.value)}>{availableWeeks.map((week) => <option key={week} value={week}>{weekLabel(new Date(week + "T00:00:00"))}</option>)}</WeekSelect></label>
           <TaskWeekInfo week={selectedWeek} members={visibleMembers} />
         </div>
         <div className="task-board-view-controls">

@@ -1,4 +1,5 @@
 "use client";
+import WeekSelect from "./ui/WeekSelect";
 
 
 import MemberWorkRow from "./MemberWorkRow";
@@ -19,7 +20,6 @@ import MemberAvatar from "./ui/MemberAvatar";
 import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
 import MetadataPill from "./ui/MetadataPill";
 import useUrlState, { isDateKey, updateUrlState } from "../hooks/useUrlState";
-import SelectField from "./ui/SelectField";
 import { taskWeekKey, weekStartDateForTs } from "./taskBoardRules";
 import { SERIES_COLORS } from "./ui/palette";
 import { useEffect, useMemo, useState } from "react";
@@ -1008,8 +1008,8 @@ export default function MemberDirectoryPage() {
 
 
       {directoryView === "weekly" && <div className="member-week-controls" aria-label="Member allocation period">
-        <label className="task-week-control"><span>Week / from</span><SelectField className="week-select" aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</SelectField></label>
-        <label className="task-week-control"><span>Through</span><SelectField className="week-select" aria-label="Member end week" value={memberEndWeek && memberEndWeek >= memberWeek ? memberEndWeek : ""} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}><option value="">Single week</option>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</SelectField></label>
+        <label className="task-week-control"><span>Week / from</span><WeekSelect aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</WeekSelect></label>
+        <label className="task-week-control"><span>Through</span><WeekSelect aria-label="Member end week" value={memberEndWeek && memberEndWeek >= memberWeek ? memberEndWeek : ""} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}><option value="">Single week</option>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{formatWeekKeyLabel(week)} · {week.slice(0,4)}</option>)}</WeekSelect></label>
       </div>}
       <section className="member-allocation-overview" aria-label={`${periodLabel} allocation by ${directoryView === "role" ? "role" : "member"}`}>
         <AllocationClock variant="member" subject={directoryView === "role" ? "Role" : "Member"} valueMode={directoryView === "role" ? "percent" : "time"} periodLabel={periodLabel} allocations={chartAllocations.sort((a,b) => b.units-a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
