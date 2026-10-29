@@ -1,5 +1,7 @@
 "use client";
 
+import CrossIcon from "./CrossIcon";
+
 import InputField from "./InputField";
 
 export default function SearchField({
@@ -10,6 +12,7 @@ export default function SearchField({
   className = "",
   inputClassName = "",
   clearTitle = "Clear search",
+  ariaLabel = "Search",
 }) {
   const wrapperClasses = ["search-field", className].filter(Boolean).join(" ");
   const classes = ["search-input", inputClassName].filter(Boolean).join(" ");
@@ -19,6 +22,7 @@ export default function SearchField({
     <div className={wrapperClasses}>
       <InputField
         type="text"
+        aria-label={ariaLabel}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
@@ -26,7 +30,7 @@ export default function SearchField({
       />
       {hasValue ? (
         <button type="button" className="search-clear" onClick={onClear} title={clearTitle}>
-          ×
+          <CrossIcon />
         </button>
       ) : null}
     </div>

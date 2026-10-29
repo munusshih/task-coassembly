@@ -1,8 +1,19 @@
 "use client";
 
+
+import FormField from "./ui/FormField";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
+import BottomComposer from "./ui/BottomComposer";
+import NotesCalendar from "./NotesCalendar";
+import EditorialNoteCard, {NoteCover} from "./EditorialNoteCard";
+import {noteImageUrl,noteCover} from "../lib/notePresentation.mjs";
+import { fuzzyMatch } from "../lib/noteSearch.mjs";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import TaskCreateTrigger from "./TaskCreateTrigger";
 import ShareViewButton from "./ShareViewButton";
 import useUrlState, { isDocumentId } from "../hooks/useUrlState";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   onDisconnect,
@@ -13,7 +24,6 @@ import {
   set,
   update,
 } from "firebase/database";
-import { createPortal } from "react-dom";
 import {
   subscribeCollection,
   subscribeDocument,
@@ -23,28 +33,20 @@ import {
   deleteDocument,
 } from "../../firestore";
 import { auth, firebaseReady, realtimeDb } from "../../firebase";
-import EmojiPicker from "emoji-picker-react";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import RichEditor from "./RichEditor";
 import {
-  BOOK_GRID_ICON,
-  BOOK_SHELF_ICON,
-  DATE_VIEW_ICON,
   DELETE_ICON,
   EDIT_ICON,
-  PROJECT_VIEW_ICON,
 } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import InputField from "./ui/InputField";
-import PageControls from "./ui/PageControls";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
-import ViewToggle from "./ui/ViewToggle";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import ModalShell from "./ui/ModalShell";
 
@@ -58,47 +60,8 @@ const ROLE_FIELDS = [
   { key: "notetakerId", label: "Notetaker" },
 ];
 
-const BOOK_PALETTE = [
-  { spine: "#b98f6f", cover: "#f3e6d8", ink: "#5f4330" },
-  { spine: "#b08f82", cover: "#f2e3dc", ink: "#5a3d3d" },
-  { spine: "#9f9b7d", cover: "#ece9d7", ink: "#48553c" },
-  { spine: "#a9968a", cover: "#efe4d9", ink: "#4f465d" },
-  { spine: "#b7a27a", cover: "#f3ead8", ink: "#5f4f2a" },
-  { spine: "#8e9eb2", cover: "#e7edf5", ink: "#2d486a" },
-  { spine: "#8da88a", cover: "#e8f0e6", ink: "#2f5a35" },
-];
-
-function hashText(value) {
-  const text = String(value || "");
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getNoteBookStyle(noteId) {
-  const hash = hashText(noteId);
-  const palette = BOOK_PALETTE[hash % BOOK_PALETTE.length];
-  const patternIndex = hash % 6;
-  return {
-    style: {
-      "--book-spine": palette.spine,
-      "--book-cover": palette.cover,
-      "--book-ink": palette.ink,
-      "--book-height": `${156 + (hash % 34)}px`,
-      "--book-tilt": `${(hash % 7) - 3}deg`,
-      "--book-band-top": `${12 + (hash % 48)}%`,
-      "--book-band-opacity": `${0.13 + ((hash >> 3) % 6) * 0.03}`,
-      "--book-grain-opacity": `${0.06 + ((hash >> 5) % 4) * 0.03}`,
-    },
-    patternClass: `note-item--pattern-${patternIndex}`,
-  };
-}
-
 function buildStarterNoteContent(title, scopeType, projectName) {
-  const heading = String(title || "Meeting notes").trim() || "Meeting notes";
+  const heading = String(title || "Notes").trim() || "Notes";
   const scopeLine =
     scopeType === NOTE_SCOPE_PROJECT && projectName
       ? `Project: ${projectName}`
@@ -142,13 +105,6 @@ function isLinkOnlyNote(noteData) {
   return hasLink && !hasContent;
 }
 
-function normalizeNoteEmoji(rawValue) {
-  const text = String(rawValue || "").trim();
-  if (!text) return "";
-  const token = text.split(/\s+/)[0] || "";
-  return Array.from(token).slice(0, 2).join("");
-}
-
 function emptyRoleAssignments() {
   return {
     facilitatorId: "",
@@ -175,7 +131,7 @@ function normalizeRoleAssignments(data) {
 
 function emptyEditMeta() {
   return {
-    emoji: "",
+    imageUrl: "",
     title: "",
     noteDate: "",
     linkUrl: "",
@@ -262,15 +218,14 @@ function colorFromTextSeed(value) {
     hash = (hash << 5) - hash + text.charCodeAt(index);
     hash |= 0;
   }
-  const palette = ["#2f5a9c", "#7a3e9d", "#2d7a58", "#b86a2f", "#8c2f56"];
+  const palette = ["var(--ink)", "var(--ink)", "var(--ink)", "var(--ink)", "var(--ink)"];
   return palette[Math.abs(hash) % palette.length];
 }
 
 export default function MeetingNotesPage({ viewerName = "" }) {
   const [notes, setNotes] = useState([]);
   const [notesLimit, setNotesLimit] = useState(80);
-  const [newEmoji, setNewEmoji] = useState("");
-  const [createEmojiPickerOpen, setCreateEmojiPickerOpen] = useState(false);
+  const [newImageUrl,setNewImageUrl]=useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newScopeType, setNewScopeType] = useState(NOTE_SCOPE_DATE);
@@ -283,17 +238,10 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
   const [editMeta, setEditMeta] = useState(() => emptyEditMeta());
-  const [editEmojiPickerOpen, setEditEmojiPickerOpen] = useState(false);
-  const [editEmojiPickerPosition, setEditEmojiPickerPosition] = useState({
-    top: 0,
-    left: 0,
-  });
-  const editEmojiTriggerRef = useRef(null);
-  const editEmojiPopoverRef = useRef(null);
-
   const [searchQuery, setSearchQuery] = useUrlState("notesSearch", "", { replace: true });
+  const [createOpen, setCreateOpen] = useState(false);
   const [groupMode, setGroupMode] = useUrlState("notesGroup", "date", { allowed: ["date", "project"] });
-  const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "grid", { allowed: ["grid", "shelf"] });
+  const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "grid", { allowed: ["grid", "shelf", "calendar"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [notePresenceRows, setNotePresenceRows] = useState([]);
@@ -383,33 +331,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   }, [editingId]);
 
   useEffect(() => {
-    if (!editEmojiPickerOpen) return;
-
-    const handleViewportChange = () => {
-      measureEditEmojiPickerPosition();
-    };
-
-    const handleOutsideClick = (event) => {
-      const trigger = editEmojiTriggerRef.current;
-      const popover = editEmojiPopoverRef.current;
-      const target = event.target;
-
-      if (trigger?.contains(target) || popover?.contains(target)) return;
-      setEditEmojiPickerOpen(false);
-    };
-
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
-    document.addEventListener("mousedown", handleOutsideClick);
-
-    return () => {
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, [editEmojiPickerOpen]);
-
-  useEffect(() => {
     const next = String(viewerName || "").trim();
     if (!next) return;
     setCurrentUsername(next);
@@ -495,46 +416,11 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     });
   }, [defaultMeetingRoles]);
 
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes.map((n) => ({ ...n, matchType: null }));
-
-    const query = searchQuery.toLowerCase();
-    return notes
-      .filter((note) => {
-        const title = (note?.data?.title || "").toLowerCase();
-        const content = (note?.data?.content || "").toLowerCase();
-        const linkUrl = normalizeExternalUrl(
-          note?.data?.linkUrl || "",
-        ).toLowerCase();
-        const scopeType = normalizeScopeType(note?.data?.scopeType);
-        const scopeLabel =
-          scopeType === NOTE_SCOPE_PROJECT ? "project-based" : "date-based";
-        const projectName = note?.data?.projectId
-          ? (projectNameById[note.data.projectId] || "").toLowerCase()
-          : "";
-        const roleNames = ROLE_FIELDS.map((field) =>
-          (memberNameById[note?.data?.[field.key]] || "").toLowerCase(),
-        ).join(" ");
-
-        const haystack = `${title} ${content} ${linkUrl} ${scopeLabel} ${projectName} ${roleNames}`;
-        return haystack.includes(query);
-      })
-      .map((note) => {
-        const title = (note?.data?.title || "").toLowerCase();
-        const content = (note?.data?.content || "").toLowerCase();
-        const linkUrl = normalizeExternalUrl(
-          note?.data?.linkUrl || "",
-        ).toLowerCase();
-        const projectName = note?.data?.projectId
-          ? (projectNameById[note.data.projectId] || "").toLowerCase()
-          : "";
-        let matchType = "content";
-        if (title.includes(query)) matchType = "title";
-        else if (linkUrl.includes(query)) matchType = "link";
-        else if (projectName.includes(query)) matchType = "project";
-        return { ...note, matchType };
-      });
-  }, [notes, searchQuery, memberNameById, projectNameById]);
+  const deferredSearch = useDeferredValue(searchQuery);
+  const filteredNotes = useMemo(() => notes.map(note => {
+    const match = fuzzyMatch({ title: note.data?.title, content: note.data?.content, link: note.data?.linkUrl, project: projectNameById[note.data?.projectId], people: ROLE_FIELDS.map(field => memberNameById[note.data?.[field.key]] || '').join(' ') }, deferredSearch);
+    return match ? { ...note, ...match } : null;
+  }).filter(Boolean).sort((a,b) => b.score-a.score), [notes, deferredSearch, memberNameById, projectNameById]);
 
   const groupedNotesByDate = useMemo(() => {
     const today = new Date();
@@ -597,7 +483,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     if (grouped.__no_project__?.length) {
       sections.push({
         key: "__no_project__",
-        title: "Project-based (No Project Selected)",
+        title: "Unassigned project",
         notesList: grouped.__no_project__,
       });
       delete grouped.__no_project__;
@@ -615,7 +501,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     if (dateScopedNotes.length > 0) {
       sections.unshift({
         key: "__date_based__",
-        title: "Date-based",
+        title: "General notes",
         notesList: dateScopedNotes,
       });
     }
@@ -715,42 +601,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     setEditMeta((prev) => ({ ...prev, [field]: value }));
   }
 
-  function measureEditEmojiPickerPosition() {
-    const trigger = editEmojiTriggerRef.current;
-    if (!trigger || typeof window === "undefined") return;
-
-    const rect = trigger.getBoundingClientRect();
-    const pickerWidth = 300;
-    const pickerHeight = 360;
-    const gutter = 8;
-
-    let left = rect.left;
-    let top = rect.bottom + 6;
-
-    if (left + pickerWidth > window.innerWidth - gutter) {
-      left = Math.max(gutter, window.innerWidth - pickerWidth - gutter);
-    }
-
-    if (top + pickerHeight > window.innerHeight - gutter) {
-      top = Math.max(gutter, rect.top - pickerHeight - 6);
-    }
-
-    setEditEmojiPickerPosition({ top, left });
-  }
-
-  function toggleEditEmojiPicker() {
-    setEditEmojiPickerOpen((open) => {
-      const next = !open;
-      if (next) measureEditEmojiPickerPosition();
-      return next;
-    });
-  }
-
   function openNote(noteId) {
     setViewingId(noteId);
     setEditingId(null);
-    setCreateEmojiPickerOpen(false);
-    setEditEmojiPickerOpen(false);
     setAutoSaveState("idle");
     setLastAutoSavedAt(null);
   }
@@ -835,10 +688,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         : fallbackProjectTeamIds;
     setEditingId(note.id);
     setViewingId(note.id);
-    setEditEmojiPickerOpen(false);
     setEditContent(note?.data?.content || "");
     setEditMeta({
-      emoji: normalizeNoteEmoji(note?.data?.emoji),
+      imageUrl: note?.data?.imageUrl || "",
       title: note?.data?.title || "",
       noteDate: formatDateInputValue(note?.data?.createdAt || Date.now()),
       linkUrl: note?.data?.linkUrl || "",
@@ -860,7 +712,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
 
   async function handleCreateNote() {
     if (!newTitle.trim()) return;
-    const emoji = normalizeNoteEmoji(newEmoji);
+    if(newImageUrl.trim()&&!noteImageUrl(newImageUrl))return;
     const scopeType = normalizeScopeType(newScopeType);
     const normalizedLinkUrl = normalizeExternalUrl(newLinkUrl);
     const isLinkOnly = Boolean(normalizedLinkUrl);
@@ -872,7 +724,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     const now = Date.now();
     try {
       await createDocument("meetingNotes", {
-        emoji: emoji || null,
+        imageUrl: noteImageUrl(newImageUrl) || null,
         title: newTitle.trim(),
         linkUrl: normalizedLinkUrl || null,
         content: normalizedLinkUrl
@@ -899,9 +751,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         createdByUsername: authorUsername || null,
         updatedByUsername: authorUsername || null,
       });
+      setCreateOpen(false);
       setNewTitle("");
-      setNewEmoji("");
-      setCreateEmojiPickerOpen(false);
+      setNewImageUrl("");
       setNewLinkUrl("");
       setNewScopeType(NOTE_SCOPE_DATE);
       setNewProjectId("");
@@ -927,7 +779,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     if (!note) return null;
 
     const title = editMeta.title.trim();
-    if (!title) return { invalid: true };
+    if (!title || (editMeta.imageUrl?.trim()&&!noteImageUrl(editMeta.imageUrl))) return { invalid: true };
 
     const scopeType = normalizeScopeType(editMeta.scopeType);
     const normalizedLinkUrl = normalizeExternalUrl(editMeta.linkUrl);
@@ -945,7 +797,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       isLinkOnly,
       payload: {
         ...note.data,
-        emoji: normalizeNoteEmoji(editMeta.emoji) || null,
+        imageUrl: noteImageUrl(editMeta.imageUrl) || null,
         title,
         createdAt: nextCreatedAt,
         linkUrl: normalizedLinkUrl || null,
@@ -1111,9 +963,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   async function handleDeleteNote(noteId, noteTitle) {
     setDeleteTarget({
       label: noteTitle || "this note",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("meetingNotes", noteId);
+          await deleteDocument("meetingNotes", noteId, reason);
           if (viewingId === noteId) setViewingId(null);
           if (editingId === noteId) setEditingId(null);
         } catch (error) {
@@ -1318,162 +1170,11 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     );
   }
 
-  function renderNoteSection(title, notesList) {
-    if (!notesList.length) return null;
-
-    return (
-      <SectionBlock
-        key={title}
-        className="notes-section"
-        title={title}
-        titleTag="h3"
-        bodyClassName="notes-section-body"
-      >
-        <ul className={`notes-list notes-list--${notesLayout}`}>
-          {notesList.map((note) => {
-            const scopeType = normalizeScopeType(note?.data?.scopeType);
-            const projectId = note?.data?.projectId || "";
-            const bookStyle = getNoteBookStyle(note.id);
-            const isLinkShortcut = isLinkOnlyNote(note?.data);
-            const shortcutHref = normalizeExternalUrl(note?.data?.linkUrl);
-            const shortcutLabel = formatLinkLabel(note?.data?.linkUrl);
-            const noteEmoji = normalizeNoteEmoji(note?.data?.emoji);
-
-            return (
-              <li
-                key={note.id}
-                className={`note-item ${bookStyle.patternClass}${isLinkShortcut ? " note-item--link-shortcut" : ""}`}
-                style={bookStyle.style}
-                onClick={() => {
-                  if (isLinkShortcut && shortcutHref) {
-                    window.open(shortcutHref, "_blank", "noopener,noreferrer");
-                    return;
-                  }
-                  openNote(note.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    if (isLinkShortcut && shortcutHref) {
-                      window.open(
-                        shortcutHref,
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                      return;
-                    }
-                    openNote(note.id);
-                  }
-                }}
-                tabIndex={0}
-                role="button"
-                aria-label={
-                  isLinkShortcut
-                    ? `Open linked page ${note.data.title || shortcutLabel || "Untitled"}`
-                    : `Open note ${note.data.title || "Untitled"}`
-                }
-                title={
-                  isLinkShortcut
-                    ? `Open ${shortcutLabel || note.data.title || "linked page"}`
-                    : note.data.title || "Untitled"
-                }
-              >
-                {noteEmoji && !isLinkShortcut && (
-                  <div className="note-item-emoji" aria-hidden="true">
-                    {noteEmoji}
-                  </div>
-                )}
-                <div className="note-row">
-                  <div className="note-content-col">
-                    {!isLinkShortcut ? (
-                      <>
-                        <span className="note-title">
-                          {formatDateInTitle(note.data.createdAt)} ·{" "}
-                          {note.data.title || "Untitled"}
-                          {searchQuery && note.matchType && (
-                            <span className="match-indicator">
-                              (matched in {note.matchType})
-                            </span>
-                          )}
-                        </span>
-
-                        {!!note?.data?.linkUrl && (
-                          <div className="note-meta-line">
-                            <span className="note-link-chip">
-                              Linked doc: {formatLinkLabel(note.data.linkUrl)}
-                            </span>
-                          </div>
-                        )}
-
-                        {note.data.updatedAt &&
-                          note.data.updatedAt !== note.data.createdAt && (
-                            <span className="note-updated">
-                              Updated {formatUpdatedTime(note.data.updatedAt)}
-                            </span>
-                          )}
-                      </>
-                    ) : (
-                      <>
-                        <div className="note-link-shortcut-head">
-                          <span
-                            className="note-link-shortcut-icon"
-                            aria-hidden="true"
-                          >
-                            ↗
-                          </span>
-                          <span className="note-title note-title--shortcut">
-                            {note.data.title || "Untitled"}
-                          </span>
-                        </div>
-                        <div className="note-meta-line">
-                          <span className="note-link-chip">
-                            Linked doc: {shortcutLabel || "external link"}
-                          </span>
-                          {scopeType === NOTE_SCOPE_PROJECT && (
-                            <span className="note-project-chip">
-                              {projectLabel(projectId)}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="note-actions-row">
-                    {editingId !== note.id && (
-                      <IconButton
-                        title="Edit"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          startEditing(note);
-                        }}
-                      >
-                        {EDIT_ICON}
-                      </IconButton>
-                    )}
-                    <IconButton
-                      variant="delete"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        handleDeleteNote(
-                          note.id,
-                          note.data.title || "Untitled",
-                        );
-                      }}
-                      title="Delete note"
-                    >
-                      {DELETE_ICON}
-                    </IconButton>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </SectionBlock>
-    );
+  function renderNoteSection(title,notesList) {
+    if(!notesList.length)return null;
+    return <SectionBlock key={title} className="notes-section notes-editorial-section" title={title} badge={notesList.length} titleTag="h3" bodyClassName="notes-section-body"><ul className={`notes-editorial-list notes-editorial-list--${notesLayout}`}>
+      {notesList.map((note,index)=><EditorialNoteCard key={note.id} note={note} index={notes.findIndex(item=>item.id===note.id)>=0?notes.findIndex(item=>item.id===note.id):index} projectName={note.data.projectId?projectLabel(note.data.projectId):''} author={formatAuditUser(note.data.createdByUsername,note.data.updatedByUsername)} date={new Date(Number(note.data.createdAt)||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} linkedHost={note.data.linkUrl?formatLinkLabel(note.data.linkUrl):''} onOpen={()=>{const href=normalizeExternalUrl(note.data.linkUrl);if(isLinkOnlyNote(note.data)&&href)window.open(href,'_blank','noopener,noreferrer');else openNote(note.id);}} onEdit={()=>startEditing(note)} onDelete={()=>handleDeleteNote(note.id,note.data.title||'Untitled')}/>)}
+    </ul></SectionBlock>;
   }
 
   const totalSectionsInCurrentMode =
@@ -1532,103 +1233,41 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     Boolean(normalizeExternalUrl(editMeta.linkUrl)) &&
     !Boolean(String(editContent || "").trim());
 
-  const groupingOptions = [
-    {
-      value: "date",
-      title: "Group by date",
-      icon: DATE_VIEW_ICON,
-    },
-    {
-      value: "project",
-      title: "Group by project",
-      icon: PROJECT_VIEW_ICON,
-    },
-  ];
 
-  const layoutOptions = [
-    { value: "grid", title: "Book covers", icon: BOOK_GRID_ICON },
-    { value: "shelf", title: "Bookshelf", icon: BOOK_SHELF_ICON },
-  ];
 
   return (
     <TabPage
       className="notes-page"
-      title="Notes / doc"
-      badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
-      right={
-        <PageControls compact>
-          <SearchField
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-          <ViewToggle
-            className="projects-view-toggle"
-            value={groupMode}
-            onChange={setGroupMode}
-            options={groupingOptions}
-            ariaLabel="Note grouping"
-          />
-          <ViewToggle
-            value={notesLayout}
-            onChange={setNotesLayout}
-            options={layoutOptions}
-            ariaLabel="Notes layout"
-          />
-        </PageControls>
-      }
+      title="Notes"
+      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker value={groupMode} onChange={value=>{setGroupMode(value);if(value==='project'&&notesLayout==='calendar')setNotesLayout('grid');}} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker prefix="in" value={notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},{value:"shelf",label:"List"},...(groupMode==='date'?[{value:'calendar',label:'Calendar'}]:[])]} label="Notes layout" /></div></WorkspacePageHero>}
     >
-      <SectionBlock
-        className="note-create-section"
-        title="Create note"
-        titleTag="h3"
-        texture={SURFACE_TEXTURES.notesComposer}
-        bodyClassName="note-create-area"
-      >
+      <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
+      <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
+      {createOpen && (
+      <BottomComposer illustration="compose-note" title="New note" onClose={() => setCreateOpen(false)} className="note-create-composer">
         <div className="note-create-row">
-          <div className="note-emoji-picker" title="Note emoji">
-            <span className="note-emoji-picker-label">Emoji</span>
-            <button
-              type="button"
-              className="note-emoji-picker-trigger"
-              onClick={() => setCreateEmojiPickerOpen((open) => !open)}
-              aria-label="Pick note emoji"
-            >
-              {normalizeNoteEmoji(newEmoji) || "📝"}
-            </button>
-            {createEmojiPickerOpen && (
-              <div className="note-emoji-picker-popover">
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    setNewEmoji(normalizeNoteEmoji(emojiData.emoji));
-                    setCreateEmojiPickerOpen(false);
-                  }}
-                  lazyLoadEmojis
-                  previewConfig={{ showPreview: false }}
-                  searchDisabled={false}
-                  skinTonesDisabled
-                  width={300}
-                  height={360}
-                />
-              </div>
-            )}
-          </div>
-          <InputField
+          <FormField label="Title"><InputField
             type="text"
             placeholder="New note title…"
+            aria-label="Note title"
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
             className="new-note-input"
-          />
-          <InputField
+          /></FormField>
+          <FormField label="Link (optional)"><InputField
             type="url"
             placeholder="Link URL (optional)"
+            aria-label="Note link URL"
             value={newLinkUrl}
             onChange={(event) => setNewLinkUrl(event.target.value)}
             className="note-meta-input"
-          />
-          <SelectField
+          /></FormField>
+          <FormField label="Cover image URL (optional)"><InputField type="url" aria-label="Note cover image URL" placeholder="https://…" value={newImageUrl} onChange={event=>setNewImageUrl(event.target.value)}/></FormField>
+          {newImageUrl.trim()&&!noteImageUrl(newImageUrl)&&<p role="alert">Use an http or https image URL.</p>}
+          {noteImageUrl(newImageUrl)&&<NoteCover key={newImageUrl} src={noteImageUrl(newImageUrl)} title={newTitle} className="note-compose-cover"/>}
+          <FormField label="Organize by"><SelectField
             className="note-meta-input"
+            aria-label="Note type"
             value={newScopeType}
             onChange={(event) => {
               const nextScope = normalizeScopeType(event.target.value);
@@ -1649,10 +1288,11 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           >
             <option value={NOTE_SCOPE_DATE}>Date-based</option>
             <option value={NOTE_SCOPE_PROJECT}>Project-based</option>
-          </SelectField>
+          </SelectField></FormField>
           {newScopeType === NOTE_SCOPE_PROJECT && (
-            <SelectField
+            <FormField label="Project"><SelectField
               className="note-meta-input"
+              aria-label="Note project"
               value={newProjectId}
               onChange={(event) => {
                 const projectId = event.target.value;
@@ -1674,9 +1314,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   {project?.data?.name || project.id}
                 </option>
               ))}
-            </SelectField>
+            </SelectField></FormField>
           )}
-          <Button onClick={handleCreateNote} disabled={!newTitle.trim()}>
+          <Button onClick={handleCreateNote} disabled={!newTitle.trim()||(Boolean(newImageUrl.trim())&&!noteImageUrl(newImageUrl))}>
             Create
           </Button>
         </div>
@@ -1705,14 +1345,16 @@ export default function MeetingNotesPage({ viewerName = "" }) {
             </div>
           </details>
         )}
-      </SectionBlock>
+      </BottomComposer>
+
+      )}
 
       <CollectionLayout variant="list" className="notes-sections">
-        {groupMode === "date" ? (
+        {searchQuery.trim() ? renderNoteSection("Search results", filteredNotes) : groupMode === "date" && notesLayout === "calendar" ? <NotesCalendar notes={filteredNotes} renderNotes={renderNoteSection} onOpenNote={note => { const href=normalizeExternalUrl(note.data?.linkUrl); if(isLinkOnlyNote(note.data) && href) window.open(href,"_blank","noopener,noreferrer"); else openNote(note.id); }} /> : groupMode === "date" ? (
           <>
             {renderNoteSection("Today", groupedNotesByDate.today)}
             {renderNoteSection("Yesterday", groupedNotesByDate.yesterday)}
-            {renderNoteSection("This Week", groupedNotesByDate.thisWeek)}
+            {renderNoteSection("Past 7 days", groupedNotesByDate.thisWeek)}
             {renderNoteSection("Older", groupedNotesByDate.older)}
           </>
         ) : (
@@ -1748,7 +1390,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           onClose={() => {
             setViewingId(null);
             setEditingId(null);
-            setEditEmojiPickerOpen(false);
           }}
         >
           {editingId === activeNote.id || activeNoteIsLinkOnly ? (
@@ -1778,19 +1419,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   />
                 </label>
 
-                <label className="note-meta-field">
-                  <span>Emoji</span>
-                  <button
-                    ref={editEmojiTriggerRef}
-                    type="button"
-                    className="note-emoji-picker-trigger note-emoji-picker-trigger--edit"
-                    onClick={toggleEditEmojiPicker}
-                    aria-label="Pick note emoji"
-                  >
-                    {normalizeNoteEmoji(editMeta.emoji) || "📝"}
-                  </button>
-                </label>
-
+                <label className="note-meta-field note-meta-field--wide"><span>Cover image URL (optional)</span><InputField type="url" value={editMeta.imageUrl||''} onChange={event=>updateEditMeta('imageUrl',event.target.value)} placeholder="https://…"/>{editMeta.imageUrl?.trim()&&!noteImageUrl(editMeta.imageUrl)&&<small role="alert">Use an http or https image URL.</small>}</label>
                 <label className="note-meta-field">
                   <span>Date</span>
                   <InputField
@@ -1892,7 +1521,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                 <span className="note-autosave-status">{autoSaveLabel}</span>
                 <Button
                   onClick={() => handleSaveEdit(activeNote.id)}
-                  disabled={!editMeta.title.trim()}
+                  disabled={!editMeta.title.trim()||(Boolean(editMeta.imageUrl?.trim())&&!noteImageUrl(editMeta.imageUrl))}
                 >
                   Save
                 </Button>
@@ -1900,7 +1529,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   variant="ghost"
                   onClick={() => {
                     setEditingId(null);
-                    setEditEmojiPickerOpen(false);
                     if (activeNoteIsLinkOnly) setViewingId(null);
                   }}
                 >
@@ -1909,15 +1537,10 @@ export default function MeetingNotesPage({ viewerName = "" }) {
               </div>
             </div>
           ) : (
-            <div className="note-preview-row">
+            <div className="note-preview-row"><NoteCover key={noteCover(activeNote?.data)} src={noteCover(activeNote?.data)} title={activeNote?.data?.title} className="note-preview-cover"/>
               <div className="note-preview-header">
                 <div className="note-preview-title-block">
                   <h3 className="note-preview-title">
-                    {normalizeNoteEmoji(activeNote?.data?.emoji) && (
-                      <span className="note-title-emoji" aria-hidden="true">
-                        {normalizeNoteEmoji(activeNote?.data?.emoji)}
-                      </span>
-                    )}
                     {formatDateInTitle(activeNote?.data?.createdAt)} ·{" "}
                     {activeNote?.data?.title || "Untitled"}
                   </h3>
@@ -1985,35 +1608,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           )}
         </ModalShell>
       )}
-
-      {editEmojiPickerOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={editEmojiPopoverRef}
-            className="note-emoji-picker-popover note-emoji-picker-popover--portal"
-            style={{
-              top: `${editEmojiPickerPosition.top}px`,
-              left: `${editEmojiPickerPosition.left}px`,
-            }}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <EmojiPicker
-              onEmojiClick={(emojiData) => {
-                updateEditMeta("emoji", normalizeNoteEmoji(emojiData.emoji));
-                setEditEmojiPickerOpen(false);
-              }}
-              lazyLoadEmojis
-              previewConfig={{ showPreview: false }}
-              searchDisabled={false}
-              skinTonesDisabled
-              width={300}
-              height={360}
-            />
-          </div>,
-          document.body,
-        )}
 
       {deleteTarget && (
         <DeleteConfirmDialog

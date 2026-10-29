@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceIdentityContext } from "./components/WorkspaceIdentity";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -25,11 +26,14 @@ import {
   normalizeMemberRoleValue,
   normalizeEmailValue,
 } from "../authAccess";
+import { SERIES_COLORS, WORKSPACE_THEME } from "./components/ui/palette";
 import useUrlState, { updateUrlState } from "./hooks/useUrlState";
 import Navigation from "./components/Navigation";
+import TimeTrackingProvider from "./components/time/TimeTrackingProvider";
 import MembersPage from "./components/MembersPage";
 import MemberDirectoryPage from "./components/MemberDirectoryPage";
 import ProjectsPage from "./components/ProjectsPage";
+import LockedPage from "./components/LockedPage";
 import FinancePage from "./components/FinancePage";
 import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
@@ -37,14 +41,21 @@ import PayoutsPage from "./components/PayoutsPage";
 import ResourcesPage from "./components/ResourcesPage";
 import BacklogPage from "./components/BacklogPage";
 import TbdPage from "./components/TbdPage";
-import PageGuide from "./components/PageGuide";
 
-const STYLE_TOOL_KEY = "coassembly-style-tool-v1";
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
-const TBD_TABS = [];
+const TBD_TABS = ["homepage", "settings"];
+
+const LOCAL_ROLE_PREVIEW_OPTIONS = [
+  { value: "worker-owner", label: "Worker-owner" },
+  { value: "associate", label: "Associate" },
+  { value: "flying-member", label: "Flying member" },
+  { value: "external-collaborator", label: "External collaborator" },
+];
 
 const TAB_ORDER = [
+  "homepage",
+  "settings",
   "members",
   "memberDirectory",
   "projects",
@@ -55,54 +66,7 @@ const TAB_ORDER = [
   "resources",
 ];
 
-const FONT_OPTIONS = [
-  {
-    value: "sentient",
-    label: "Sentient (Editorial)",
-  },
-  {
-    value: "sans",
-    label: "Avenir (Clean)",
-  },
-  {
-    value: "sponact",
-    label: "Sponact (All)",
-  },
-];
-
-const SHAPE_OPTIONS = [
-  { value: "soft", label: "Soft corners" },
-  { value: "square", label: "Sharp corners" },
-  { value: "round", label: "Round corners" },
-];
-
-const PATTERN_OPTIONS = [
-  { value: "paper", label: "Paper", glyph: "::", bgColor: "#f3efe6" },
-  { value: "linen", label: "Linen", glyph: "##", bgColor: "#e3efe4" },
-  { value: "blueprint", label: "Blueprint", glyph: "+ +", bgColor: "#d7e6ff" },
-  { value: "confetti", label: "Confetti", glyph: "..", bgColor: "#fcfdff" },
-  { value: "kraft", label: "Kraft", glyph: "//", bgColor: "#dfc18f" },
-];
-
-const PRESENCE_COLORS = [
-  "#D81B60",
-  "#1E88E5",
-  "#43A047",
-  "#F4511E",
-  "#5E35B1",
-  "#00897B",
-  "#6D4C41",
-  "#8E24AA",
-];
-
-const DEFAULT_STYLE_PREFS = {
-  bg: "paper",
-  font: "sentient",
-  radius: "soft",
-  bgColor: "#f2ebe2",
-  grain: 0.95,
-  wash: 0.1,
-};
+const PRESENCE_COLORS = [SERIES_COLORS[0], SERIES_COLORS[1], SERIES_COLORS[3], SERIES_COLORS[6]];
 
 function hashIdToColor(id) {
   const text = String(id || "viewer");
@@ -158,45 +122,8 @@ function isPermissionDeniedError(error) {
   );
 }
 
-function loadStylePrefsFromStorage() {
-  if (typeof window === "undefined") return DEFAULT_STYLE_PREFS;
-
-  try {
-    const raw = window.localStorage.getItem(STYLE_TOOL_KEY);
-    if (!raw) return DEFAULT_STYLE_PREFS;
-    const parsed = JSON.parse(raw);
-    return {
-      bg: ["paper", "linen", "blueprint", "confetti", "kraft"].includes(
-        parsed?.bg,
-      )
-        ? parsed.bg
-        : "paper",
-      font: ["sentient", "sans", "sponact"].includes(parsed?.font)
-        ? parsed.font
-        : "sentient",
-      radius: ["soft", "square", "round"].includes(parsed?.radius)
-        ? parsed.radius
-        : "soft",
-      bgColor:
-        typeof parsed?.bgColor === "string" &&
-        /^#[0-9a-fA-F]{6}$/.test(parsed.bgColor)
-          ? parsed.bgColor
-          : "#f2ebe2",
-      grain: Number.isFinite(Number(parsed?.grain))
-        ? Math.min(1, Math.max(0, Number(parsed.grain)))
-        : 0.7,
-      wash: Number.isFinite(Number(parsed?.wash))
-        ? Math.min(1, Math.max(0, Number(parsed.wash)))
-        : 0.18,
-    };
-  } catch {
-    return DEFAULT_STYLE_PREFS;
-  }
-}
-
 export default function Home() {
   const [activeTab, setActiveTab] = useUrlState("tab", "members", { allowed: TAB_ORDER });
-  const [slideDir, setSlideDir] = useState("right");
   const [authReady, setAuthReady] = useState(false);
   const [currentMember, setCurrentMember] = useState(null);
   const [identity, setIdentity] = useState(null);
@@ -206,9 +133,17 @@ export default function Home() {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [presenceRows, setPresenceRows] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
-  const [stylePrefs, setStylePrefs] = useState(DEFAULT_STYLE_PREFS);
-  const [stylePrefsLoaded, setStylePrefsLoaded] = useState(false);
-  const [toolboxOpen, setToolboxOpen] = useState(false);
+  const [previewRole, setPreviewRole] = useState(null);
+  const rolePreviewRef = useRef(null);
+  useEffect(() => {
+    function closeRolePreview(event) {
+      if (rolePreviewRef.current && !rolePreviewRef.current.contains(event.target)) {
+        rolePreviewRef.current.open = false;
+      }
+    }
+    document.addEventListener("pointerdown", closeRolePreview);
+    return () => document.removeEventListener("pointerdown", closeRolePreview);
+  }, []);
   const cursorRef = useRef({ x: 120, y: 120 });
   const lastCursorWriteAtRef = useRef(0);
   const lastCursorPointRef = useRef({ x: 0, y: 0 });
@@ -264,8 +199,8 @@ export default function Home() {
 
         if (!cancelled) {
           setCurrentMember({
-            id: member.id,
             ...member.data,
+            id: member.id,
             authUid: user.uid,
             email: normalizedGoogleEmail,
             emailLower: normalizedGoogleEmail,
@@ -289,17 +224,67 @@ export default function Home() {
     };
   }, []);
 
-  const isAdmin = useMemo(() => isWorkerOwner(currentMember), [currentMember]);
+  const actualRole = normalizeMemberRoleValue(currentMember?.role);
+  const canPreviewRoles =
+    process.env.NODE_ENV === "development" && isWorkerOwner(currentMember);
+  const effectiveRole =
+    canPreviewRoles && previewRole ? previewRole : actualRole;
+  const effectiveMember = useMemo(
+    () =>
+      currentMember
+        ? {
+            ...currentMember,
+            role: effectiveRole,
+          }
+        : null,
+    [currentMember, effectiveRole],
+  );
+  const isAdmin = useMemo(
+    () => isWorkerOwner(effectiveMember),
+    [effectiveMember],
+  );
   const hasLimitedAccess = useMemo(
-    () => hasLimitedWorkspaceAccess(currentMember),
-    [currentMember],
+    () => hasLimitedWorkspaceAccess(effectiveMember),
+    [effectiveMember],
   );
   const allowedTabs = useMemo(() => {
     if (hasLimitedAccess) {
-      return ["members", "projects", "payouts"];
+      return ["homepage", "settings", "members", "projects", "payouts"];
     }
     return TAB_ORDER;
   }, [hasLimitedAccess]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (typeof window === "undefined") return;
+    if (!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname))
+      return;
+
+    const rawRole = new URLSearchParams(window.location.search)
+      .get("role")
+      ?.trim()
+      .replace(/^["']|["']$/g, "");
+    const normalizedRole = rawRole
+      ? normalizeMemberRoleValue(rawRole)
+      : null;
+    const isKnownRole = LOCAL_ROLE_PREVIEW_OPTIONS.some(
+      (option) => option.value === normalizedRole,
+    );
+    setPreviewRole(isKnownRole ? normalizedRole : null);
+  }, []);
+
+  function handlePreviewRoleChange(nextRole) {
+    if (!canPreviewRoles || typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (nextRole) {
+      url.searchParams.set("role", nextRole);
+      setPreviewRole(nextRole);
+    } else {
+      url.searchParams.delete("role");
+      setPreviewRole(null);
+    }
+    window.history.replaceState({}, "", url);
+  }
 
   useEffect(() => {
     if (!firebaseReady || !authReady || !currentMember) {
@@ -357,22 +342,6 @@ export default function Home() {
       updateUrlState({ tab: "members" }, { replace: true });
     }
   }, [authReady, currentMember, activeTab, allowedTabs, isAdmin, setActiveTab]);
-
-  useEffect(() => {
-    const loaded = loadStylePrefsFromStorage();
-    setStylePrefs(loaded);
-    setStylePrefsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!stylePrefsLoaded) return;
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(STYLE_TOOL_KEY, JSON.stringify(stylePrefs));
-    } catch {
-      // Ignore storage write failures.
-    }
-  }, [stylePrefs, stylePrefsLoaded]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -568,13 +537,6 @@ export default function Home() {
     [tabComments, activeTab],
   );
 
-  const selectedPattern = useMemo(
-    () =>
-      PATTERN_OPTIONS.find((option) => option.value === stylePrefs.bg) ||
-      PATTERN_OPTIONS[0],
-    [stylePrefs.bg],
-  );
-
   useEffect(() => {
     if (!firebaseReady || !realtimeDb || !identity) return;
 
@@ -625,7 +587,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">CoA</div>
+          <div className="splash-brand">Protocol</div>
           <div className="splash-dots" aria-hidden="true">
             <span />
             <span />
@@ -641,7 +603,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">CoA</div>
+          <div className="splash-brand">Protocol</div>
           <p className="splash-label">
             Sign in with your approved Google account to continue.
           </p>
@@ -658,7 +620,7 @@ export default function Home() {
       return (
         <MembersPage
           viewerMemberId={currentMember.id}
-          viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          viewerRole={effectiveRole}
           sharedMembers={sharedMembers}
           sharedProjects={sharedProjects}
           sharedTasks={sharedTasks}
@@ -680,7 +642,7 @@ export default function Home() {
       return (
         <ProjectsPage
           viewerMemberId={currentMember.id}
-          viewerRole={normalizeMemberRoleValue(currentMember.role)}
+          viewerRole={effectiveRole}
           sharedMembers={sharedMembers}
           sharedProjects={sharedProjects}
           sharedTasks={sharedTasks}
@@ -690,22 +652,13 @@ export default function Home() {
     if (activeTab === "backlog") {
       return <BacklogPage viewerName={currentMember.name || ""} />;
     }
-    if (activeTab === "finance") {
-      return <FinancePage />;
-    }
-    if (activeTab === "payouts") {
-      return (
-        <PayoutsPage
-          viewerMemberId={currentMember.id}
-          viewerRole={normalizeMemberRoleValue(currentMember.role)}
-          sharedMembers={sharedMembers}
-        />
-      );
+    if (activeTab === "finance" || activeTab === "payouts") {
+      return <LockedPage title={activeTab === "finance" ? "Finance" : "Requests"} />;
     }
     if (activeTab === "meetingNotes") {
       return <MeetingNotesPage viewerName={currentMember.name || ""} />;
     }
-    if (activeTab === "resources") return <ResourcesPage />;
+    if (activeTab === "resources") return <ResourcesPage currentMember={currentMember} members={sharedMembers || []} />;
     if (DATA_TABS.includes(activeTab))
       return <DataViewPage tabKey={activeTab} />;
     if (TBD_TABS.includes(activeTab)) return <TbdPage tabKey={activeTab} />;
@@ -713,21 +666,12 @@ export default function Home() {
   }
 
   function handleTabChange(newTab) {
-    const oldIdx = TAB_ORDER.indexOf(activeTab);
-    const newIdx = TAB_ORDER.indexOf(newTab);
-    setSlideDir(newIdx >= oldIdx ? "left" : "right");
     setActiveTab(newTab);
   }
 
   return (
-    <main
-      className={`page-shell style-bg-${stylePrefs.bg} style-font-${stylePrefs.font} style-radius-${stylePrefs.radius}`}
-      style={{
-        "--playground-bg": stylePrefs.bgColor,
-        "--playground-grain": String(stylePrefs.grain),
-        "--playground-wash": String(stylePrefs.wash),
-      }}
-    >
+    <WorkspaceIdentityContext.Provider value={currentMember}><TimeTrackingProvider key={currentMember.id} memberId={currentMember.id} active={activeTab === "members"}>
+    <main style={WORKSPACE_THEME} className={`page-shell page-shell--workspace${activeTab === "members" ? " page-shell--task" : ""}`}>
       <Navigation
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -737,8 +681,41 @@ export default function Home() {
         allowedTabs={allowedTabs}
       />
       <div className="page-main">
-        <PageGuide tabKey={activeTab} />
-        <section className="page-content" key={activeTab} data-dir={slideDir}>
+        {canPreviewRoles ? (
+          <details className={`role-preview-float${previewRole ? " role-preview-float--active" : ""}`} ref={rolePreviewRef} onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector("summary")?.focus();
+            }
+          }}>
+            <summary aria-label="Toggle local role preview">Role preview{previewRole ? <span className="role-preview-active-dot" aria-label="Preview active" /> : null}</summary>
+            <div className="role-preview-bar">
+            <label className="role-preview-label" htmlFor="local-role-preview">Local role preview</label>
+            <select
+              className="role-preview-select"
+              id="local-role-preview"
+              value={previewRole || ""}
+              onChange={(event) =>
+                handlePreviewRoleChange(event.target.value)
+              }
+              aria-label="Preview dashboard as role"
+            >
+              <option value="">Actual role ({actualRole})</option>
+              {LOCAL_ROLE_PREVIEW_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {previewRole ? (
+              <span className="role-preview-note">
+                UI only · signed in as {currentMember.name || currentMember.email}
+              </span>
+            ) : null}
+            </div>
+          </details>
+        ) : null}
+        <section className="page-content" key={activeTab}>
           {renderPage()}
         </section>
 
@@ -752,7 +729,7 @@ export default function Home() {
               <span className="peer-cursor-arrow" />
               <span
                 className="peer-cursor-label"
-                style={{ background: peer.color || "#666" }}
+                style={{ background: hashIdToColor(peer.id) }}
               >
                 {peer.name || "Viewer"}
               </span>
@@ -768,13 +745,13 @@ export default function Home() {
               style={{
                 left: Number(comment.x) || 0,
                 top: Number(comment.y) || 0,
-                borderColor: comment.color || "#bbb",
+                borderColor: hashIdToColor(comment.authorId),
               }}
               title={comment.authorName || "Viewer"}
             >
               <span
                 className="tab-comment-author"
-                style={{ color: comment.color || "#666" }}
+                style={{ color: hashIdToColor(comment.authorId) }}
               >
                 {comment.authorName || "Viewer"}
               </span>
@@ -782,125 +759,8 @@ export default function Home() {
             </div>
           ))}
         </div>
-
-        <div
-          className={`style-toolbox${toolboxOpen ? " style-toolbox--open" : ""}`}
-          role="region"
-          aria-label="Style toolbox"
-        >
-          <button
-            type="button"
-            className="style-toolbox-trigger"
-            onClick={() => setToolboxOpen((prev) => !prev)}
-            aria-expanded={toolboxOpen}
-            aria-controls="playground-panel"
-            title="Open theme controls"
-          >
-            <span
-              className={`style-toolbox-trigger-icon style-toolbox-trigger-icon--${selectedPattern.value}`}
-              aria-hidden="true"
-            >
-              {selectedPattern.glyph}
-            </span>
-            <span className="style-toolbox-trigger-text">Themes</span>
-          </button>
-
-          {toolboxOpen ? (
-            <div className="style-toolbox-panel" id="playground-panel">
-              <div className="style-toolbox-head">
-                <div>
-                  <div className="style-toolbox-title">Theme controls</div>
-                  <div className="style-toolbox-subtitle">
-                    Choose pattern, type, and shape
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="style-toolbox-close"
-                  onClick={() => setToolboxOpen(false)}
-                  aria-label="Close playground"
-                >
-                  x
-                </button>
-              </div>
-
-              <div className="style-toolbox-group">
-                <div className="style-toolbox-label">Pattern</div>
-                <div className="style-swatch-grid">
-                  {PATTERN_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`style-swatch${stylePrefs.bg === option.value ? " style-swatch--active" : ""}`}
-                      onClick={() =>
-                        setStylePrefs((prev) => ({
-                          ...prev,
-                          bg: option.value,
-                          bgColor: option.bgColor,
-                        }))
-                      }
-                      title={option.label}
-                      aria-pressed={stylePrefs.bg === option.value}
-                    >
-                      <span
-                        className={`style-swatch-preview style-swatch-preview--${option.value}`}
-                      />
-                      <span className="style-swatch-glyph">{option.glyph}</span>
-                      <span className="style-swatch-label">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="style-toolbox-group">
-                <div className="style-toolbox-label">Type</div>
-                <div className="style-chip-row">
-                  {FONT_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`style-chip-btn${stylePrefs.font === option.value ? " style-chip-btn--active" : ""}`}
-                      onClick={() =>
-                        setStylePrefs((prev) => ({
-                          ...prev,
-                          font: option.value,
-                        }))
-                      }
-                      title={option.label}
-                      aria-pressed={stylePrefs.font === option.value}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="style-toolbox-group">
-                <div className="style-toolbox-label">Shape</div>
-                <div className="style-chip-row">
-                  {SHAPE_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`style-chip-btn${stylePrefs.radius === option.value ? " style-chip-btn--active" : ""}`}
-                      onClick={() =>
-                        setStylePrefs((prev) => ({
-                          ...prev,
-                          radius: option.value,
-                        }))
-                      }
-                      title={option.label}
-                      aria-pressed={stylePrefs.radius === option.value}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
       </div>
     </main>
+    </TimeTrackingProvider></WorkspaceIdentityContext.Provider>
   );
 }

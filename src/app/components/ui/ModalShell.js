@@ -1,5 +1,7 @@
 "use client";
 
+import CloseButton from "./CloseButton";
+
 export default function ModalShell({
   title,
   headerActions,
@@ -54,14 +56,7 @@ export default function ModalShell({
             <span className="edit-modal-title">{title}</span>
             {headerActions}
             {onClose ? (
-              <button
-                type="button"
-                className="edit-modal-close"
-                onClick={requestClose}
-                title={closeTitle}
-              >
-                ✕
-              </button>
+              <CloseButton className="edit-modal-close" onClick={requestClose} label={closeTitle} />
             ) : null}
           </div>
         )}

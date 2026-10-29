@@ -1,11 +1,13 @@
 // A single schema owns the public URL contract. Component state names stay private.
 export const TAB_PATHS = {
+  homepage: "homepage",
+  settings: "settings",
   members: "tasks",
   memberDirectory: "members",
   projects: "projects",
   backlog: "wishes",
   finance: "finance",
-  payouts: "requests",
+  payouts: "finance/requests",
   meetingNotes: "notes",
   resources: "resources",
 };
@@ -22,23 +24,26 @@ export function isDateKey(value) {
 }
 
 const schema = {
+  memberView: { tab: "memberDirectory", query: "view", default: "role", allowed: ["role", "weekly", "overall"] },
+  memberWeek: { tab: "memberDirectory", query: "week", validate: isDateKey },
+  memberEndWeek: { tab: "memberDirectory", query: "endWeek", validate: isDateKey },
   week: { tab: "members", query: "week", validate: isDateKey },
   taskView: { tab: "members", query: "view", default: "member", allowed: ["member", "project", "resources"] },
   project: { tab: "projects", path: true, validate: isDocumentId },
-  projectView: { tab: "projects", query: "view", default: "list", allowed: ["list", "kanban"] },
+  projectView: { tab: "projects", query: "view", default: "category", allowed: ["category", "status", "list", "kanban"] },
   note: { tab: "meetingNotes", path: true, validate: isDocumentId },
   notesSearch: { tab: "meetingNotes", query: "q" },
   notesGroup: { tab: "meetingNotes", query: "group", default: "date", allowed: ["date", "project"] },
-  notesLayout: { tab: "meetingNotes", query: "layout", default: "grid", allowed: ["grid", "shelf"] },
+  notesLayout: { tab: "meetingNotes", query: "layout", default: "grid", allowed: ["grid", "shelf", "calendar"] },
   financeView: { tab: "finance", query: "view", default: "project", allowed: ["project", "person"] },
   financeCategory: { tab: "finance", query: "category", default: "projects", allowed: ["projects", "non-projects"] },
   year: { tab: "finance", query: "year", default: "overall", validate: (v) => v === "overall" || /^\d{4}$/.test(v) },
   quarter: { tab: "finance", query: "quarter", default: "overall", validate: (v) => v === "overall" || /^\d{4}-Q[1-4]$/.test(v) },
-  resourcesSearch: { tab: "resources", query: "q" },
-  resourcesView: { tab: "resources", query: "view", default: "category", allowed: ["category", "free"] },
+  resourcesView: { tab: "resources", query: "view", default: "category", allowed: ["category", "date"] },
+  wishGroup: { tab: "backlog", query: "group", default: "project", allowed: ["project", "date"] },
   wishesSearch: { tab: "backlog", query: "q" },
 };
-const ownedQueries = new Set(["tab", ...Object.keys(schema), ...Object.values(schema).map((s) => s.query).filter(Boolean)]);
+const ownedQueries = new Set(["tab", "resourcesSearch", ...Object.keys(schema), ...Object.values(schema).map((s) => s.query).filter(Boolean)]);
 
 function valid(spec, value) {
   return typeof value === "string" && value !== "" &&
@@ -47,6 +52,7 @@ function valid(spec, value) {
 
 export function isViewPath(parts) {
   if (!Array.isArray(parts) || parts.length === 0) return false;
+  if (parts.join("/") === "finance/requests" || parts.join("/") === "requests") return true;
   if (!Object.values(TAB_PATHS).includes(parts[0])) return false;
   if (parts.length === 1) return true;
   return parts.length === 2 && ["notes", "projects"].includes(parts[0]) && isDocumentId(parts[1]);
@@ -54,7 +60,7 @@ export function isViewPath(parts) {
 
 export function readViewUrl(url) {
   const parts = url.pathname.split("/").filter(Boolean);
-  const pathTab = Object.keys(TAB_PATHS).find((tab) => TAB_PATHS[tab] === parts[0]);
+  const pathTab = parts.join("/") === "requests" ? "payouts" : Object.keys(TAB_PATHS).find((tab) => TAB_PATHS[tab] === parts.join("/")) || Object.keys(TAB_PATHS).find((tab) => TAB_PATHS[tab] === parts[0]);
   const legacyTab = url.searchParams.get("tab");
   const tab = pathTab || (Object.hasOwn(TAB_PATHS, legacyTab) ? legacyTab : "members");
   const state = { tab };
@@ -62,6 +68,7 @@ export function readViewUrl(url) {
     if (spec.tab !== tab) continue;
     let value = spec.path && parts[1] ? safeDecode(parts[1]) :
       url.searchParams.get(spec.query || key) ?? url.searchParams.get(key);
+    if (key === "projectView") value = value === "list" ? "category" : value === "kanban" ? "status" : value;
     // Previous links could contain several expanded rows. The final row becomes the focus.
     if (key === "project" && value?.includes(",")) value = value.split(",").filter(Boolean).at(-1);
     if (valid(spec, value)) state[key] = value;

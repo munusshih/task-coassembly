@@ -1,19 +1,20 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
+import { actionRecord } from "./lib/actionReason.mjs";
 
 function getDb() {
   if (!db) {
@@ -40,17 +41,33 @@ function sortDocuments(items) {
   });
 }
 
-export function subscribeCollection(collectionName, onData) {
+function handleSubscriptionError(collectionName, error) {
+  const message = `Firestore subscription failed for collection "${collectionName}".`;
+  if (error?.code === "permission-denied") {
+    console.warn(message, error);
+    return;
+  }
+  console.error(message, error);
+}
+
+export function subscribeCollection(collectionName, onData, onError) {
   const collectionRef = collection(getDb(), collectionName);
 
-  return onSnapshot(collectionRef, (snapshot) => {
-    const documents = snapshot.docs.map((snapshotDocument) => ({
-      id: snapshotDocument.id,
-      data: snapshotDocument.data(),
-    }));
+  return onSnapshot(
+    collectionRef,
+    (snapshot) => {
+      const documents = snapshot.docs.map((snapshotDocument) => ({
+        id: snapshotDocument.id,
+        data: snapshotDocument.data(),
+      }));
 
-    onData(sortDocuments(documents));
-  });
+      onData(sortDocuments(documents));
+    },
+    (error) => {
+      handleSubscriptionError(collectionName, error);
+      onError?.(error);
+    },
+  );
 }
 
 export async function fetchCollection(collectionName) {
@@ -93,14 +110,18 @@ export function subscribeCollectionQuery(
     ? query(collectionRef, ...constraints)
     : collectionRef;
 
-  return onSnapshot(source, (snapshot) => {
-    const documents = snapshot.docs.map((snapshotDocument) => ({
-      id: snapshotDocument.id,
-      data: snapshotDocument.data(),
-    }));
+  return onSnapshot(
+    source,
+    (snapshot) => {
+      const documents = snapshot.docs.map((snapshotDocument) => ({
+        id: snapshotDocument.id,
+        data: snapshotDocument.data(),
+      }));
 
-    onData(sortDocuments(documents));
-  });
+      onData(sortDocuments(documents));
+    },
+    (error) => handleSubscriptionError(collectionName, error),
+  );
 }
 
 export async function createDocument(collectionName, payload) {
@@ -110,7 +131,22 @@ export async function createDocument(collectionName, payload) {
 }
 
 export async function replaceDocument(collectionName, id, payload) {
-  await setDoc(doc(getDb(), collectionName, id), payload);
+  const documentRef = doc(getDb(), collectionName, id);
+  if (collectionName !== "tasks") {
+    await setDoc(documentRef, payload);
+    return;
+  }
+  // Ordinary task edits can carry an old snapshot. Keep counters owned by the
+  // time-entry transaction, even when an editor was opened before a timer ended.
+  await runTransaction(getDb(), async (transaction) => {
+    const snapshot = await transaction.get(documentRef);
+    const next = { ...payload };
+    for (const field of ["trackedSeconds", "trackedEntryCount"]) {
+      delete next[field];
+      if (snapshot.exists() && snapshot.data()[field] !== undefined) next[field] = snapshot.data()[field];
+    }
+    transaction.set(documentRef, next);
+  });
 }
 
 export async function updateDocument(collectionName, id, payload) {
@@ -131,8 +167,16 @@ export async function updateDocumentsAtomically(operations) {
   await batch.commit();
 }
 
-export async function deleteDocument(collectionName, id) {
-  await deleteDoc(doc(getDb(), collectionName, id));
+export async function deleteDocument(collectionName, id, reason) {
+  const entry = actionRecord('delete', reason, auth?.currentUser?.uid);
+  const database = getDb();
+  const target = doc(database, collectionName, id);
+  const batch = writeBatch(database);
+  // Firestore keeps subcollections after their parent is removed. Commit the
+  // reason and deletion atomically so no deletion can silently lose its context.
+  batch.set(doc(collection(target, 'activity')), entry);
+  batch.delete(target);
+  await batch.commit();
 }
 
 export async function deleteDocumentsWhereBefore(
@@ -140,6 +184,7 @@ export async function deleteDocumentsWhereBefore(
   field,
   cutoffTs,
   maxDelete = 100,
+  reason,
 ) {
   const collectionRef = collection(getDb(), collectionName);
   const snapshot = await getDocs(
@@ -152,7 +197,7 @@ export async function deleteDocumentsWhereBefore(
 
   if (snapshot.empty) return 0;
 
-  await Promise.all(snapshot.docs.map((row) => deleteDoc(row.ref)));
+  await Promise.all(snapshot.docs.map((row) => deleteDocument(collectionName, row.id, reason)));
   return snapshot.docs.length;
 }
 

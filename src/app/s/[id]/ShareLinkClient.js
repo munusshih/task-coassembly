@@ -29,7 +29,7 @@ export default function ShareLinkClient({ id }) {
   return (
     <main className="page-shell page-shell--single splash-screen">
       <div className="splash-card">
-        <div className="splash-brand">CoA</div>
+        <div className="splash-brand">Protocol</div>
         <p className="splash-label" role="status">{error || "Opening shared view…"}</p>
         {error ? <a href="/tasks">Go to Task</a> : null}
       </div>

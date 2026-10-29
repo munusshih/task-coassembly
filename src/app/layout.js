@@ -1,32 +1,22 @@
-import localFont from "next/font/local";
 import "./globals.css";
 import "driver.js/dist/driver.css";
 import { Analytics } from "@vercel/analytics/react";
 
-const sentient = localFont({
-  src: "../assets/fonts/Sentient-Variable.ttf",
-  variable: "--font-sentient",
-  display: "swap",
-  weight: "100 900",
-  preload: false,
-});
-
-const sponact = localFont({
-  src: "../assets/fonts/sponact015001-Regular (1).otf",
-  variable: "--font-sponact",
-  display: "swap",
-  preload: false,
-});
-
 export const metadata = {
-  title: "CoAssembly Task",
+  title: "Protocol",
   description: "Team management dashboard.",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${sentient.variable} ${sponact.variable}`}>
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+      </head>
       <body suppressHydrationWarning>
+        {process.env.NODE_ENV === "development" ? <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async /> : null}
         {children}
         {process.env.NODE_ENV === "production" ? <Analytics /> : null}
       </body>

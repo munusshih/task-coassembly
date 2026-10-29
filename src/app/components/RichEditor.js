@@ -1,5 +1,7 @@
 "use client";
 
+import { seriesColorForKey } from "./ui/palette";
+
 import { useEditor, EditorContent } from "@tiptap/react";
 import { mergeAttributes, Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -114,7 +116,7 @@ function createCollaborationCursorExtension(collaboratorsRef) {
 
             const caret = document.createElement("span");
             caret.className = "collab-cursor-caret";
-            const color = String(collaborator?.color || "#2f5a9c");
+            const color = seriesColorForKey(collaborator?.id || collaborator?.username);
             caret.style.backgroundColor = color;
             marker.appendChild(caret);
 

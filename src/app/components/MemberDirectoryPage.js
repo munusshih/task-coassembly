@@ -1,5 +1,28 @@
 "use client";
+import WeekSelect from "./ui/WeekSelect";
 
+
+import MemberTenure from "./ui/MemberTenure";
+import MemberWorkRow from "./MemberWorkRow";
+import AllocationClock from "./ui/AllocationClock";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
+import BottomComposer from "./ui/BottomComposer";
+import { formatPronouns, pronounsForInput } from "../lib/pronouns.mjs";
+import MemberEditButton from "./ui/MemberEditButton";
+import SpoonMeter from "./ui/SpoonMeter";
+import MemberForm from "./MemberForm";
+import TaskCreateTrigger from "./TaskCreateTrigger";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import TaskClockIcon from "./ui/TaskClockIcon";
+import MemberMilestones from "./ui/MemberMilestones";
+import { calendarDate } from "./memberMilestones.mjs";
+import MemberAvatar from "./ui/MemberAvatar";
+import { memberRoleMetrics, projectWorkTone } from "./memberRoleMetrics.mjs";
+import MetadataPill from "./ui/MetadataPill";
+import useUrlState, { isDateKey, updateUrlState } from "../hooks/useUrlState";
+import { taskWeekKey, weekStartDateForTs } from "./taskBoardRules";
+import { SERIES_COLORS } from "./ui/palette";
 import { useEffect, useMemo, useState } from "react";
 import {
   subscribeCollection,
@@ -10,16 +33,12 @@ import {
 import { firebaseReady } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
-import { DELETE_ICON, EDIT_ICON } from "./icons";
+import { DELETE_ICON } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
 import EntityCard from "./ui/EntityCard";
-import InputField from "./ui/InputField";
 import ModalShell from "./ui/ModalShell";
-import SelectField from "./ui/SelectField";
-import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
-import TextareaField from "./ui/TextareaField";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import { renderTextWithLinks } from "./ui/linkifyText";
 import { normalizeEmailValue } from "../../authAccess";
@@ -35,30 +54,11 @@ const MEMBER_TYPE_OPTIONS = [
   { value: "flying-member", label: "Flying member" },
   { value: "external-collaborator", label: "External collaborator" },
 ];
-const PROJECT_KIND_COLORS = [
-  "#0066CC",
-  "#FF7A00",
-  "#2E8B57",
-  "#D7263D",
-  "#7B2CBF",
-  "#00A6A6",
-  "#C0A000",
-  "#8C564B",
-  "#E83E8C",
-  "#1D3557",
-  "#F94144",
-  "#43AA8B",
-];
-const PROJECT_KIND_COLOR_BY_KEY = {
-  commissioned: "#0066CC",
-  "self-funded": "#FF7A00",
-  grant: "#2E8B57",
-  internal: "#D7263D",
-  admin: "#7B2CBF",
-  "pass-through": "#00A6A6",
-  unspecified: "#C0A000",
-  "no-project": "#8C564B",
-};
+const PROJECT_KIND_COLORS = SERIES_COLORS;
+const PROJECT_KIND_COLOR_BY_KEY = Object.fromEntries(
+  ["commissioned", "self-funded", "grant", "internal", "admin", "pass-through", "unspecified", "no-project"]
+    .map((key, index) => [key, SERIES_COLORS[index]]),
+);
 
 function normalizeMemberRole(rawRole) {
   const value = String(rawRole || "")
@@ -321,7 +321,7 @@ function toProjectSegments(timeMap) {
 
 function donutBackground(segments) {
   if (!Array.isArray(segments) || segments.length === 0) {
-    return "conic-gradient(#ececec 0deg 360deg)";
+    return "conic-gradient(var(--surface-quiet) 0deg 360deg)";
   }
 
   let start = 0;
@@ -332,7 +332,7 @@ function donutBackground(segments) {
     start = end;
   }
   if (start < 360) {
-    parts.push(`rgba(0,0,0,0.08) ${start.toFixed(2)}deg 360deg`);
+    parts.push(`color-mix(in srgb, var(--ink) 8%, transparent) ${start.toFixed(2)}deg 360deg`);
   }
   return `conic-gradient(${parts.join(", ")})`;
 }
@@ -420,6 +420,10 @@ function emptyMemberForm() {
     email: "",
     timezone: "",
     joinedOn: "",
+    birthday: "",
+    pronouns: "",
+    leftOn: "",
+    photoURL: "",
     notes: "",
     active: true,
   };
@@ -456,6 +460,10 @@ function buildFormFromMember(memberData) {
       typeof memberData.timezone === "string" ? memberData.timezone : "",
     joinedOn:
       typeof memberData.joinedOn === "string" ? memberData.joinedOn : "",
+    pronouns: pronounsForInput(memberData.pronouns),
+    birthday: memberData.birthday || "",
+    leftOn: memberData.leftOn || "",
+    photoURL: memberData.photoURL || "",
     notes: typeof memberData.notes === "string" ? memberData.notes : "",
     active: memberData.active !== false,
   };
@@ -471,11 +479,23 @@ function taskMetricAnchorTs(taskData) {
 }
 
 export default function MemberDirectoryPage() {
+  const [directoryView, setDirectoryView] = useUrlState("memberView", "role", { allowed: ["role", "weekly", "overall"] });
+  const currentWeek = weekStartDateForTs(Date.now()).toISOString().slice(0, 10);
+  const [memberWeek] = useUrlState("memberWeek", currentWeek, { validate: isDateKey });
+  const [memberEndWeek] = useUrlState("memberEndWeek", "", { validate: isDateKey });
+  const endWeek = memberEndWeek >= memberWeek ? memberEndWeek : currentWeek >= memberWeek ? currentWeek : memberWeek;
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [newMember, setNewMember] = useState(() => emptyMemberForm());
   const [expandedMembers, setExpandedMembers] = useState({});
+  const [today, setToday] = useState(() => calendarDate());
+  useEffect(() => {
+    const timer = setInterval(() => setToday(calendarDate()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const [highlightedMember, setHighlightedMember] = useState(null);
+  const [profileId, setProfileId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(() => emptyMemberForm());
   const [notice, setNotice] = useState(null);
@@ -483,7 +503,6 @@ export default function MemberDirectoryPage() {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [rotationOpen, setRotationOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [memberTimeTabById, setMemberTimeTabById] = useState({});
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -722,6 +741,10 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: newMember.timezone.trim(),
         joinedOn: newMember.joinedOn || monthKeyFromTs(now) + "-01",
+        pronouns: newMember.pronouns.trim(),
+        birthday: newMember.birthday || null,
+        leftOn: newMember.leftOn || null,
+        photoURL: newMember.photoURL.trim() || null,
         notes: newMember.notes.trim(),
         active: Boolean(newMember.active),
         meetingAttendance: {},
@@ -730,6 +753,7 @@ export default function MemberDirectoryPage() {
         updatedAt: now,
       });
       setNewMember(emptyMemberForm());
+      setAddMemberOpen(false);
       setNotice({ error: false, text: "Member added" });
     } catch (error) {
       setNotice({ error: true, text: error.message || "Could not add member" });
@@ -746,17 +770,25 @@ export default function MemberDirectoryPage() {
     setEditDraft(emptyMemberForm());
   }
 
+  function closeMemberEditor() {
+    cancelEdit();
+    if (addMemberOpen) setNewMember(emptyMemberForm());
+    setAddMemberOpen(false);
+  }
+
   function toggleMemberExpanded(memberId) {
     setExpandedMembers((prev) => ({ ...prev, [memberId]: !prev[memberId] }));
   }
 
-  function setMemberTimeTab(memberId, tab) {
-    setMemberTimeTabById((prev) => ({ ...prev, [memberId]: tab }));
-  }
+
 
   async function saveEdit(member) {
     const name = editDraft.name.trim();
     if (!name) return;
+    if (editDraft.leftOn && editDraft.joinedOn && editDraft.leftOn < editDraft.joinedOn) {
+      setNotice({ error: true, text: "The leaving date must be on or after the join date." });
+      return;
+    }
     const now = Date.now();
     const email = normalizeEmailValue(editDraft.email);
     const alsoKnownAs = normalizeAlsoKnownAs(editDraft.aliases);
@@ -770,6 +802,10 @@ export default function MemberDirectoryPage() {
         emailLower: email,
         timezone: editDraft.timezone.trim(),
         joinedOn: editDraft.joinedOn || null,
+        pronouns: editDraft.pronouns.trim(),
+        birthday: editDraft.birthday || null,
+        leftOn: editDraft.leftOn || null,
+        photoURL: editDraft.photoURL.trim() || null,
         notes: editDraft.notes.trim(),
         active: Boolean(editDraft.active),
         updatedAt: now,
@@ -881,7 +917,7 @@ export default function MemberDirectoryPage() {
     setDeleteTarget({
       label: memberName,
       detail,
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
           const now = Date.now();
           await Promise.all([
@@ -905,7 +941,7 @@ export default function MemberDirectoryPage() {
               });
             }),
           ]);
-          await deleteDocument("members", member.id);
+          await deleteDocument("members", member.id, reason);
           if (editingId === member.id) cancelEdit();
           setNotice({ error: false, text: "Member deleted" });
         } catch (error) {
@@ -920,14 +956,44 @@ export default function MemberDirectoryPage() {
     });
   }
 
+  const roleMetricsById = useMemo(() => Object.fromEntries(membersSorted.map(member => [member.id, memberRoleMetrics(member.id, tasks, projects, Date.now(), directoryView, { start: memberWeek, end: endWeek })])), [membersSorted, tasks, projects, today, directoryView, memberWeek, endWeek]);
+  const directoryMembers = [...membersSorted].sort((a,b) => directoryView === "role" ? 0 : roleMetricsById[b.id].total-roleMetricsById[a.id].total);
+  const activeDirectoryMembers = directoryMembers.filter(member => member.data?.active !== false);
+  const inactiveDirectoryMembers = directoryMembers.filter(member => member.data?.active === false);
+
+  const weekOptions = [...new Set([currentWeek, memberWeek, endWeek, ...tasks.map(task => taskWeekKey(task.data)).filter(Boolean)])].sort().reverse();
+  const periodLabel = directoryView === "overall" ? "All recorded weeks" : directoryView === "weekly" ? (memberWeek === endWeek ? formatWeekKeyLabel(memberWeek) : `${formatWeekKeyLabel(memberWeek)} to ${formatWeekKeyLabel(endWeek)}`) : "Last four weeks";
+  const chartAllocations = directoryView === "role"
+    ? MEMBER_TYPE_OPTIONS.map(option => ({ id: option.value, name: option.label, units: activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value).reduce((sum, member) => sum + roleMetricsById[member.id].total, 0) }))
+    : (directoryView === "overall" ? directoryMembers : activeDirectoryMembers).map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total }));
+  const highlightKey = member => directoryView === "role" ? normalizeMemberRole(member.data?.role) : member.id;
+
+  function renderMemberGroup(title, group, key) {
+    if (!group.length) return null;
+    return <section key={key} className={`member-role-section${key === 'inactive' ? ' member-role-section--inactive' : ''}`}>
+      <div className="member-role-heading"><h2>{title}</h2><span className="task-scope-count">{group.length}</span>
+
+      </div>
+      <CollectionLayout variant="grid" className="member-role-list">{group.map(renderRoleMember)}</CollectionLayout>
+    </section>;
+  }
+
+  function renderRoleMember(member) {
+    return <MemberWorkRow key={member.id} member={member} metric={roleMetricsById[member.id]} mode={directoryView} periodLabel={periodLabel} roleTitle={roleLabel(member.data?.role)} today={today} formatTime={formatUnitsAsHours} weekLabel={formatWeekKeyLabel} onProfile={() => setProfileId(member.id)} onEdit={() => startEdit(member)} highlighted={highlightedMember===highlightKey(member)} dimmed={Boolean(highlightedMember && highlightedMember!==highlightKey(member))} />;
+  }
+
+  useEffect(() => setHighlightedMember(null), [directoryView, memberWeek, endWeek]);
+
+  const profileMember = membersSorted.find(member => member.id === profileId);
   const editingMember = membersSorted.find((m) => m.id === editingId) ?? null;
 
   return (
     <TabPage
-      className="member-directory-page"
+      className={`member-directory-page member-directory-page--${directoryView}`}
       title="Members"
-      subtitle="Manage member records, meeting ownership roles, and workload/project assignment snapshots."
+      header={<WorkspacePageHero title="Members" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }, { value: "overall", label: "Overall" }]} /></WorkspacePageHero>}
     >
+      <WorkspaceCreateDock label="New member" expanded={addMemberOpen} onClick={() => setAddMemberOpen(true)} />
       {notice && (
         <p
           className={
@@ -940,626 +1006,43 @@ export default function MemberDirectoryPage() {
         </p>
       )}
 
-      <CollectionLayout variant="grid" className="member-directory-top">
-        <SectionBlock
-          className="member-directory-panel member-form-panel"
-          title="Add member"
-          titleTag="h3"
-          bodyClassName="member-form-panel-body"
-          actions={
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setAddMemberOpen((v) => !v)}
-            >
-              {addMemberOpen ? "▴ Close" : "▾ Expand"}
-            </Button>
-          }
-        >
-          {addMemberOpen && (
-            <form className="member-form" onSubmit={handleCreateMember}>
-              <div className="member-form-grid">
-                <label className="member-form-field">
-                  <span>Name</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.name}
-                    onChange={(e) =>
-                      updateNewMemberField("name", e.target.value)
-                    }
-                    placeholder="Member name"
-                  />
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Also known as</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.aliases}
-                    onChange={(e) =>
-                      updateNewMemberField("aliases", e.target.value)
-                    }
-                    placeholder="Comma separated aliases, e.g. 一豪, 木木, 宥丞"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Type</span>
-                  <SelectField
-                    className="member-form-input"
-                    value={newMember.role}
-                    onChange={(e) =>
-                      updateNewMemberField("role", e.target.value)
-                    }
-                  >
-                    {MEMBER_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
-                <label className="member-form-field">
-                  <span>Email</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.email}
-                    onChange={(e) =>
-                      updateNewMemberField("email", e.target.value)
-                    }
-                    placeholder="name@example.com"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Timezone</span>
-                  <InputField
-                    className="member-form-input"
-                    value={newMember.timezone}
-                    onChange={(e) =>
-                      updateNewMemberField("timezone", e.target.value)
-                    }
-                    placeholder="America/New_York"
-                  />
-                </label>
-                <label className="member-form-field">
-                  <span>Joined on</span>
-                  <InputField
-                    type="date"
-                    className="member-form-input"
-                    value={newMember.joinedOn}
-                    onChange={(e) =>
-                      updateNewMemberField("joinedOn", e.target.value)
-                    }
-                  />
-                </label>
-                <label className="member-form-field member-form-field--toggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(newMember.active)}
-                    onChange={(e) =>
-                      updateNewMemberField("active", e.target.checked)
-                    }
-                  />
-                  <span>Active member</span>
-                </label>
-                <label className="member-form-field member-form-field--full">
-                  <span>Notes</span>
-                  <TextareaField
-                    className="member-form-input member-form-textarea"
-                    value={newMember.notes}
-                    onChange={(e) =>
-                      updateNewMemberField("notes", e.target.value)
-                    }
-                    placeholder="Any context for this member..."
-                  />
-                </label>
-              </div>
-              <div className="member-form-actions">
-                <Button type="submit" disabled={!newMember.name.trim()}>
-                  Save member
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setNewMember(emptyMemberForm())}
-                >
-                  Clear
-                </Button>
-              </div>
-            </form>
-          )}
-        </SectionBlock>
 
-        <SectionBlock
-          className="member-directory-panel"
-          title="Meeting rotation"
-          titleTag="h3"
-          actions={
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setRotationOpen((v) => !v)}
-            >
-              {rotationOpen ? "▴ Close" : "▾ Expand"}
-            </Button>
-          }
-        >
-          {rotationOpen &&
-            (workerOwners.length === 0 ? (
-              <p className="member-directory-empty">
-                No worker-owner members yet.
-              </p>
-            ) : (
-              <div className="rotation-timeline">
-                {rotationMonthKeys.map((monthKey) => {
-                  const monthRotation = rotationByMonth[monthKey] || [];
-                  const isCurrent = monthKey === currentMonthKey;
-                  return (
-                    <section
-                      key={monthKey}
-                      className={
-                        isCurrent
-                          ? "rotation-month rotation-month--current"
-                          : "rotation-month"
-                      }
-                    >
-                      <div className="rotation-month-head">
-                        <div className="rotation-month-title-wrap">
-                          <strong className="rotation-month-title">
-                            {formatMonthKeyLabel(monthKey)}
-                          </strong>
-                          <span className="rotation-month-key">{monthKey}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => handleSwitchRolesForMonth(monthKey)}
-                          disabled={
-                            switchingMonthKey === monthKey ||
-                            monthRotation.length < 2
-                          }
-                        >
-                          {switchingMonthKey === monthKey
-                            ? "Switching..."
-                            : "Switch roles"}
-                        </Button>
-                      </div>
 
-                      <ul className="rotation-list">
-                        {monthRotation.map((entry) => (
-                          <li
-                            key={`${monthKey}-${entry.member.id}`}
-                            className="rotation-item"
-                          >
-                            <div className="rotation-main">
-                              <strong>
-                                {entry.member?.data?.name || entry.member.id}
-                              </strong>
-                              <span
-                                className={`rotation-role rotation-role--${entry.role.replace(/\s+/g, "-").toLowerCase()}`}
-                              >
-                                {entry.role}
-                              </span>
-                            </div>
-                            {isCurrent && (
-                              <label className="rotation-attendance">
-                                <input
-                                  type="checkbox"
-                                  checked={entry.present}
-                                  onChange={(e) =>
-                                    toggleWorkerOwnerPresence(
-                                      entry.member,
-                                      monthKey,
-                                      e.target.checked,
-                                    )
-                                  }
-                                />
-                                <span>present this month</span>
-                              </label>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
-            ))}
-        </SectionBlock>
-      </CollectionLayout>
+      {directoryView === "weekly" && <div data-rationale-anchor="member-period" data-rationale-label="Member allocation period" className="member-week-controls" aria-label="Member allocation period">
+        <label className="task-week-control"><span>From</span><WeekSelect aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
+        <label className="task-week-control"><span>Through</span><WeekSelect aria-label="Member end week" value={endWeek} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
+      </div>}
+      <section className="member-allocation-overview" aria-label={`${periodLabel} allocation by ${directoryView === "role" ? "role" : "member"}`}>
+        <AllocationClock variant="member" subject={directoryView === "role" ? "Role" : "Member"} valueMode={directoryView === "role" ? "percent" : "time"} periodLabel={periodLabel} allocations={chartAllocations.sort((a,b) => b.units-a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
+      </section>
 
-      <CollectionLayout variant="list" className="member-directory-list">
-        {membersSorted.length === 0 && <EmptyState>No members yet.</EmptyState>}
+      {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">
+        {["role","weekly"].includes(directoryView) ? MEMBER_TYPE_OPTIONS.map(option => renderMemberGroup(`${option.label}s`, activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value), option.value)) : <CollectionLayout variant="grid" className="member-role-list">{activeDirectoryMembers.map(renderRoleMember)}</CollectionLayout>}
+        {directoryView !== "weekly" && renderMemberGroup("Inactive members", inactiveDirectoryMembers, "inactive")}
+      </div>}
 
-        {membersSorted.map((member) => {
-          const metric = memberMetrics[member.id] || {
-            totalTaskCount: 0,
-            assignedTotalCount: 0,
-            completedTotalCount: 0,
-            finishedUnitsTotal: 0,
-            assignedThisWeekCount: 0,
-            completedThisWeekCount: 0,
-            finishedUnitsThisWeek: 0,
-            plannedUnits: 0,
-            weekly: recentWeekKeys.map((weekKey) => ({
-              weekKey,
-              assigned: 0,
-              completed: 0,
-              finishedUnits: 0,
-            })),
-            currentProjectCount: 0,
-            historicalProjectCount: 0,
-            currentProjects: [],
-            projectSegments: [],
-            thisWeekProjectSegments: [],
-            projectKindSegments: [],
-            thisWeekProjectKindSegments: [],
-          };
 
-          const expanded = Boolean(expandedMembers[member.id]);
-          const latestWeek = metric.weekly[0] || {
-            weekKey: currentWeekKey,
-            assigned: metric.assignedThisWeekCount,
-            completed: metric.completedThisWeekCount,
-          };
-          const timeTab = memberTimeTabById[member.id] || "weekly";
-          const role = normalizeMemberRole(member?.data?.role);
-          const meetingRequired = isWorkerOwner(role);
 
-          return (
-            <EntityCard
-              key={member.id}
-              as="article"
-              className={
-                expanded
-                  ? "member-directory-card member-directory-card--open"
-                  : "member-directory-card"
-              }
-            >
-              <div className="member-directory-card-head">
-                <div className="member-directory-card-titles">
-                  <h3 className="member-directory-card-name">
-                    {member?.data?.name || member.id}
-                  </h3>
-                  <div className="member-directory-card-badges">
-                    <span
-                      className={`member-role-chip${role ? ` member-role-chip--${role}` : ""}`}
-                    >
-                      {roleLabel(role)}
-                    </span>
-                    {meetingRequired && (
-                      <span className="member-role-chip member-role-chip--required">
-                        meeting required
-                      </span>
-                    )}
-                    {member?.data?.active === false && (
-                      <span className="member-role-chip member-role-chip--inactive">
-                        inactive
-                      </span>
-                    )}
-                  </div>
-                </div>
 
-                <div className="member-directory-card-actions">
-                  <IconButton
-                    onClick={() => toggleMemberExpanded(member.id)}
-                    title={expanded ? "Collapse details" : "Expand details"}
-                    aria-expanded={expanded}
-                  >
-                    {expanded ? "▴" : "▾"}
-                  </IconButton>
-                  <IconButton onClick={() => startEdit(member)} title="Edit">
-                    {EDIT_ICON}
-                  </IconButton>
-                  <IconButton
-                    variant="delete"
-                    onClick={() => handleDeleteMember(member)}
-                    title="Delete"
-                  >
-                    {DELETE_ICON}
-                  </IconButton>
-                </div>
-              </div>
 
-              <>
-                <button
-                  type="button"
-                  className="member-directory-card-condensed"
-                  onClick={() => toggleMemberExpanded(member.id)}
-                  aria-expanded={expanded}
-                >
-                  <div className="member-directory-card-condensed-head">
-                    <span className="member-directory-meta-label">
-                      Week{" "}
-                      {latestWeek?.weekKey
-                        ? formatWeekKeyLabel(latestWeek.weekKey)
-                        : "—"}
-                    </span>
-                    <span className="member-directory-condensed-week">
-                      {latestWeek.assigned} assigned · {latestWeek.completed}{" "}
-                      done
-                    </span>
-                  </div>
-                  <div className="member-directory-stats">
-                    <span className="member-stat-chip">
-                      {metric.totalTaskCount} tracked tasks
-                    </span>
-                    <span className="member-stat-chip">
-                      {formatPlannedHoursFromUnits(metric.plannedUnits)} planned
-                    </span>
-                      <span className="member-stat-chip">
-                        {formatUnitsAsHours(metric.finishedUnitsThisWeek)} done this week
-                      </span>
-                      <span className="member-stat-chip">
-                        {formatUnitsAsHours(metric.finishedUnitsTotal)} done overall
-                      </span>
-                    <span className="member-stat-chip">
-                      {metric.currentProjectCount} current projects
-                    </span>
-                    <span className="member-stat-chip">
-                      {metric.historicalProjectCount} total projects taken
-                    </span>
-                  </div>
-                </button>
+      {profileMember && <ModalShell title={`${profileMember.data?.name || profileMember.id} · Profile`} onClose={() => setProfileId(null)} footer={<Button onClick={() => { startEdit(profileMember); setProfileId(null); }}>Edit profile</Button>}>
+        <div className="member-profile-details">
+          <MemberAvatar member={profileMember} onClick={() => { startEdit(profileMember); setProfileId(null); }} />
+          <MetadataPill tone="project">{roleLabel(profileMember.data?.role)}</MetadataPill>
+          <MemberTenure member={profileMember} today={today}/>
+          <MemberMilestones member={profileMember} today={today} />
+          <dl><dt>Pronouns</dt><dd>{formatPronouns(profileMember.data?.pronouns) || "Not set"}</dd><dt>Birthday</dt><dd>{profileMember.data?.birthday ? new Date(profileMember.data.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Not set'}</dd><dt>Joined</dt><dd>{profileMember.data?.joinedOn || 'Date not set'}</dd><dt>Email</dt><dd>{profileMember.data?.email || 'Not set'}</dd><dt>Timezone</dt><dd>{profileMember.data?.timezone || 'Not set'}</dd></dl>
+          {profileMember.data?.notes && <p>{renderTextWithLinks(profileMember.data.notes, `profile-${profileMember.id}`)}</p>}
+        </div>
+      </ModalShell>}
 
-                {expanded && (
-                  <div className="member-directory-card-details">
-                    <div className="member-directory-meta">
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Email
-                        </span>
-                        <span>{member?.data?.email || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Timezone
-                        </span>
-                        <span>{member?.data?.timezone || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Joined
-                        </span>
-                        <span>{member?.data?.joinedOn || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="member-directory-meta-label">
-                          Weekly planned time
-                        </span>
-                        <span>
-                          {formatPlannedHoursFromUnits(metric.plannedUnits)}
-                        </span>
-                      </div>
-                    </div>
+      {editingMember && <ModalShell className="member-editor-modal" title={editingMember ? `Edit ${editingMember.data?.name || 'member'}` : 'New member'} onClose={closeMemberEditor}>
+        <MemberForm draft={editingMember ? editDraft : newMember} onChange={editingMember ? updateEditField : updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating={!editingMember} onCancel={closeMemberEditor} onSubmit={event => { event.preventDefault(); if (editingMember) saveEdit(editingMember); else handleCreateMember(event); }} />
+      </ModalShell>}
 
-                    <div className="member-chart-section">
-                      <div className="member-time-tabs" role="tablist" aria-label="Time analytics view">
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={timeTab === "weekly"}
-                          className={
-                            timeTab === "weekly"
-                              ? "member-time-tab member-time-tab--active"
-                              : "member-time-tab"
-                          }
-                          onClick={() => setMemberTimeTab(member.id, "weekly")}
-                        >
-                          Weekly
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={timeTab === "overall"}
-                          className={
-                            timeTab === "overall"
-                              ? "member-time-tab member-time-tab--active"
-                              : "member-time-tab"
-                          }
-                          onClick={() => setMemberTimeTab(member.id, "overall")}
-                        >
-                          Overall
-                        </button>
-                      </div>
-
-                      {timeTab === "weekly" ? (
-                        <>
-                          <span className="member-directory-meta-label">This week</span>
-                          <div className="member-kind-charts">
-                            <TimeDonutChart
-                              label="Time by project"
-                              segments={metric.thisWeekProjectSegments}
-                              emptyText="No finished project time this week."
-                              ariaLabel={`project-time-week-${member.id}`}
-                            />
-                            <TimeDonutChart
-                              label="Time by project type"
-                              segments={metric.thisWeekProjectKindSegments}
-                              emptyText="No finished project-type time this week."
-                              ariaLabel={`project-kind-time-week-${member.id}`}
-                            />
-                          </div>
-
-                          <div className="member-weekly-board">
-                            {metric.weekly.map((weekly) => (
-                              <div
-                                key={`${member.id}-${weekly.weekKey}`}
-                                className="member-weekly-item"
-                              >
-                                <span className="member-weekly-week">
-                                  {formatWeekKeyLabel(weekly.weekKey)}
-                                </span>
-                                <span className="member-weekly-values">
-                                  {weekly.assigned} assigned · {weekly.completed} done · {formatUnitsAsHours(weekly.finishedUnits)} finished
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="member-directory-meta-label">Overall</span>
-                          <div className="member-kind-charts">
-                            <TimeDonutChart
-                              label="Time by project"
-                              segments={metric.projectSegments}
-                              emptyText="No finished project time yet."
-                              ariaLabel={`project-time-all-${member.id}`}
-                            />
-                            <TimeDonutChart
-                              label="Time by project type"
-                              segments={metric.projectKindSegments}
-                              emptyText="No finished project-type time yet."
-                              ariaLabel={`project-kind-time-all-${member.id}`}
-                            />
-                          </div>
-
-                          <div className="member-overall-board">
-                            <div className="member-weekly-item">
-                              <span className="member-weekly-week">Overall</span>
-                              <span className="member-weekly-values">
-                                {metric.assignedTotalCount} assigned · {metric.completedTotalCount} done · {formatUnitsAsHours(metric.finishedUnitsTotal)} finished
-                              </span>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {metric.currentProjects.length > 0 && (
-                      <div className="member-current-projects">
-                        <span className="member-directory-meta-label">
-                          Current projects
-                        </span>
-                        <div className="member-project-list">
-                          {metric.currentProjects.map((project) => (
-                            <span
-                              key={project.id}
-                              className="member-project-chip"
-                            >
-                              {project.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {member?.data?.notes && (
-                      <p className="member-notes">
-                        {renderTextWithLinks(
-                          member.data.notes,
-                          `member-note-${member.id}`,
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </>
-            </EntityCard>
-          );
-        })}
-      </CollectionLayout>
-
-      {editingMember && (
-        <ModalShell
-          title={editingMember.data?.name || "Edit member"}
-          onClose={cancelEdit}
-          footer={
-            <>
-              <Button
-                type="button"
-                size="small"
-                onClick={() => saveEdit(editingMember)}
-                disabled={!editDraft.name.trim()}
-              >
-                Save
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={cancelEdit}
-              >
-                Cancel
-              </Button>
-            </>
-          }
-        >
-          <div className="member-form-grid">
-            <label className="member-form-field">
-              <span>Name</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.name}
-                onChange={(e) => updateEditField("name", e.target.value)}
-                autoFocus
-              />
-            </label>
-            <label className="member-form-field member-form-field--full">
-              <span>Also known as</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.aliases}
-                onChange={(e) => updateEditField("aliases", e.target.value)}
-                placeholder="Comma separated aliases"
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Type</span>
-              <SelectField
-                className="member-form-input"
-                value={editDraft.role}
-                onChange={(e) => updateEditField("role", e.target.value)}
-              >
-                {MEMBER_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-            <label className="member-form-field">
-              <span>Email</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.email}
-                onChange={(e) => updateEditField("email", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Timezone</span>
-              <InputField
-                className="member-form-input"
-                value={editDraft.timezone}
-                onChange={(e) => updateEditField("timezone", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field">
-              <span>Joined on</span>
-              <InputField
-                type="date"
-                className="member-form-input"
-                value={editDraft.joinedOn}
-                onChange={(e) => updateEditField("joinedOn", e.target.value)}
-              />
-            </label>
-            <label className="member-form-field member-form-field--toggle">
-              <input
-                type="checkbox"
-                checked={Boolean(editDraft.active)}
-                onChange={(e) => updateEditField("active", e.target.checked)}
-              />
-              <span>Active member</span>
-            </label>
-            <label className="member-form-field member-form-field--full">
-              <span>Notes</span>
-              <TextareaField
-                className="member-form-input member-form-textarea"
-                value={editDraft.notes}
-                onChange={(e) => updateEditField("notes", e.target.value)}
-              />
-            </label>
-          </div>
-        </ModalShell>
-      )}
+      {addMemberOpen && <BottomComposer illustration="compose-member" title="New member" onClose={closeMemberEditor}>
+        <MemberForm draft={newMember} onChange={updateNewMemberField} roleOptions={MEMBER_TYPE_OPTIONS} creating onCancel={closeMemberEditor} onSubmit={handleCreateMember} />
+      </BottomComposer>}
 
       {deleteTarget && (
         <DeleteConfirmDialog

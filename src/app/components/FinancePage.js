@@ -1,5 +1,7 @@
 "use client";
 
+
+import { SERIES_COLORS } from "./ui/palette";
 import useUrlState, { updateUrlState } from "../hooks/useUrlState";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCollection } from "../../firestore";
@@ -13,7 +15,6 @@ import SelectField from "./ui/SelectField";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
 import { IconDocument, IconFolder, IconUsers } from "./ui/icons";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 
 const CONFIG_DOC_ID = "company";
 const FINANCE_SPREADSHEET_URL =
@@ -936,32 +937,28 @@ function computeProjectPanels(values, selectedYear = "overall") {
     });
 }
 
-const RING_CHART_COLORS = [
-  "#3b82f6",
-  "#ef4444",
-  "#10b981",
-  "#f59e0b",
-  "#8b5cf6",
-  "#06b6d4",
-  "#ec4899",
-  "#84cc16",
-];
+const RING_CHART_COLORS = SERIES_COLORS;
 
 const RING_LABEL_COLOR_MAP = {
-  公司池: "#374151",
-  Underpaid: "#b91c1c",
-  Overpaid: "#1d4ed8",
-  Matched: "#15803d",
+  公司池: "var(--series-1)",
+  Underpaid: "var(--series-5)",
+  Overpaid: "var(--series-3)",
+  Matched: "var(--series-2)",
 };
 
 function ringColorForLabel(label, index) {
   const fixed = RING_LABEL_COLOR_MAP[String(label || "").trim()];
   if (fixed) return fixed;
-  return RING_CHART_COLORS[index % RING_CHART_COLORS.length];
+  // Reserve purple for the common pool; keep each payee stable across charts.
+  const colors = RING_CHART_COLORS.slice(1);
+  let hash = 0;
+  for (const char of String(label || index)) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  return colors[Math.abs(hash) % colors.length];
 }
 
-function PercentageRows({ rows, max = 8 }) {
-  const top = (rows || []).slice(0, max);
+function PercentageRows({ rows }) {
+  // Keep every category in the denominator and legend, including small shares.
+  const top = rows || [];
   const total = top.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   if (!top.length || total <= 0) {
     return <p className="finance-dashboard-empty">No entries.</p>;
@@ -1024,9 +1021,8 @@ function CommonPoolRingRows({
   itemizedRows,
   itemizedKey,
   totalOverride,
-  max = 8,
 }) {
-  const top = (rows || []).slice(0, max);
+  const top = rows || [];
   const totalAbs = top.reduce(
     (s, r) => s + (Math.abs(Number(r.amount)) || 0),
     0,
@@ -1717,7 +1713,7 @@ function FinanceDashboard({ data }) {
               <h5 className="finance-split-title">By category (分類)</h5>
               <CategoryBars
                 rows={expenseRows}
-                accent="#c2543d"
+                accent="var(--ink)"
                 max={expenseMax}
                 formatter={formatTWD}
               />
@@ -1728,7 +1724,7 @@ function FinanceDashboard({ data }) {
               </h5>
               <CategoryBars
                 rows={expenseDescriptionRows}
-                accent="#c2543d"
+                accent="var(--ink)"
                 max={expenseDescMax}
                 formatter={formatTWD}
                 limit={10}
@@ -1750,7 +1746,7 @@ function FinanceDashboard({ data }) {
               <h5 className="finance-split-title">By category (分類)</h5>
               <CategoryBars
                 rows={incomeRows}
-                accent="#2f7d56"
+                accent="var(--ink)"
                 max={incomeMax}
                 formatter={formatTWD}
               />
@@ -1761,7 +1757,7 @@ function FinanceDashboard({ data }) {
               </h5>
               <CategoryBars
                 rows={incomeDescriptionRows}
-                accent="#2f7d56"
+                accent="var(--ink)"
                 max={incomeDescMax}
                 formatter={formatTWD}
                 limit={10}
@@ -3301,13 +3297,13 @@ export default function FinancePage() {
       className="finance-page"
       title="Finance"
       badge={`${projectedByProjectRows.length} projects`}
-      subtitle="Actual cash flow from accountant + projected project cash flow"
+      subtitle="Understand where our money comes from, who gets paid, and what we share."
     >
       <CollectionLayout variant="stack" className="finance-stack">
         <SectionBlock
           className="finance-section"
-          texture={SURFACE_TEXTURES.projectLedger}
-          title="Finance By Project Or Person"
+
+          title="Money by project or person"
           titleTag="h3"
           actions={
             <div className="finance-actions">

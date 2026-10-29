@@ -1,6 +1,19 @@
 "use client";
 
+
 import useUrlState from "../hooks/useUrlState";
+import FormField from "./ui/FormField";
+import MetadataPill from "./ui/MetadataPill";
+import { projectWorkTone } from "./memberRoleMetrics.mjs";
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import ProjectCollection from "./ProjectCollection";
+import {filterProjectScope} from "./workspaceGroups.mjs";
+import TimeButton from "./ui/TimeButton";
+import CloseButton from "./ui/CloseButton";
+import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
+import BottomComposer from "./ui/BottomComposer";
+import TaskCreateTrigger from "./TaskCreateTrigger";
 import { useEffect, useState, useMemo } from "react";
 import {
   subscribeCollection,
@@ -24,7 +37,6 @@ import InputField from "./ui/InputField";
 import SelectField from "./ui/SelectField";
 import ModalShell from "./ui/ModalShell";
 import PageControls from "./ui/PageControls";
-import { SURFACE_TEXTURES } from "./ui/paperTextures";
 import SectionBlock from "./ui/SectionBlock";
 import StatusStack from "./ui/StatusStack";
 import TabPage from "./ui/TabPage";
@@ -53,21 +65,21 @@ const PROJECT_STATUSES = [
 ];
 
 const STATUS_STYLE = {
-  Scheduled: { bg: "#e8f0fe", color: "#3367d6" },
-  "In Progress": { bg: "#e6f4ea", color: "#1e8e3e" },
-  "Waiting for Response": { bg: "#fef7e0", color: "#b06000" },
-  "On Hold": { bg: "#f0f0f0", color: "#888" },
-  Completed: { bg: "#e8f5e9", color: "#2e7d32" },
-  Cancelled: { bg: "#fce8e6", color: "#c5221f" },
+  Scheduled: { bg: "var(--surface-quiet)", color: "var(--ink)" },
+  "In Progress": { bg: "var(--surface-strong)", color: "var(--ink)" },
+  "Waiting for Response": { bg: "var(--palette-planned)", color: "var(--ink)" },
+  "On Hold": { bg: "var(--surface-strong)", color: "var(--muted)" },
+  Completed: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Cancelled: { bg: "var(--surface-strong)", color: "var(--ink)" },
 };
 
 const KIND_STYLE = {
-  Commissioned: { bg: "#e3f0ff", color: "#1a5fcc" },
-  "Self-funded": { bg: "#f0e8ff", color: "#6b21a8" },
-  Grant: { bg: "#e0f7e9", color: "#1a7a3c" },
-  Internal: { bg: "#f0f0ee", color: "#555" },
-  Admin: { bg: "#fff3e0", color: "#a05000" },
-  "Pass-through": { bg: "#e0f5f7", color: "#0f6e7a" },
+  Commissioned: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  "Self-funded": { bg: "var(--surface-quiet)", color: "var(--ink)" },
+  Grant: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Internal: { bg: "var(--surface-strong)", color: "var(--ink)" },
+  Admin: { bg: "var(--palette-planned)", color: "var(--ink)" },
+  "Pass-through": { bg: "var(--surface-strong)", color: "var(--ink)" },
 };
 
 // Staffing roles available per team member on a project
@@ -1311,36 +1323,12 @@ function ProjectRow({
   }
 
   return (
-    <li className={"project-row" + (open ? " project-row--open" : "")}>
+    <li data-rationale-anchor={`project-detail-${project.id}`} data-rationale-label={d.name || "Project"} className={"project-row" + (open ? " project-row--open" : "")}>
       {/* Summary row */}
-      <div className="project-row-summary" onClick={() => setOpen((s) => !s)}>
+      <div className="project-row-summary" role="button" tabIndex={0} aria-expanded={open} onKeyDown={event => { if(event.target === event.currentTarget && ["Enter"," "].includes(event.key)) { event.preventDefault(); setOpen(value=>!value); } }} onClick={() => setOpen((s) => !s)}>
         <div className="project-row-main">
           <span className="project-row-name">{d.name || "Unnamed"}</span>
-          <div className="project-row-badges">
-            {d.status && (
-              <span
-                className="project-row-status"
-                style={{ background: statusSt.bg, color: statusSt.color }}
-              >
-                {d.status}
-              </span>
-            )}
-            {d.kind && (
-              <span
-                className="project-row-kind"
-                style={
-                  KIND_STYLE[d.kind]
-                    ? {
-                        background: KIND_STYLE[d.kind].bg,
-                        color: KIND_STYLE[d.kind].color,
-                      }
-                    : {}
-                }
-              >
-                {d.kind}
-              </span>
-            )}
-          </div>
+          <div className="project-row-badges">{d.status && <MetadataPill>{d.status}</MetadataPill>}{d.kind && <MetadataPill tone={projectWorkTone(d.kind)}>{d.kind}</MetadataPill>}</div>
         </div>
 
         <div className="project-row-budget-cell">
@@ -1885,140 +1873,6 @@ function ProjectRow({
 
 // ─ ProjectsPage ──────────────────────────────────────────────────────────────────────────────
 
-// ─ Kanban board ────────────────────────────────────────────────────────────────────────────────
-
-function ProjectKanbanCard({ project, allTasks, onComplete }) {
-  const d = project.data;
-  const budgTWD = budgetToTWD(d.budget, d.budgetCurrency);
-  const internalOrAdmin = isInternalOrAdminKind(d.kind);
-  const passThrough = isPassThroughKind(d.kind);
-  const donationPct = Number(d.donationPercent) || 0;
-  const donationTWD = donationAmount(budgTWD, donationPct);
-  const companyTaxTWD =
-    d.companyTax && budgTWD != null ? Math.round(budgTWD * 0.05) : null;
-  const effectiveBudgetTWD =
-    budgTWD != null
-      ? Math.max(0, budgTWD - (donationTWD || 0) - (companyTaxTWD || 0))
-      : null;
-  const leadBonusTWD =
-    !internalOrAdmin && !passThrough && effectiveBudgetTWD != null
-      ? Math.round(effectiveBudgetTWD * 0.05)
-      : null;
-  const teamDistributableTWD =
-    effectiveBudgetTWD != null && leadBonusTWD != null
-      ? Math.max(0, effectiveBudgetTWD - leadBonusTWD)
-      : effectiveBudgetTWD;
-  const hourly = internalOrAdmin
-    ? d.projectedHourlyWage != null
-      ? Number(d.projectedHourlyWage)
-      : null
-    : teamDistributableTWD != null && d.maxHours
-      ? Math.round(teamDistributableTWD / Number(d.maxHours))
-      : null;
-  const teamCount = Array.isArray(d.staffing) ? d.staffing.length : 0;
-  const projectTasks = allTasks.filter(
-    (t) => t.data.projectId === project.id && !t.data.archived,
-  );
-  const doneTasks = projectTasks.filter((t) => t.data.completed);
-
-  return (
-    <div className="kanban-card">
-      <div className="kanban-card-name">{d.name || "Unnamed"}</div>
-      {d.kind && (
-        <span
-          className="kanban-card-kind"
-          style={
-            KIND_STYLE[d.kind]
-              ? {
-                  background: KIND_STYLE[d.kind].bg,
-                  color: KIND_STYLE[d.kind].color,
-                }
-              : {}
-          }
-        >
-          {d.kind}
-        </span>
-      )}
-      <div className="kanban-card-meta">
-        {budgTWD != null && (
-          <span className="kanban-card-budget">{fmtTWD(budgTWD)}</span>
-        )}
-        {hourly != null && <span>NT${hourly}/h</span>}
-        {teamCount > 0 && (
-          <span>
-            {teamCount} member{teamCount !== 1 ? "s" : ""}
-          </span>
-        )}
-        {projectTasks.length > 0 && (
-          <span>
-            {doneTasks.length}/{projectTasks.length} tasks
-          </span>
-        )}
-      </div>
-      {onComplete && !isProjectClosed(project) ? (
-        <Button
-          type="button"
-          size="small"
-          variant="secondary"
-          className="kanban-complete-btn"
-          onClick={() => onComplete(project)}
-        >
-          Complete project
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function ProjectKanbanBoard({ projects, allTasks, onComplete }) {
-  const sorted = [...projects].sort(
-    (a, b) => (Number(b.data.createdAt) || 0) - (Number(a.data.createdAt) || 0),
-  );
-  const grouped = {};
-  PROJECT_STATUSES.forEach((s) => {
-    grouped[s] = [];
-  });
-  grouped[""] = [];
-  sorted.forEach((p) => {
-    const s = p.data.status || "";
-    if (grouped[s] !== undefined) grouped[s].push(p);
-    else grouped[""].push(p);
-  });
-  const cols = [
-    ...PROJECT_STATUSES.filter((s) => grouped[s].length > 0),
-    ...(grouped[""].length > 0 ? [""] : []),
-  ];
-  return (
-    <div className="kanban-board">
-      {cols.map((status) => (
-        <div key={status || "__none__"} className="kanban-col">
-          <div className="kanban-col-head">
-            <span
-              className="kanban-col-title"
-              style={
-                STATUS_STYLE[status]
-                  ? { color: STATUS_STYLE[status].color }
-                  : {}
-              }
-            >
-              {status || "No status"}
-            </span>
-            <span className="kanban-col-count">{grouped[status].length}</span>
-          </div>
-          {grouped[status].map((p) => (
-            <ProjectKanbanCard
-              key={p.id}
-              project={p}
-              allTasks={allTasks}
-              onComplete={onComplete}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ProjectsPage({
   viewerMemberId = null,
   viewerRole = "associate",
@@ -2031,9 +1885,11 @@ export default function ProjectsPage({
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [showClosedProjects,setShowClosedProjects]=useState(false);
   const [toasts, setToasts] = useState([]);
   const [focusedProject, setFocusedProject] = useUrlState("project", "");
-  const [viewMode, setViewMode] = useUrlState("projectView", "list", { allowed: ["list", "kanban"] });
+  const [viewMode, setViewMode] = useUrlState("projectView", "category", { allowed: ["category", "status", "list", "kanban"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [completeTarget, setCompleteTarget] = useState(null);
   const [completingProjectId, setCompletingProjectId] = useState(null);
@@ -2146,6 +2002,7 @@ export default function ProjectsPage({
         return [{ id, data: created }, ...prev];
       });
       setForm(EMPTY_FORM);
+      setCreateOpen(false);
       addToast("Project added");
     } catch (err) {
       addToast(err.message || "Could not add project", true);
@@ -2188,9 +2045,9 @@ export default function ProjectsPage({
     }
     setDeleteTarget({
       label: project.data?.name || "this project",
-      onConfirm: async () => {
+      onConfirm: async (reason) => {
         try {
-          await deleteDocument("projects", project.id);
+          await deleteDocument("projects", project.id, reason);
           setProjects((prev) => prev.filter((item) => item.id !== project.id));
           addToast("Deleted");
         } catch (err) {
@@ -2302,6 +2159,10 @@ export default function ProjectsPage({
     );
   }, [isLimitedViewer, projects, viewerMemberId]);
 
+  const activeProjects=filterProjectScope(visibleProjects);
+  const collectionProjects=showClosedProjects?visibleProjects:activeProjects;
+  const closedProjectCount=visibleProjects.length-activeProjects.length;
+
   const visibleTasks = useMemo(() => {
     if (!isLimitedViewer) return allTasks;
     const visibleProjectIds = new Set(
@@ -2366,41 +2227,31 @@ export default function ProjectsPage({
       ? `NT$${numberFmt.format(totalBudgetTWD)} total · Pool NT$${numberFmt.format(totalCompanyPoolTWD)} · Member budget NT$${numberFmt.format(totalMemberDistributableTWD)}`
       : "Budget, staffing, and delivery capacity overview";
 
+  useEffect(()=>{
+    if(!focusedProject)return;
+    const frame=requestAnimationFrame(()=>document.getElementById("project-selected-detail")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"}));
+    return()=>cancelAnimationFrame(frame);
+  },[focusedProject,visibleProjects.length]);
+
   return (
     <TabPage
       className="projects-page"
       title="Projects"
-      badge={`${visibleProjects.length} project${visibleProjects.length !== 1 ? "s" : ""}`}
-      subtitle={projectSubtitle}
-      right={
-        <PageControls compact>
-          <ViewToggle
-            className="projects-view-toggle"
-            value={viewMode}
-            onChange={setViewMode}
-            options={projectViewOptions}
-            ariaLabel="Project view"
-          />
-        </PageControls>
-      }
+      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'}]} /></WorkspacePageHero>}
     >
       {!isLimitedViewer ? (
-        <SectionBlock
-          className="project-create-section"
-          title="Create project"
-          titleTag="h3"
-          texture={SURFACE_TEXTURES.projectCreate}
-        >
+        <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
+        {createOpen && <BottomComposer illustration="compose-project" title="New project" onClose={() => setCreateOpen(false)}>
           <form className="project-add-form" onSubmit={handleAdd}>
-            <InputField
+            <FormField label="Project name"><InputField
               className="project-field project-field--name"
               type="text"
               placeholder="Project name *"
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
               required
-            />
-            <SelectField
+            /></FormField>
+            <FormField label="Category"><SelectField
               className="project-field project-field--kind"
               value={form.kind}
               onChange={(e) => setField("kind", e.target.value)}
@@ -2411,8 +2262,8 @@ export default function ProjectsPage({
                   {k}
                 </option>
               ))}
-            </SelectField>
-            <SelectField
+            </SelectField></FormField>
+            <FormField label="Status"><SelectField
               className="project-field project-field--status"
               value={form.status}
               onChange={(e) => setField("status", e.target.value)}
@@ -2423,9 +2274,9 @@ export default function ProjectsPage({
                   {s}
                 </option>
               ))}
-            </SelectField>
+            </SelectField></FormField>
             <div className="project-budget-group">
-              <InputField
+              <FormField label="Budget"><InputField
                 className="project-field project-field--budget"
                 type="number"
                 placeholder="Budget"
@@ -2434,8 +2285,8 @@ export default function ProjectsPage({
                 value={form.budget}
                 onChange={(e) => setField("budget", e.target.value)}
                 disabled={form.kind === "Self-funded"}
-              />
-              <SelectField
+              /></FormField>
+              <FormField label="Currency"><SelectField
                 className="project-field project-field--currency"
                 value={form.budgetCurrency}
                 onChange={(e) => setField("budgetCurrency", e.target.value)}
@@ -2443,10 +2294,10 @@ export default function ProjectsPage({
               >
                 <option value="TWD">TWD</option>
                 <option value="USD">USD</option>
-              </SelectField>
+              </SelectField></FormField>
             </div>
             {form.kind !== "Self-funded" ? (
-              <SelectField
+              <FormField label="Company contribution"><SelectField
                 className="project-field project-field--donation"
                 value={form.donationPercent}
                 onChange={(e) => setField("donationPercent", e.target.value)}
@@ -2457,28 +2308,28 @@ export default function ProjectsPage({
                     {pct}% donation
                   </option>
                 ))}
-              </SelectField>
+              </SelectField></FormField>
             ) : (
               <span className="finance-section-note">
                 Budget comes from self funding. Donation is disabled.
               </span>
             )}
-            <InputField
+            <FormField label="Start date"><InputField
               className="project-field"
               type="date"
               value={form.startDate}
               onChange={(e) => setField("startDate", e.target.value)}
               title="Project start date"
-            />
-            <InputField
+            /></FormField>
+            <FormField label="End date"><InputField
               className="project-field"
               type="date"
               value={form.endDate}
               onChange={(e) => setField("endDate", e.target.value)}
               title="Project end date"
-            />
+            /></FormField>
             {isInternalOrAdminKind(form.kind) && (
-              <InputField
+              <FormField label="Projected hourly rate (TWD)"><InputField
                 className="project-field"
                 type="number"
                 placeholder={`Projected hourly (>=${MIN_INTERNAL_ADMIN_HOURLY_TWD})`}
@@ -2489,78 +2340,26 @@ export default function ProjectsPage({
                   setField("projectedHourlyWage", e.target.value)
                 }
                 title="Projected hourly wage for Internal/Admin projects (TWD)"
-              />
+              /></FormField>
             )}
-            <Button type="submit" disabled={saving || !form.name.trim()}>
-              Add project
-            </Button>
+            <div className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></div>
           </form>
-        </SectionBlock>
+        </BottomComposer>}</>
       ) : (
         <SectionBlock
           className="project-create-section"
           title="Project access"
           titleTag="h3"
-          texture={SURFACE_TEXTURES.projectCreate}
         >
           <p>You can view projects where you are assigned in staffing.</p>
         </SectionBlock>
       )}
 
-      {visibleProjects.length === 0 ? (
-        <EmptyState>No projects yet.</EmptyState>
-      ) : viewMode === "kanban" ? (
-        <SectionBlock
-          className="project-kanban-section"
-          title="Kanban board"
-          titleTag="h3"
-          texture={SURFACE_TEXTURES.projectKanban}
-        >
-          <ProjectKanbanBoard
-            projects={visibleProjects}
-            allTasks={visibleTasks}
-            onComplete={isLimitedViewer ? null : requestCompleteProject}
-          />
-        </SectionBlock>
-      ) : (
-        <SectionBlock
-          className="project-list-section"
-          title="Project ledger"
-          titleTag="h3"
-          texture={SURFACE_TEXTURES.projectLedger}
-        >
-          <div className="project-col-headers">
-            <span>Name</span>
-            <span>Budget</span>
-            <span>Hours</span>
-            <span>Hourly Rate (TWD)</span>
-            <span />
-          </div>
-          <CollectionLayout as="ul" variant="list" className="project-list">
-            {[...visibleProjects]
-              .sort(
-                (a, b) =>
-                  (Number(b.data.createdAt) || 0) -
-                  (Number(a.data.createdAt) || 0),
-              )
-              .map((p) => (
-                <ProjectRow
-                  key={p.id}
-                  project={p}
-                  focusedProject={focusedProject}
-                  onFocusProject={setFocusedProject}
-                  allTasks={visibleTasks}
-                  members={members}
-                  onSave={handleSave}
-                  onComplete={
-                    isLimitedViewer ? null : requestCompleteProject
-                  }
-                  onDelete={handleDelete}
-                />
-              ))}
-          </CollectionLayout>
-        </SectionBlock>
-      )}
+      <div className="project-collection-controls"><span>{showClosedProjects?'All projects':'Active projects'} <span className="task-scope-count">{collectionProjects.length}</span></span>{closedProjectCount>0&&<TimeButton quiet aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?'Hide closed projects':`Show closed projects (${closedProjectCount})`}</TimeButton>}</div>
+      {collectionProjects.length === 0 ? <EmptyState>{visibleProjects.length?'No active projects.':'No projects yet.'}</EmptyState> : <>
+        <ProjectCollection projects={collectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})}/>
+        {visibleProjects.some(project=>project.id===focusedProject)&&<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid">{visibleProjects.filter(project=>project.id===focusedProject).map(project=><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/>)}</ul></section>}
+      </>}
 
       <StatusStack className="toast-container" ariaLive="polite">
         {toasts.map((t) => (

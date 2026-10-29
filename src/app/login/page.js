@@ -26,9 +26,9 @@ export default async function LoginPage({ searchParams }) {
     <main className="login-page">
       <section className="login-card" aria-label="Sign in">
         <div className="login-brand" aria-hidden="true">
-          <span className="login-brand-text">CoA</span>
+          <span className="login-brand-text">Protocol</span>
         </div>
-        <h1 className="login-title">CoAssembly</h1>
+        <h1 className="login-title">Protocol</h1>
         <p className="login-subtitle">Members only.</p>
 
         <LoginClient

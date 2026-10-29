@@ -20,6 +20,60 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Authors edit their own explanations; active members may archive shared notes.
+    match /workspaceRationales/{noteId} {
+      function activeMember() {
+        let member = get(/databases/$(database)/documents/members/$(request.resource.data.editorMemberId)).data;
+        return member.authUid == request.auth.uid && (!('active' in member) || member.active != false);
+      }
+      function activeOwner() {
+        let member = get(/databases/$(database)/documents/members/$(request.resource.data.editorMemberId)).data;
+        return member.authUid == request.auth.uid
+          && member.role in ['worker-owner', 'worker_owner', 'worker owner', 'workerowner']
+          && (!('active' in member) || member.active != false);
+      }
+      function validNote() {
+        return request.resource.data.keys().hasOnly(['pageKey','title','body','createdAt','createdBy','createdByName','editorMemberId','editedByName','updatedAt','revision','deleted','deleteReason','deletedAt','position','anchor','archived','kind'])
+          && request.resource.data.pageKey in ['members','memberDirectory','projects','backlog','resources','meetingNotes','finance','payouts','settings','homepage']
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+          && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 3000
+          && request.resource.data.editorMemberId is string
+          && request.resource.data.createdByName is string && request.resource.data.createdByName.size() <= 200
+          && request.resource.data.editedByName is string && request.resource.data.editedByName.size() <= 200
+          && request.resource.data.createdAt is number && request.resource.data.updatedAt is number
+          && request.resource.data.revision is int
+          && request.resource.data.deleted is bool
+          && (!('kind' in request.resource.data) || request.resource.data.kind in ['why','rule','guide','question','decision'])
+          && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
+          && (!('anchor' in request.resource.data) || request.resource.data.anchor == null || (request.resource.data.anchor is string && request.resource.data.anchor.size() <= 180))
+          && (!('position' in request.resource.data) || (request.resource.data.position is map
+            && request.resource.data.position.keys().hasOnly(['x','y'])
+            && request.resource.data.position.x is number && request.resource.data.position.y is number
+            && request.resource.data.position.x >= 0 && request.resource.data.position.x <= 1
+            && request.resource.data.position.y >= 0 && request.resource.data.position.y <= 1));
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && validNote() && activeMember()
+        && (activeOwner() || (request.resource.data.archived == true && noteId.matches('(members-(shared-plan|why-time|share-results|estimates))|((members|memberDirectory|projects|backlog|resources|meetingNotes|finance|payouts|settings|homepage)-(welcome|our-reasons))')))
+        && request.resource.data.createdBy == request.resource.data.editorMemberId
+        && request.resource.data.revision == 1 && request.resource.data.deleted == false;
+      allow update: if signedIn() && validNote() && activeMember()
+        && (resource.data.createdBy == request.resource.data.editorMemberId
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived','updatedAt','editorMemberId','editedByName','revision']))
+        && request.resource.data.pageKey == resource.data.pageKey
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdByName == resource.data.createdByName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.revision == resource.data.revision + 1
+        && resource.data.deleted == false
+        && (request.resource.data.deleted == false || (
+          request.resource.data.createdBy == request.resource.data.editorMemberId
+          && request.resource.data.deleteReason is string
+          && request.resource.data.deleteReason.size() > 0 && request.resource.data.deleteReason.size() <= 2000
+          && request.resource.data.deletedAt is number));
+      allow delete: if false;
+    }
+
     match /members/{document=**} {
       allow read, write: if signedIn();
     }
@@ -37,6 +91,18 @@ service cloud.firestore {
     }
 
     match /meetingNotes/{document=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /backlogItems/{document=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /reimbursements/{document=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /financeConfig/{document=**} {
       allow read, write: if signedIn();
     }
 

@@ -1,5 +1,8 @@
 "use client";
 
+import BottomComposer from "./ui/BottomComposer";
+
+
 import { useEffect, useMemo, useState } from "react";
 import {
   createDocument,
@@ -8,6 +11,9 @@ import {
   updateDocument,
 } from "../../firestore";
 import { isWorkerOwner } from "../../authAccess";
+import ReasonDialog from "./ui/ReasonDialog";
+import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
+import { actionRecord } from "../../lib/actionReason.mjs";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import { DELETE_ICON } from "./icons";
@@ -96,12 +102,12 @@ function formatTime(ts) {
   });
 }
 
-// Generates a short receipt-style ID from a Firestore doc ID
+// Compact reference for a request.
 function shortId(id) {
   return String(id || "").slice(-6).toUpperCase();
 }
 
-// ─── ThermalReceipt ───────────────────────────────────────────────────────────
+// ─── RequestEntry ───────────────────────────────────────────────────────────
 
 function ThermalReceipt({ row, isAdmin, onApprove, onReject, onMarkPaid, onDelete }) {
   const type = row?.data?.type || "reimbursement";
@@ -119,7 +125,7 @@ function ThermalReceipt({ row, isAdmin, onApprove, onReject, onMarkPaid, onDelet
       <div className="thermal-paper">
 
         {/* store name / org header */}
-        <div className="thermal-org">CoAssembly</div>
+        <div className="thermal-org">Protocol</div>
         <div className="thermal-org-sub">Internal Request</div>
 
         <div className="thermal-rule" />
@@ -314,7 +320,7 @@ function MemberRequestCard({
 
         {(isOwn || isAdmin) && (
           addOpen ? (
-            <div className="req-add-form">
+            <BottomComposer title={`New request · ${member.data?.name || member.id}`} onClose={() => setAddOpen(false)}><div className="req-add-form">
               <div className="req-add-row">
                 <SelectField
                   className="meta-select"
@@ -385,7 +391,7 @@ function MemberRequestCard({
                   Cancel
                 </Button>
               </div>
-            </div>
+            </div></BottomComposer>
           ) : (
             <button className="notepad-add-trigger" onClick={() => setAddOpen(true)}>
               <span className="notepad-add-plus">+</span>
@@ -405,7 +411,10 @@ export default function PayoutsPage({
   viewerRole = "associate",
   sharedMembers = [],
 }) {
+  const [decisionTarget, setDecisionTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [rows, setRows] = useState([]);
+  const [loadError, setLoadError] = useState(null);
 
   const isAdmin = useMemo(() => isWorkerOwner({ role: viewerRole }), [viewerRole]);
 
@@ -415,7 +424,7 @@ export default function PayoutsPage({
   );
 
   useEffect(() => {
-    const unsub = subscribeCollection("reimbursements", setRows);
+    const unsub = subscribeCollection("reimbursements", setRows, setLoadError);
     return () => unsub();
   }, []);
 
@@ -446,25 +455,36 @@ export default function PayoutsPage({
     });
   }
 
-  async function handleApprove(row) {
-    await updateDocument("reimbursements", row.id, { status: "approved", updatedAt: Date.now() });
-  }
-
-  async function handleReject(row) {
-    await updateDocument("reimbursements", row.id, { status: "rejected", updatedAt: Date.now() });
+  function handleApprove(row) { setDecisionTarget({ row, action: 'approve' }); }
+  function handleReject(row) { setDecisionTarget({ row, action: 'reject' }); }
+  async function confirmDecision(reason) {
+    const { row, action } = decisionTarget;
+    const decision = actionRecord(action, reason, viewerMemberId);
+    await updateDocument("reimbursements", row.id, { status: action === 'approve' ? 'approved' : 'rejected', decisionReason: decision.reason, decisionHistory: [...(Array.isArray(row.data.decisionHistory) ? row.data.decisionHistory : []), decision], updatedAt: Date.now() });
+    setDecisionTarget(null);
   }
 
   async function handleMarkPaid(row) {
     await updateDocument("reimbursements", row.id, { status: "paid", updatedAt: Date.now() });
   }
 
-  async function handleDelete(row) {
-    await deleteDocument("reimbursements", row.id);
-  }
+  function handleDelete(row) { setDeleteTarget(row); }
 
   const visibleMembers = isAdmin
     ? activeMembers
     : activeMembers.filter((m) => m.id === viewerMemberId);
+
+  if (loadError) {
+    return (
+      <TabPage title="Requests">
+        <p className="error-message" role="alert">
+          {loadError.code === "permission-denied"
+            ? "Requests could not be loaded. The current Firebase rules do not allow access to reimbursements."
+            : "Requests could not be loaded. Reload to try again."}
+        </p>
+      </TabPage>
+    );
+  }
 
   return (
     <TabPage
@@ -492,6 +512,8 @@ export default function PayoutsPage({
           ))}
         </CollectionLayout>
       )}
+      {decisionTarget && <ReasonDialog illustration={decisionTarget.action} title={decisionTarget.action === 'approve' ? 'Approve request' : 'Reject request'} message={decisionTarget.row.data?.title} confirmLabel={decisionTarget.action === 'approve' ? 'Approve' : 'Reject'} onConfirm={confirmDecision} onCancel={() => setDecisionTarget(null)} />}
+      {deleteTarget && <DeleteConfirmDialog label={deleteTarget.data?.title || 'this request'} onConfirm={async reason => { await deleteDocument('reimbursements', deleteTarget.id, reason); setDeleteTarget(null); }} onCancel={() => setDeleteTarget(null)} />}
     </TabPage>
   );
 }

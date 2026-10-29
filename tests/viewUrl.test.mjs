@@ -15,7 +15,7 @@ test("defaults are omitted, dates stay pinned, and legacy links normalize", () =
 });
 test("switching tabs discards irrelevant filters", () => {
   assert.equal(compact("/tasks?week=2026-10-12&view=project", { tab: "meetingNotes" }), "/notes");
-  assert.equal(compact("/?tab=projects&week=2026-10-12&notesSearch=hello&projectView=kanban"), "/projects?view=kanban");
+  assert.equal(compact("/?tab=projects&week=2026-10-12&notesSearch=hello&projectView=kanban"), "/projects?view=status");
   assert.equal(compact("/finance?year=2026&view=person", { tab: "members" }), "/tasks");
 });
 test("document paths keep complete stable IDs and drop note list controls", () => {
@@ -44,9 +44,55 @@ test("invalid values and paths are rejected", () => {
   assert.equal(isDateKey("2025-02-29"), false);
 });
 test("normalization is idempotent and preserves unrelated params and hashes", () => {
-  for (const path of ["/?tab=members&week=2026-10-12&taskView=project", "/notes/id", "/projects?view=kanban", "/finance?year=2026&view=person"]) {
+  for (const path of ["/?tab=members&week=2026-10-12&taskView=project", "/notes/id", "/projects?view=status", "/finance?year=2026&view=person"]) {
     const once = compact(path);
     assert.equal(compact(once), once);
   }
   assert.equal(compact("/tasks?role=associate&week=2026-10-12#task"), "/tasks?role=associate&week=2026-10-12#task");
+});
+
+test("placeholder pages and nested finance requests have stable destinations", () => {
+  assert.equal(isViewPath(["homepage"]), true);
+  assert.equal(isViewPath(["settings"]), true);
+  assert.equal(isViewPath(["finance", "requests"]), true);
+  assert.deepEqual(readViewUrl(url("/finance/requests")), { tab: "payouts" });
+  assert.equal(compact("/requests"), "/finance/requests");
+  assert.equal(compact("/tasks", { tab: "homepage" }), "/homepage");
+  assert.equal(compact("/tasks", { tab: "settings" }), "/settings");
+});
+
+test("Resource offers category or date, normalizing the removed free-arrange view", () => {
+  assert.deepEqual(readViewUrl(url("/resources?view=date")), { tab: "resources", resourcesView: "date" });
+  assert.equal(compact("/resources?view=free"), "/resources");
+});
+
+
+test("Members supports shareable role, weekly and overall views", () => {
+  assert.deepEqual(readViewUrl(url("/members?view=weekly")), { tab: "memberDirectory", memberView: "weekly" });
+  assert.equal(compact("/members", { memberView: "overall" }), "/members?view=overall");
+  assert.equal(compact("/members?view=role"), "/members");
+  assert.equal(compact("/members?view=rotation"), "/members");
+  assert.equal(compact("/members?view=weekly", { tab: "resources" }), "/resources");
+});
+
+test('new project and wish grouping survives shared links and reloads',()=>{
+ assert.equal(compact('/projects?view=status'),'/projects?view=status');
+ assert.equal(compact('/projects?view=category'),'/projects');
+ assert.equal(compact('/wishes?group=date'),'/wishes?group=date');
+ assert.equal(compact('/wishes?group=project'),'/wishes');
+});
+
+test('member week ranges survive view changes and remain separate from Task weeks', () => {
+ const url = buildViewUrl(new URL('https://example.test/members?view=weekly'), {memberWeek:'2026-10-12',memberEndWeek:'2026-10-26'});
+ assert.equal(url.searchParams.get('week'),'2026-10-12');
+ assert.equal(readViewUrl(url).memberEndWeek,'2026-10-26');
+ const overall = buildViewUrl(url,{memberView:'overall'});
+ assert.equal(readViewUrl(overall).memberWeek,'2026-10-12');
+ const tasks = buildViewUrl(overall,{tab:'members'});
+ assert.equal(readViewUrl(tasks).week,undefined);
+ assert.equal(tasks.searchParams.has('endWeek'),false);
+});
+
+test('Notes retains calendar as an explicit layout alongside editorial grid',()=>{
+ assert.equal(readViewUrl(url('/notes?layout=calendar')).notesLayout,'calendar');
 });

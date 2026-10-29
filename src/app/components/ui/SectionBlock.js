@@ -1,7 +1,6 @@
 "use client";
 
 import CountBadge from "./CountBadge";
-import { resolvePaperTexture } from "./paperTextures";
 
 export default function SectionBlock({
   title,
@@ -13,15 +12,11 @@ export default function SectionBlock({
   headerClassName = "",
   titleTag = "h3",
   header = true,
-  texture,
 }) {
   const TitleTag = titleTag;
-  const resolvedTexture = texture ? resolvePaperTexture(texture) : null;
   const classes = [
     "section-block",
     "card-section",
-    resolvedTexture ? "paper-surface" : "",
-    resolvedTexture ? `paper-surface--${resolvedTexture}` : "",
     className,
   ]
     .filter(Boolean)

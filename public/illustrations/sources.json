@@ -1,0 +1,21 @@
+{
+  "file": "https://www.figma.com/design/UMIQhpdilJKxfw4yEfjRDK/SAI?node-id=72-2",
+  "exports": {
+    "projects-team.svg": "81:3694",
+    "resource-balancer.svg": "81:3412",
+    "wishes-person.svg": "81:3432",
+    "wishes-stone-high.svg": "81:3406",
+    "wishes-stone-low.svg": "81:3404",
+    "wishes-motion-high.svg": "81:3410",
+    "wishes-motion-low.svg": "81:3408",
+    "compose-task.svg": "81:3505",
+    "compose-project.svg": "81:3804",
+    "compose-member.svg": "81:3785",
+    "compose-note.svg": "81:3787",
+    "compose-wish.svg": "81:3670",
+    "compose-resource.svg": "81:3417",
+    "sticky-paper.svg": "81:3459",
+    "note-archive.svg": "81:3499"
+  },
+  "note": "Original SVG exports, with contentsOnly enabled. Wishes is composed at its original relative positions in WorkspaceIllustration."
+}
