@@ -1,6 +1,9 @@
 "use client";
 
 
+import WorkspacePageHero from "./ui/WorkspacePageHero";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import TaskCreateTrigger from "./TaskCreateTrigger";
 import ShareViewButton from "./ShareViewButton";
 import useUrlState, { isDocumentId } from "../hooks/useUrlState";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +34,8 @@ import RichEditor from "./RichEditor";
 import {
   KANBAN_VIEW_ICON,
   LIST_VIEW_ICON,
-  DATE_VIEW_ICON,
   DELETE_ICON,
   EDIT_ICON,
-  PROJECT_VIEW_ICON,
 } from "./icons";
 import CollectionLayout from "./ui/CollectionLayout";
 import EmptyState from "./ui/EmptyState";
@@ -59,7 +60,7 @@ const ROLE_FIELDS = [
 ];
 
 function buildStarterNoteContent(title, scopeType, projectName) {
-  const heading = String(title || "Meeting notes").trim() || "Meeting notes";
+  const heading = String(title || "Notes").trim() || "Notes";
   const scopeLine =
     scopeType === NOTE_SCOPE_PROJECT && projectName
       ? `Project: ${projectName}`
@@ -253,6 +254,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const editEmojiPopoverRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useUrlState("notesSearch", "", { replace: true });
+  const [createOpen, setCreateOpen] = useState(false);
   const [groupMode, setGroupMode] = useUrlState("notesGroup", "date", { allowed: ["date", "project"] });
   const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "grid", { allowed: ["grid", "shelf"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -558,7 +560,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     if (grouped.__no_project__?.length) {
       sections.push({
         key: "__no_project__",
-        title: "Project-based (No Project Selected)",
+        title: "Unassigned project",
         notesList: grouped.__no_project__,
       });
       delete grouped.__no_project__;
@@ -576,7 +578,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     if (dateScopedNotes.length > 0) {
       sections.unshift({
         key: "__date_based__",
-        title: "Date-based",
+        title: "General notes",
         notesList: dateScopedNotes,
       });
     }
@@ -860,6 +862,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         createdByUsername: authorUsername || null,
         updatedByUsername: authorUsername || null,
       });
+      setCreateOpen(false);
       setNewTitle("");
       setNewEmoji("");
       setCreateEmojiPickerOpen(false);
@@ -1287,6 +1290,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         key={title}
         className="notes-section"
         title={title}
+        badge={notesList.length}
         titleTag="h3"
         bodyClassName="notes-section-body"
       >
@@ -1491,19 +1495,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     Boolean(normalizeExternalUrl(editMeta.linkUrl)) &&
     !Boolean(String(editContent || "").trim());
 
-  const groupingOptions = [
-    {
-      value: "date",
-      title: "Group by date",
-      icon: DATE_VIEW_ICON,
-    },
-    {
-      value: "project",
-      title: "Group by project",
-      icon: PROJECT_VIEW_ICON,
-    },
-  ];
-
   const layoutOptions = [
     { value: "grid", title: "Grid view", icon: KANBAN_VIEW_ICON },
     { value: "shelf", title: "List view", icon: LIST_VIEW_ICON },
@@ -1512,35 +1503,19 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   return (
     <TabPage
       className="notes-page"
-      title="Notes / doc"
-      badge={`${notes.length} note${notes.length !== 1 ? "s" : ""}`}
-      right={
-        <PageControls compact>
-          <SearchField
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            onClear={() => setSearchQuery("")}
-          />
-          <ViewToggle
-            className="projects-view-toggle"
-            value={groupMode}
-            onChange={setGroupMode}
-            options={groupingOptions}
-            ariaLabel="Note grouping"
-          />
-          <ViewToggle
-            value={notesLayout}
-            onChange={setNotesLayout}
-            options={layoutOptions}
-            ariaLabel="Notes layout"
-          />
-        </PageControls>
-      }
+      title="Notes"
+      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><WorkspaceViewPicker value={groupMode} onChange={setGroupMode} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /></WorkspacePageHero>}
     >
+      <div className="notes-toolbar">
+        <TaskCreateTrigger label="New note…" onClick={() => setCreateOpen(open => !open)} />
+        <PageControls compact><SearchField ariaLabel="Search notes" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /><ViewToggle value={notesLayout} onChange={setNotesLayout} options={layoutOptions} ariaLabel="Notes layout" /></PageControls>
+      </div>
+      {createOpen && (
       <SectionBlock
         className="note-create-section"
-        title="Create note"
+        title="New note"
         titleTag="h3"
+        actions={<Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>}
 
         bodyClassName="note-create-area"
       >
@@ -1575,6 +1550,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           <InputField
             type="text"
             placeholder="New note title…"
+            aria-label="Note title"
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
             className="new-note-input"
@@ -1582,12 +1558,14 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           <InputField
             type="url"
             placeholder="Link URL (optional)"
+            aria-label="Note link URL"
             value={newLinkUrl}
             onChange={(event) => setNewLinkUrl(event.target.value)}
             className="note-meta-input"
           />
           <SelectField
             className="note-meta-input"
+            aria-label="Note type"
             value={newScopeType}
             onChange={(event) => {
               const nextScope = normalizeScopeType(event.target.value);
@@ -1612,6 +1590,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           {newScopeType === NOTE_SCOPE_PROJECT && (
             <SelectField
               className="note-meta-input"
+              aria-label="Note project"
               value={newProjectId}
               onChange={(event) => {
                 const projectId = event.target.value;
@@ -1666,12 +1645,14 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         )}
       </SectionBlock>
 
+      )}
+
       <CollectionLayout variant="list" className="notes-sections">
         {groupMode === "date" ? (
           <>
             {renderNoteSection("Today", groupedNotesByDate.today)}
             {renderNoteSection("Yesterday", groupedNotesByDate.yesterday)}
-            {renderNoteSection("This Week", groupedNotesByDate.thisWeek)}
+            {renderNoteSection("Past 7 days", groupedNotesByDate.thisWeek)}
             {renderNoteSection("Older", groupedNotesByDate.older)}
           </>
         ) : (

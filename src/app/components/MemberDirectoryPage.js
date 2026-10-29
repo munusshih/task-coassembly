@@ -6,6 +6,7 @@ import MemberEditButton from "./ui/MemberEditButton";
 import SpoonMeter from "./ui/SpoonMeter";
 import MemberForm from "./MemberForm";
 import TaskCreateTrigger from "./TaskCreateTrigger";
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import TaskClockIcon from "./ui/TaskClockIcon";
 import MemberMilestones from "./ui/MemberMilestones";
@@ -1253,7 +1254,7 @@ export default function MemberDirectoryPage() {
     <TabPage
       className={`member-directory-page member-directory-page--${directoryView}`}
       title="Members"
-      header={<WorkspacePageHero title="Members" illustration="member-team"><label className="task-view-picker"><span>by</span><select className="task-view-selector" aria-label="Member view" value={directoryView} onChange={(event) => setDirectoryView(event.target.value)}><option value="role">Role</option><option value="weekly">Weekly</option><option value="overall">Overall</option></select></label></WorkspacePageHero>}
+      header={<WorkspacePageHero title="Members" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }, { value: "overall", label: "Overall" }]} /></WorkspacePageHero>}
     >
       {notice && (
         <p

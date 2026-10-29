@@ -328,7 +328,7 @@ const PAGE_GUIDES = {
     ],
   },
   meetingNotes: {
-    title: copy("Notes / doc", "筆記／文件"),
+    title: copy("Notes", "筆記"),
     intro: copy(
       "Hi—welcome to the team library! A note can be a collaborative document, a meeting record, or a quick external link, with project scope, roles, attendance, and live editing when needed.",
       "嗨，歡迎來到團隊資料庫！一則筆記可以是協作文件、會議紀錄或外部連結，也能依需要加入專案範圍、會議分工、出席狀況與即時編輯。",
@@ -339,7 +339,7 @@ const PAGE_GUIDES = {
     ),
     steps: [
       {
-        element: ".notes-page .page-header",
+        element: ".notes-page .workspace-page-hero",
         title: copy("Search, group, and change the shelf", "搜尋、分組與切換排列"),
         description: copy(
           "Search covers titles and content. Group notes by date or project, then switch between cover-grid and bookshelf layouts.",
@@ -348,7 +348,8 @@ const PAGE_GUIDES = {
         side: "bottom",
       },
       {
-        element: ".notes-page .note-create-section",
+        element: ".notes-page .notes-toolbar",
+        reveal: { trigger: ".notes-page .notes-toolbar .notepad-add-trigger", openSelector: ".notes-page .note-create-section" },
         title: copy("Create a note or a link shortcut", "建立筆記或連結捷徑"),
         description: copy(
           "Give the item an emoji and title. Add a URL to create a shortcut, or leave it blank to create an editable note with a scope and optional project.",
