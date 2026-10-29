@@ -4,7 +4,7 @@ export const WORK_CATEGORIES = [
   { key: 'rd', label: 'R&D', tone: 'project' },
   { key: 'work', label: 'Work', tone: 'worked' },
   { key: 'admin', label: 'Admin', tone: 'date' },
-  { key: 'unclassified', label: 'Unclassified', tone: 'neutral' },
+  { key: 'unclassified', label: '?', tone: 'neutral' },
 ];
 
 export function workCategory(kind) {
