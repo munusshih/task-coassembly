@@ -39,7 +39,8 @@ import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
 import PayoutsPage from "./components/PayoutsPage";
 import ResourcesPage from "./components/ResourcesPage";
-import BacklogPage from "./components/BacklogPage";
+import BacklogPage from "./components/ProposalsPage";
+import SettingsPage from "./components/SettingsPage";
 import TbdPage from "./components/TbdPage";
 
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
@@ -661,6 +662,7 @@ export default function Home() {
     if (activeTab === "resources") return <ResourcesPage currentMember={currentMember} members={sharedMembers || []} />;
     if (DATA_TABS.includes(activeTab))
       return <DataViewPage tabKey={activeTab} />;
+    if (activeTab === "settings") return <SettingsPage viewerName={currentMember.name||""}/>;
     if (TBD_TABS.includes(activeTab)) return <TbdPage tabKey={activeTab} />;
     return null;
   }

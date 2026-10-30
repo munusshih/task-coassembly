@@ -27,6 +27,14 @@
   --cover-4: #c3bbdf;
   --cover-5: #e5b8ce;
   --cover-6: #b9ced9;
+  --radius-panel: 16px;
+  --radius-button: 999px;
+  --radius-field: 999px;
+  --folder-progress: color-mix(in srgb, var(--ink) 16%, transparent);
+  --underline-width: 3px;
+  --timer-automatic: color-mix(in srgb,var(--cover-2) 58%,var(--paper));
+  --timer-unlogged: color-mix(in srgb,var(--cover-3) 76%,var(--paper));
+  --timer-focus: color-mix(in srgb,var(--cover-4) 70%,var(--paper));
   --workspace-project: var(--palette-project);
   --workspace-worked: var(--palette-worked);
   --workspace-planned: var(--palette-planned);

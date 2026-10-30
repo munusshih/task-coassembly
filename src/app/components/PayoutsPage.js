@@ -29,7 +29,7 @@ const CURRENCY_OPTIONS = ["TWD", "USD", "JPY", "EUR"];
 // reimbursement + payout → company owes member
 // repayment → member owes company
 const ENTRY_TYPES = [
-  { value: "reimbursement", label: "Reimbursement", dir: "owed_to_me",  hint: "I paid out of pocket — company owes me", receiptRequired: true },
+  { value: "reimbursement", label: "Reimbursement", dir: "owed_to_me",  hint: "I paid out of pocket · company owes me", receiptRequired: true },
   { value: "repayment",     label: "Repayment",     dir: "owe_company", hint: "I owe the company (returning advance, etc.)", receiptRequired: false },
 ];
 
@@ -84,7 +84,7 @@ function formatReceiptLabel(rawUrl) {
 
 function formatDate(ts) {
   const value = Number(ts);
-  if (!value) return "—";
+  if (!value) return "·";
   return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "2-digit",

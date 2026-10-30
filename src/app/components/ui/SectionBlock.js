@@ -1,6 +1,6 @@
 "use client";
 
-import CountBadge from "./CountBadge";
+import HeadingCount from "./HeadingCount";
 
 export default function SectionBlock({
   title,
@@ -34,10 +34,7 @@ export default function SectionBlock({
     <section className={classes}>
       {showHeader ? (
         <div className={headerClasses}>
-          <div className="section-block-title-row">
-            {title ? <TitleTag className="section-block-title card-section-title">{title}</TitleTag> : null}
-            {badge ? <CountBadge>{badge}</CountBadge> : null}
-          </div>
+          <HeadingCount as={titleTag} title={title} count={badge} className="section-block-title-row" titleClassName="section-block-title card-section-title"/>
           {actions ? <div className="section-block-actions">{actions}</div> : null}
         </div>
       ) : null}

@@ -16,6 +16,6 @@ export default function ResourcePreviewImage({ link }) {
     requests.get(identity).then((result) => { if (live) setPreview(result); });
     return () => { live = false; };
   }, [link.id, url, revision]);
-  if (!preview?.src) return null;
+  if (!preview?.src || preview.favicon) return null;
   return <img className={`resource-preview-image${preview.favicon ? " resource-preview-image--favicon" : ""}`} src={preview.src} alt="" onError={() => setPreview(null)} />;
 }

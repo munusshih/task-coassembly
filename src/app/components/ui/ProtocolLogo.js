@@ -1,0 +1,1 @@
+export default function ProtocolLogo({markOnly=false}){return <span className={`protocol-brand${markOnly?' protocol-brand--mark':''}`} aria-label={markOnly?undefined:'Protocol'}><img src="/icon.svg" alt=""/>{!markOnly&&<span>Protocol</span>}</span>;}

@@ -11,12 +11,9 @@ test('editing an explanation detects both simultaneous updates and concurrent fi
  assert.throws(()=>assertRationaleRevision({revision:1},0),/Someone edited/);
  assert.throws(()=>assertRationaleRevision({revision:3},2),/Someone edited/);
 });
-test('initial explanations are distinct per page and do not pretend to have an author',()=>{
- const tasks=rationaleDefaults('members',['Tasks','Shared plan']);
- const projects=rationaleDefaults('projects',['Projects','Shared projects']);
- assert.equal(new Set([...tasks,...projects].map(note=>note.id)).size,tasks.length+projects.length);
- assert.ok(tasks.every(note=>note.seed&&note.data.revision===0&&!note.data.createdBy));
- assert.ok(tasks.some(note=>/track time/.test(note.data.title)));
+test('interface discussions are not populated with automatic instructional notes',()=>{
+ assert.deepEqual(rationaleDefaults('members',['Tasks','Shared plan']),[]);
+ assert.deepEqual(rationaleDefaults('projects',['Projects','Shared projects']),[]);
 });
 
 test('editing, moving, and deleting require the recorded author',async()=>{

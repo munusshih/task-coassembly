@@ -73,3 +73,10 @@ test('focus allocation groups real focused time by task, including the current s
  assert.equal(slices[0].span,.5);
  assert.equal(slices[1].position,.5);
 });
+
+test('last 24 hours includes yesterday and clips precisely at the rolling boundary',()=>{
+ const at=new Date(2026,9,29,20,0).getTime();
+ const j={...emptyJournal(),fragments:[fragment('older',at-25*HISTORY_MS,at-24*HISTORY_MS-1),fragment('yesterday',at-25*HISTORY_MS,at-23*HISTORY_MS)]};
+ assert.deepEqual(historyWindow(at,'day'),{start:at-24*HISTORY_MS,cycle:24*HISTORY_MS});
+ const entries=historySegments(j,at,'day');assert.equal(entries.length,1);assert.equal(entries[0].seconds,3600);assert.equal(entries[0].span,1/24);
+});

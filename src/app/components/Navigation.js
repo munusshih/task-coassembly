@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ConstructionIcon from "./ui/ConstructionIcon";
+import ProtocolLogo from "./ui/ProtocolLogo";
+import {applyPreferences} from "./SettingsPage";
 import TaskWeekInfo from "./TaskWeekInfo";
 import { createPortal } from "react-dom";
 import WorkspaceIllustration from "./ui/WorkspaceIllustration";
@@ -30,7 +33,7 @@ export default function Navigation({
   allowedTabs = [],
 }) {
   const [portalReady,setPortalReady] = useState(false);
-  useEffect(()=>setPortalReady(true),[]);
+  useEffect(()=>{setPortalReady(true);try{applyPreferences(JSON.parse(localStorage.getItem("protocol-preferences")||"{}"));}catch{}},[]);
   const navigationRef = useRef(null);
   const overlayRef = useRef(null);
   const [hoveredTab,setHoveredTab] = useState(null);
@@ -83,25 +86,26 @@ export default function Navigation({
   return (
     <header className="task-navigation">
       {activeTab !== "members" && <div className="task-week-toolbar"><TaskWeekInfo pageKey={activeTab} /></div>}
-      <button type="button" className="task-menu-trigger" aria-label="Open workspace navigation" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><span /><span /><span /></button>
+      <button type="button" className="task-menu-trigger" aria-label="Open workspace navigation" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><ProtocolLogo markOnly/></button>
       {portalReady && createPortal(<dialog ref={overlayRef} className={`task-navigation-overlay${menuClosing ? " task-navigation-overlay--closing" : ""}`} aria-label="Workspace navigation" onCancel={(event) => { event.preventDefault(); closeNavigation(); }} onClose={() => setMenuOpen(false)} onClick={(event) => {
         if (event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX > bounds.right || event.clientX < bounds.left) closeNavigation();
       }}>
         {hoveredTab && <WorkspaceIllustration className="navigation-background-art" name={({members:"task-maker",memberDirectory:"member-team",projects:"projects-team",backlog:"wishes-catcher",meetingNotes:"book-carrier",resources:"resource-balancer"})[hoveredTab]} />}
+        <ProtocolLogo/>
         <CloseButton className="task-menu-close" label="Close workspace navigation" onClick={closeNavigation} autoFocus />
         <nav onMouseLeave={() => setHoveredTab(null)} onBlur={event => {if(!event.currentTarget.contains(event.relatedTarget))setHoveredTab(null);}} ref={navigationRef} className="task-overlay-links" aria-label="Workspace pages">
-          {TABS.filter((tab) => tab.key !== "payouts" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
+          {TABS.filter((tab) => tab.key !== "payouts" && tab.key !== "finance" && (isAdmin || tab.key !== "memberDirectory") && (!allowed || allowed.has(tab.key))).map((tab) => (
             <div className="task-navigation-group" key={tab.key}>
               {tab.key === "finance" ? <span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-locked" aria-disabled="true">Finance <LockIcon /></span> : <a onMouseEnter={() => setHoveredTab(tab.key)} onFocus={() => setHoveredTab(tab.key)} href={viewHref(tab.key)} aria-current={tab.key === activeTab ? "page" : undefined} onClick={(event) => navigate(event, tab.key)}><span>{tab.label}</span>{tab.key === "finance" && <LockIcon />}</a>}
               {tab.key === "finance" && (!allowed || allowed.has("payouts")) && <span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span>}
             </div>
           ))}
-          {allowed && !allowed.has("finance") && allowed.has("payouts") && <div className="task-navigation-group"><span className="task-navigation-parent">Finance</span><span onMouseEnter={() => setHoveredTab(null)} className="task-navigation-subpage task-navigation-locked" aria-disabled="true">Requests <LockIcon /></span></div>}
+
 
         </nav>
-        <footer className="task-overlay-footer">
+        <footer className="task-overlay-footer"><div className="navigation-construction"><span><ConstructionIcon/> In progress</span><div><span aria-disabled="true">Finance</span><span aria-disabled="true">Requests</span></div></div>
           <a href={viewHref("settings")} aria-current={activeTab === "settings" ? "page" : undefined} onClick={(event) => navigate(event, "settings")}>Settings</a>
           <button type="button" className="task-logout" onClick={handleSignOut}>Log out</button>
         </footer>

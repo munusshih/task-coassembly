@@ -11,7 +11,7 @@ export function workCategory(kind) {
   const value = String(kind || '').trim().toLowerCase();
   if (['internal', 'self-funded', 'grant', 'rd', 'r&d'].includes(value)) return 'rd';
   if (['commissioned', 'pass-through', 'commercial'].includes(value)) return 'work';
-  if (value === 'admin') return 'admin';
+  if (['admin','service','common pool'].includes(value)) return 'admin';
   return 'unclassified';
 }
 
@@ -59,6 +59,7 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), m
   return {
     assigned, completed, mode,
     projectTotals:[...totals.values()].filter(project => project.units > 0).sort((a,b) => b.units-a.units),
+    historicalProjects: projects.filter(project=>tasks.some(task=>task.data?.memberId===memberId&&task.data?.projectId===project.id)&&!current.has(project.id)),
     currentProjects: [...current.values()].sort((a, b) => String(a.data?.name || a.id).localeCompare(String(b.data?.name || b.id))),
     weeks: weeks.map(w => ({ ...w, projects: [...w.projects.values()].filter(project => project.units > 0).sort((a, b) => b.units - a.units) })),
     categories: WORK_CATEGORIES.filter(c => c.key !== 'unclassified' || categories[c.key] > 0).map(c => ({ ...c, units: categories[c.key], percent: total ? categories[c.key] / total * 100 : 0 })),

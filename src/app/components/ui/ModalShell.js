@@ -1,5 +1,7 @@
 "use client";
 
+import {createPortal} from "react-dom";
+import {useEffect,useState,useRef} from "react";
 import CloseButton from "./CloseButton";
 
 export default function ModalShell({
@@ -9,6 +11,7 @@ export default function ModalShell({
   children,
   footer,
   size = "md",
+  fullscreen = false,
   className = "",
   bodyClassName = "",
   closeTitle = "Close",
@@ -17,8 +20,30 @@ export default function ModalShell({
   unsavedWarning = "You have unsaved changes. Close anyway?",
   onDiscardChanges,
 }) {
+  const modalRef=useRef(null);
+  const closeRef=useRef(null);
+  const [mounted,setMounted]=useState(false);
+  useEffect(()=>setMounted(true),[]);
+  useEffect(()=>{
+    if(!fullscreen||!mounted)return;
+    const previous=document.activeElement, overflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    modalRef.current?.focus();
+    const key=event=>{
+      if(event.key==='Escape'){event.preventDefault();closeRef.current?.();}
+      if(event.key==='Tab'){
+        const nodes=[...modalRef.current.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[contenteditable=true],[tabindex="0"]')].filter(node=>node.getClientRects().length);
+        const first=nodes[0],last=nodes[nodes.length-1];
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+      }
+    };
+    document.addEventListener('keydown',key);
+    return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus();};
+  },[fullscreen,mounted]);
   const modalClasses = [
     "edit-modal",
+    fullscreen ? "edit-modal--fullscreen" : "",
     size === "sm" ? "edit-modal--sm" : "",
     size === "lg" ? "edit-modal--lg" : "",
     className,
@@ -40,14 +65,21 @@ export default function ModalShell({
     onClose();
   }
 
+  closeRef.current=requestClose;
+
   function handleOverlayClick() {
     if (!closeOnOverlayClick) return;
     requestClose();
   }
 
-  return (
-    <div className="edit-modal-overlay" onClick={handleOverlayClick}>
+  const content = (
+    <div className={`edit-modal-overlay${fullscreen?' edit-modal-overlay--fullscreen':''}`} onClick={handleOverlayClick}>
       <div
+        ref={modalRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || "Dialog"}
         className={modalClasses}
         onClick={(event) => event.stopPropagation()}
       >
@@ -65,4 +97,5 @@ export default function ModalShell({
       </div>
     </div>
   );
+  return fullscreen ? (mounted ? createPortal(content,document.body) : null) : content;
 }

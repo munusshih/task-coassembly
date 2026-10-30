@@ -1,0 +1,18 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {subscribeCollection,updateDocument} from '../../firestore';
+import {pronounsForInput} from '../lib/pronouns.mjs';
+import TabPage from './ui/TabPage';
+import WorkspacePageHero from './ui/WorkspacePageHero';
+import SectionBlock from './ui/SectionBlock';
+import FormField from './ui/FormField';
+import InputField from './ui/InputField';
+import Button from './Button';
+export function applyPreferences(value){document.documentElement.dataset.motion=value.reduceMotion?'reduced':'system';document.documentElement.dataset.density=value.compact?'compact':'comfortable';}
+export default function SettingsPage({viewerName=''}) {
+ const [member,setMember]=useState(null),[draft,setDraft]=useState(null),[preferences,setPreferences]=useState({reduceMotion:false,compact:false,focusMinutes:25}),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>{try{const value={reduceMotion:false,compact:false,focusMinutes:25,...JSON.parse(localStorage.getItem('protocol-preferences')||'{}')};setPreferences(value);applyPreferences(value);}catch{}return subscribeCollection('members',items=>{const person=items.find(item=>String(item.data.name||'').toLowerCase()===viewerName.toLowerCase());setMember(person);setDraft(previous=>previous||{email:person?.data.email||'',pronouns:pronounsForInput(person?.data.pronouns),photoURL:person?.data.photoURL||''});});},[viewerName]);
+ function preference(patch){const value={...preferences,...patch};setPreferences(value);localStorage.setItem('protocol-preferences',JSON.stringify(value));applyPreferences(value);window.dispatchEvent(new Event('protocol:preferences'));setMessage('Preferences saved on this browser.');}
+ async function save(event){event.preventDefault();setBusy(true);try{await updateDocument('members',member.id,{...draft,updatedAt:Date.now()});setMessage('Profile saved.');}catch(error){setMessage(error.message);}finally{setBusy(false);}}
+ return <TabPage className="settings-page" header={<WorkspacePageHero title="Settings"/>}><div className="settings-grid"><SectionBlock title="Your profile">{member&&draft?<form onSubmit={save}><h3>{member.data.name}</h3>{[['email','Email','email'],['pronouns','Pronouns','text'],['photoURL','Photo URL','url']].map(([key,label,type])=><FormField key={key} label={label}><InputField type={type} value={draft[key]} onChange={event=>setDraft({...draft,[key]:event.target.value})}/></FormField>)}<Button disabled={busy}>Save profile</Button></form>:<p>Loading your profile…</p>}</SectionBlock><SectionBlock title="Your workspace"><label className="settings-toggle"><input type="checkbox" checked={preferences.reduceMotion} onChange={event=>preference({reduceMotion:event.target.checked})}/>Reduce animation</label><label className="settings-toggle"><input type="checkbox" checked={preferences.compact} onChange={event=>preference({compact:event.target.checked})}/>Compact cards</label><FormField label="Default focus duration · minutes"><InputField type="number" min="1" max="240" value={preferences.focusMinutes} onChange={event=>{const minutes=Number(event.target.value);if(minutes>=1&&minutes<=240)preference({focusMinutes:minutes});}}/></FormField><p>Display and focus preferences apply to this browser.</p></SectionBlock><SectionBlock title="Workspace management"><div className="settings-links"><a href="/members">Members, contact details, and project history ↗</a><a href="/projects?view=priority">Project priorities ↗</a><a href="/wishes">Proposals and decisions ↗</a><a href="/notes">Meeting records and discussion ↗</a></div></SectionBlock></div><p role="status">{message}</p></TabPage>;
+}

@@ -1,0 +1,4 @@
+import Button from '../Button';
+export default function TabBar({id,label,value,items,onChange,panelId}) {
+ return <div className="workspace-tabs" role="tablist" aria-label={label}>{items.map((item,index)=><Button key={item.value} role="tab" id={`${id}-${item.value}`} aria-controls={panelId} aria-selected={value===item.value} tabIndex={value===item.value?0:-1} variant={value===item.value?'primary':'secondary'} onClick={()=>onChange(item.value)} onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowRight'?1:-1)+items.length)%items.length;onChange(items[next].value);event.currentTarget.parentElement.querySelectorAll('[role=tab]')[next].focus();}}>{item.label}</Button>)}</div>;
+}

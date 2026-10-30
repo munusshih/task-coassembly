@@ -149,7 +149,7 @@ export default function DataViewPage({ tabKey }) {
             </div>
           )}
         >
-          <p className="panel-subtitle">{selectedDocument ? selectedDocument.id : "—"}</p>
+          <p className="panel-subtitle">{selectedDocument ? selectedDocument.id : "·"}</p>
           <TextareaField
             className="json-input"
             value={draft}

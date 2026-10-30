@@ -24,17 +24,18 @@ export function isDateKey(value) {
 }
 
 const schema = {
+  memberProfile: { tab: "memberDirectory", query: "profile", validate: isDocumentId },
   memberView: { tab: "memberDirectory", query: "view", default: "role", allowed: ["role", "weekly", "overall"] },
   memberWeek: { tab: "memberDirectory", query: "week", validate: isDateKey },
   memberEndWeek: { tab: "memberDirectory", query: "endWeek", validate: isDateKey },
   week: { tab: "members", query: "week", validate: isDateKey },
   taskView: { tab: "members", query: "view", default: "member", allowed: ["member", "project", "resources"] },
   project: { tab: "projects", path: true, validate: isDocumentId },
-  projectView: { tab: "projects", query: "view", default: "category", allowed: ["category", "status", "list", "kanban"] },
+  projectView: { tab: "projects", query: "view", default: "category", allowed: ["category", "status", "priority", "tasks", "list", "kanban"] },
   note: { tab: "meetingNotes", path: true, validate: isDocumentId },
   notesSearch: { tab: "meetingNotes", query: "q" },
   notesGroup: { tab: "meetingNotes", query: "group", default: "date", allowed: ["date", "project"] },
-  notesLayout: { tab: "meetingNotes", query: "layout", default: "grid", allowed: ["grid", "shelf", "calendar"] },
+  notesLayout: { tab: "meetingNotes", query: "layout", default: "calendar", allowed: ["grid", "calendar"] },
   financeView: { tab: "finance", query: "view", default: "project", allowed: ["project", "person"] },
   financeCategory: { tab: "finance", query: "category", default: "projects", allowed: ["projects", "non-projects"] },
   year: { tab: "finance", query: "year", default: "overall", validate: (v) => v === "overall" || /^\d{4}$/.test(v) },

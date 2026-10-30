@@ -1,5 +1,9 @@
 "use client";
 
+import {useContext} from "react";
+import {ComposerDismissContext} from "./ui/BottomComposer";
+import {planningProjectGroups} from "./projectPriority.mjs";
+import MemberSelect from "./ui/MemberSelect";
 import FormField from "./ui/FormField";
 import TimeButton from "./ui/TimeButton";
 import TaskClockIcon from "./ui/TaskClockIcon";
@@ -13,6 +17,8 @@ export function emptyTaskCreateDraft(projectId = "") {
 }
 
 export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: submitAdd, onCancel: cancelAdd, inputRef, projects: assignableProjects, remainingHint: addRemainingHint, unitOptions: UNIT_OPTIONS, formatUnitOption, members, assigneeId, onAssigneeChange }) {
+  const dismissComposer=useContext(ComposerDismissContext);
+  const cancel=()=>dismissComposer?dismissComposer():cancelAdd();
   const { addTitle, addTime, addProject, addDeadline, addSubtasks, addLinks } = draft;
   function setAddSubtask(index, field, value) {
     const next = [...addSubtasks];
@@ -57,17 +63,14 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                   placeholder="Task title…"
                   onChange={(e) => patchUi({ addTitle: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") cancelAdd();
+                    if (e.key === "Escape") cancel();
                   }}
                 /></FormField>
               </div>
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  {members ? <FormField label="Assigned to"><SelectField chevron className="meta-select" aria-label="Task assignee" value={assigneeId} onChange={(event) => onAssigneeChange(event.target.value)} required>
-                    <option value="">Member…</option>
-                    {members.map((member) => <option key={member.id} value={member.id}>{member.data?.name || member.id}</option>)}
-                  </SelectField></FormField> : null}
+                  {members ? <FormField label="Assigned to"><MemberSelect members={members} value={assigneeId} onChange={onAssigneeChange} label="Task assignee" placeholder="Member…"/></FormField> : null}
                   <FormField label="Planned time"><SelectField chevron
                     className="meta-select"
                     icon={<TaskClockIcon />}
@@ -92,11 +95,7 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                     onChange={(e) => patchUi({ addProject: e.target.value })}
                   >
                     <option value="">Project</option>
-                    {assignableProjects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.data.name || p.id}
-                      </option>
-                    ))}
+                    {planningProjectGroups(assignableProjects).map(group=><optgroup key={group.key} label={group.label}>{group.projects.map(p=><option key={p.id} value={p.id}>{['Urgent','High'].includes(p.data.priority)?`${p.data.priority} · `:''}{p.data.name||p.id}</option>)}</optgroup>)}
                   </SelectField></FormField>
                   {addRemainingHint ? (
                     <span className="meta-helper-chip">{addRemainingHint}</span>
@@ -236,7 +235,7 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
 
               <div className="notepad-add-actions">
                 <TimeButton onClick={submitAdd} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
-                <TimeButton quiet onClick={cancelAdd}>Cancel</TimeButton>
+                <TimeButton quiet onClick={cancel}>Cancel</TimeButton>
               </div>
             </div>
   );

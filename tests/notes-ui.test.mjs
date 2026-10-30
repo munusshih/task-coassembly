@@ -9,11 +9,15 @@ test('pronouns format legacy arrays and editable strings without merging labels'
   assert.equal(formatPronouns('he/him, they/them; he/him'), 'he/him · they/them');
   assert.equal(formatPronouns(null), '');
 });
-test('note search matches content, accents, transpositions and words across fields', () => {
+test('note search requires an exact phrase and identifies the matching field', () => {
   const fields={ title:'Café planning', content:'<p>Budget &amp; allocation decisions</p>', project:'Protocol' };
-  assert.ok(fuzzyMatch(fields,'cafe'));
-  assert.ok(fuzzyMatch(fields,'budegt'));
-  assert.ok(fuzzyMatch(fields,'allocaton protocol'));
+  assert.equal(fuzzyMatch(fields,'cafe'),null);
+  assert.equal(fuzzyMatch(fields,'café').matchType,'title');
+  assert.equal(fuzzyMatch(fields,'budegt'),null);
+  assert.equal(fuzzyMatch(fields,'allocaton protocol'),null);
+  const match=fuzzyMatch(fields,'allocation decisions');
+  assert.equal(match.matchType,'content');
+  assert.ok(match.matchText.includes('allocation decisions'));
   assert.equal(fuzzyMatch(fields,'unrelated zebras'), null);
   assert.equal(fuzzyMatch(fields,'<p>'), null);
   assert.equal(searchableText(fields.content), 'budget & allocation decisions');

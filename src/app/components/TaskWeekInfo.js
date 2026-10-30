@@ -19,7 +19,7 @@ export default function TaskWeekInfo({ week = new Date().toISOString().slice(0, 
     meetingNotes: ["Notes", "A shared memory of our meetings. Find a conversation, revisit a decision, or add the next set of notes."],
     memberDirectory: ["Members", "Meet the people behind the work and keep team information up to date. Explore people by role, weekly workload, or overall contributions."],
     homepage: ["Homepage", "Our shared starting point is coming soon."],
-    settings: ["Settings", "Workspace settings are coming soon."],
+    settings: ["Settings", "Profile, focus, and display preferences."],
   }[pageKey] || ["Tasks", "Plan the week together."];
   const {notes,allNotes,loaded,error}=usePageRationales(pageKey,pageInfo);
   const countId=useId();

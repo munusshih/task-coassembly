@@ -1,7 +1,8 @@
 "use client";
 
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import CrossIcon from "./ui/CrossIcon";
-import FolderOutline from "./ui/FolderOutline";
+import EditButton from "./ui/EditButton";
 
 
 import useUrlState from "../hooks/useUrlState";
@@ -197,62 +198,18 @@ function ResourceForm({
 
 // ─── Shared card renderer ────────────────────────────────────────────────────
 function ResourceCard({ link, onEdit, onDelete, members = [] }) {
-  return (
-    <EntityCard
-      className="resource-sticky" data-rationale-anchor={`resource-${link.id}`} data-rationale-label={link.data.name || "Resource"}
-      interactive
-    >
-      <div className="resource-folder-cover" style={{ backgroundColor: COVER_COLORS[Array.from(link.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % 6] }}><ResourcePreviewImage link={link} /></div>
-      <FolderOutline/>
-      <div className="resource-sticky-actions">
-        <IconButton onClick={() => onEdit(link)} title="Edit">
-          {EDIT_ICON}
-        </IconButton>
-        <IconButton
-          variant="delete"
-          onClick={() => onDelete(link)}
-          title="Delete"
-        >
-          {DELETE_ICON}
-        </IconButton>
-      </div>
-      <div className="resource-sticky-body">
-        <a
-          className="resource-sticky-name"
-          href={toLinkHref(link.data.url)}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {link.data.name}
-        </a>
-        {link.data.description && (
-          <span className="resource-sticky-desc">{link.data.description}</span>
-        )}
-        {Array.isArray(link.data.subLinks) &&
-          link.data.subLinks.filter((s) => s.url).length > 0 && (
-            <div className="resource-sticky-sublinks">
-              {link.data.subLinks
-                .filter((s) => s.url)
-                .map((sl, i) => (
-                  <a
-                    key={i}
-                    className="resource-sticky-sublink"
-                    href={toLinkHref(sl.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {sl.label || sl.url}
-                  </a>
-                ))}
-            </div>
-          )}
-      </div>
-      <span className="resource-submission">
-        {contributorName(link.data, members) !== "Unknown contributor" && <span>{contributorName(link.data, members)}</span>}
-        <time dateTime={resourceDate(link.data.createdAt)?.toISOString()}>{resourceDate(link.data.createdAt)?.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }) || "Date unavailable"}</time>
-      </span>
-    </EntityCard>
-  );
+  const date=resourceDate(link.data.createdAt);
+  const author=contributorName(link.data,members);
+  const tone=COVER_COLORS[Array.from(link.id).reduce((sum,ch)=>sum+ch.charCodeAt(0),0)%COVER_COLORS.length];
+  return <article className="resource-list-card" data-rationale-anchor={`resource-${link.id}`} data-rationale-label={link.data.name||'Resource'}>
+    <a className="resource-list-image" style={{background:tone}} href={toLinkHref(link.data.url)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${link.data.name}`}><span>{link.data.name}</span><ResourcePreviewImage link={link}/></a>
+    <div className="resource-list-copy"><div className="resource-list-meta">{author!=='Unknown contributor'&&<span>{author}</span>}{date&&<time dateTime={date.toISOString()}>{date.toLocaleDateString('en-US',{month:'short',year:'numeric',timeZone:'UTC'})}</time>}</div>
+      <a className="resource-list-title resource-card-main-link" href={toLinkHref(link.data.url)} target="_blank" rel="noopener noreferrer">{link.data.name}</a>
+      {link.data.description&&<p>{link.data.description}</p>}
+      {link.data.subLinks?.some(item=>item.url)&&<div className="resource-list-links">{link.data.subLinks.filter(item=>item.url).map((item,index)=><a key={index} href={toLinkHref(item.url)} target="_blank" rel="noopener noreferrer">{item.label||'Related link'}</a>)}</div>}
+      <div className="resource-list-actions"><EditButton label={`Edit ${link.data.name}`} onClick={()=>onEdit(link)}/><IconButton aria-label={`Delete ${link.data.name}`} title="Delete resource" onClick={()=>onDelete(link)}>{DELETE_ICON}</IconButton></div>
+    </div>
+  </article>;
 }
 
 // ─── Category view ───────────────────────────────────────────────────────────
@@ -425,9 +382,7 @@ export default function ResourcesPage({ currentMember, members = [] }) {
       className="resources-page"
       title="Resource"
       header={<WorkspacePageHero title="Resource" illustration="resource-balancer">
-        <label className="task-view-picker"><span>by</span><select className="task-view-selector" aria-label="Resource view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
-          <option value="category">Category</option><option value="date">Date</option>
-        </select></label>
+        <WorkspaceViewPicker label="Resource view" value={viewMode} onChange={setViewMode} options={[{value:"category",label:"Category"},{value:"date",label:"Chronology"}]} />
       </WorkspacePageHero>}
     >
       <div className="resource-board-controls">

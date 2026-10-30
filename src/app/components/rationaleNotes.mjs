@@ -16,15 +16,8 @@ export function validateRationale({ pageKey, title, body,position,anchor,archive
 export function assertRationaleRevision(current, expectedRevision) {
   if ((current?.revision || 0) !== expectedRevision) throw new Error('Someone edited this note while you were writing. Cancel and reopen it to see their changes.');
 }
-export function rationaleDefaults(pageKey, pageInfo) {
- const notes = pageKey === 'members' ? [
-  ['shared-plan','A plan we can share','A task, a project, and an estimate make the week easier to plan together. People shows workloads; Projects gathers related work; Links keeps the results close by.'],
-  ['why-time','Why we track time','Actual time helps us see the effort behind the work and notice overloaded weeks. It is information for making more room and offering support, never a race to finish fastest.'],
-  ['share-results','Leave a trail for each other','Add at least one link before completing a task. A teammate can then find the result and review it with context. O means approve; X means ask for another pass, with a reason.'],
-  ['estimates','Estimates can change','Plans are a starting point. If the work grows, talk about the scope and update the allocation together. Small unlogged blocks under ten minutes stay out of the review list.'],
- ] : [['welcome',`Why ${pageInfo[0]} is here`,pageInfo[1]],['our-reasons','Keep asking why','These notes are a shared place to explain our choices. Each author can revise their own notes. Worker-owners can add another perspective, and any active member can archive a note as our ways of working evolve.']];
- return notes.map(([key,title,body])=>({id:`${pageKey}-${key}`,data:{pageKey,title,body,kind:key==='share-results'?'rule':key==='shared-plan'||key==='estimates'?'guide':'why',revision:0},seed:true}));
-}
+// Sticky notes are authored interface discussions. The driver tour owns instructions.
+export function rationaleDefaults() { return []; }
 
 export function assertRationaleAuthor(note,memberId) {
  if(!note || !memberId || note.createdBy !== memberId) throw new Error('Only the member who created this note can edit, move, or delete it.');

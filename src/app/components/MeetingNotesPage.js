@@ -5,10 +5,15 @@ import FormField from "./ui/FormField";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
 import NotesCalendar from "./NotesCalendar";
+import PersonIdentity from "./ui/PersonIdentity";
+import NoteDiscussion from "./NoteDiscussion";
+import {projectWorkTone} from "./memberRoleMetrics.mjs";
 import EditorialNoteCard, {NoteCover} from "./EditorialNoteCard";
 import {noteImageUrl,noteCover} from "../lib/notePresentation.mjs";
 import { fuzzyMatch } from "../lib/noteSearch.mjs";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
+import EditButton from "./ui/EditButton";
+import MetadataPill from "./ui/MetadataPill";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import TaskCreateTrigger from "./TaskCreateTrigger";
 import ShareViewButton from "./ShareViewButton";
@@ -241,7 +246,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   const [searchQuery, setSearchQuery] = useUrlState("notesSearch", "", { replace: true });
   const [createOpen, setCreateOpen] = useState(false);
   const [groupMode, setGroupMode] = useUrlState("notesGroup", "date", { allowed: ["date", "project"] });
-  const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "grid", { allowed: ["grid", "shelf", "calendar"] });
+  const [notesLayout, setNotesLayout] = useUrlState("notesLayout", "calendar", { allowed: ["grid", "calendar"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [notePresenceRows, setNotePresenceRows] = useState([]);
@@ -1173,7 +1178,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   function renderNoteSection(title,notesList) {
     if(!notesList.length)return null;
     return <SectionBlock key={title} className="notes-section notes-editorial-section" title={title} badge={notesList.length} titleTag="h3" bodyClassName="notes-section-body"><ul className={`notes-editorial-list notes-editorial-list--${notesLayout}`}>
-      {notesList.map((note,index)=><EditorialNoteCard key={note.id} note={note} index={notes.findIndex(item=>item.id===note.id)>=0?notes.findIndex(item=>item.id===note.id):index} projectName={note.data.projectId?projectLabel(note.data.projectId):''} author={formatAuditUser(note.data.createdByUsername,note.data.updatedByUsername)} date={new Date(Number(note.data.createdAt)||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} linkedHost={note.data.linkUrl?formatLinkLabel(note.data.linkUrl):''} onOpen={()=>{const href=normalizeExternalUrl(note.data.linkUrl);if(isLinkOnlyNote(note.data)&&href)window.open(href,'_blank','noopener,noreferrer');else openNote(note.id);}} onEdit={()=>startEditing(note)} onDelete={()=>handleDeleteNote(note.id,note.data.title||'Untitled')}/>)}
+      {notesList.map((note,index)=><EditorialNoteCard key={note.id} note={note} index={index} authorMember={members.find(member=>String(member.data?.name||'').toLowerCase()===String(note.data.createdByUsername||'').toLowerCase())} projectTone={projectWorkTone(projects.find(project=>project.id===note.data.projectId)?.data?.kind)} projectName={note.data.projectId?projectLabel(note.data.projectId):''} author={formatAuditUser(note.data.createdByUsername,note.data.updatedByUsername)} date={new Date(Number(note.data.createdAt)||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} linkedHost={note.data.linkUrl?formatLinkLabel(note.data.linkUrl):''} onOpen={()=>{const href=normalizeExternalUrl(note.data.linkUrl);if(isLinkOnlyNote(note.data)&&href)window.open(href,'_blank','noopener,noreferrer');else openNote(note.id);}} onEdit={()=>startEditing(note)} onDelete={()=>handleDeleteNote(note.id,note.data.title||'Untitled')}/>)}
     </ul></SectionBlock>;
   }
 
@@ -1239,7 +1244,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     <TabPage
       className="notes-page"
       title="Notes"
-      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker value={groupMode} onChange={value=>{setGroupMode(value);if(value==='project'&&notesLayout==='calendar')setNotesLayout('grid');}} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker prefix="in" value={notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},{value:"shelf",label:"List"},...(groupMode==='date'?[{value:'calendar',label:'Calendar'}]:[])]} label="Notes layout" /></div></WorkspacePageHero>}
+      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker compact value={groupMode} onChange={value=>{setGroupMode(value);if(value==='project'&&notesLayout==='calendar')setNotesLayout('grid');}} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker compact prefix="in" value={groupMode==='project'?'grid':notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},...(groupMode==='date'?[{value:'calendar',label:'Calendar'}]:[])]} label="Notes layout" /></div></WorkspacePageHero>}
     >
       <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
       <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
@@ -1374,7 +1379,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       </CollectionLayout>
 
       {viewingId && !activeNote && (
-        <ModalShell title="Note details" onClose={() => setViewingId(null)}>
+        <ModalShell fullscreen title="Note details" onClose={() => setViewingId(null)}>
           <p>{loadedNoteId === viewingId
             ? "This note is unavailable. It may have been deleted or you may not have access."
             : "Loading note…"}</p>
@@ -1383,9 +1388,10 @@ export default function MeetingNotesPage({ viewerName = "" }) {
 
       {activeNote && (
         <ModalShell
-          title={editingId === activeNote.id ? "Edit note" : "Note details"}
+          title={editingId === activeNote.id ? "Edit note" : "Notes"}
           headerActions={<ShareViewButton compact />}
           size="lg"
+          fullscreen
           className="note-detail-modal"
           onClose={() => {
             setViewingId(null);
@@ -1541,29 +1547,23 @@ export default function MeetingNotesPage({ viewerName = "" }) {
               <div className="note-preview-header">
                 <div className="note-preview-title-block">
                   <h3 className="note-preview-title">
-                    {formatDateInTitle(activeNote?.data?.createdAt)} ·{" "}
                     {activeNote?.data?.title || "Untitled"}
                   </h3>
-                  <p className="note-preview-updated">
-                    {`Created by ${formatAuditUser(activeNote?.data?.createdByUsername, activeNote?.data?.updatedByUsername || currentUsername)} · ${formatAuditTimestamp(activeNote?.data?.createdAt)}`}
-                  </p>
-                  <p className="note-preview-updated">
-                    {`Last edited by ${formatAuditUser(activeNote?.data?.updatedByUsername || activeNote?.data?.createdByUsername, currentUsername)} · ${formatAuditTimestamp(activeNote?.data?.updatedAt || activeNote?.data?.createdAt)}`}
-                  </p>
+                  <div className="note-audit-grid">{[['Created',activeNote?.data?.createdByUsername,activeNote?.data?.createdAt],['Edited',activeNote?.data?.updatedByUsername||activeNote?.data?.createdByUsername,activeNote?.data?.updatedAt||activeNote?.data?.createdAt]].map(([label,name,date])=><PersonIdentity key={label} label={label} name={formatAuditUser(name,currentUsername)} member={members.find(member=>String(member.data?.name||'').toLowerCase()===String(name||'').toLowerCase())}><time>{formatAuditTimestamp(date)}</time></PersonIdentity>)}</div>
                 </div>
                 <div className="note-editor-actions note-editor-actions--preview">
-                  <Button onClick={() => startEditing(activeNote)}>Edit</Button>
+                  <EditButton label="Edit note" onClick={() => startEditing(activeNote)}/>
                 </div>
               </div>
 
               <div className="note-preview-meta">
                 <div className="note-meta-line">
-                  <span className="note-scope-chip">
+                  <MetadataPill tone="neutral" className="note-scope-chip">
                     {normalizeScopeType(activeNote?.data?.scopeType) ===
                     NOTE_SCOPE_PROJECT
                       ? "project-based"
                       : "date-based"}
-                  </span>
+                  </MetadataPill>
                   {!!activeNote?.data?.linkUrl && (
                     <a
                       className="note-linked-doc"
@@ -1578,9 +1578,9 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   )}
                   {normalizeScopeType(activeNote?.data?.scopeType) ===
                     NOTE_SCOPE_PROJECT && (
-                    <span className="note-project-chip">
+                    <MetadataPill tone={projectWorkTone(projects.find(project=>project.id===activeNote?.data?.projectId)?.data?.kind)} className="note-project-chip">
                       {projectLabel(activeNote?.data?.projectId || "")}
-                    </span>
+                    </MetadataPill>
                   )}
                 </div>
 
@@ -1604,6 +1604,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                     : "No content yet. Click Edit to add content."}
                 </p>
               )}
+              <NoteDiscussion note={activeNote} members={members} username={currentUsername}/>
             </div>
           )}
         </ModalShell>

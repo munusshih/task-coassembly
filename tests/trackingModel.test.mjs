@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyJournal, advanceJournal, closeAuto, startFocus, pauseFocus, resumeFocus, finishFocus, recoverJournal, planTimeLog, focusElapsed, workedTaskSeconds, FRAGMENT_MS, IDLE_MS } from '../src/app/components/time/trackingModel.mjs';
+import { emptyJournal, setAutomaticRecording, advanceJournal, closeAuto, startFocus, pauseFocus, resumeFocus, finishFocus, recoverJournal, planTimeLog, focusElapsed, workedTaskSeconds, FRAGMENT_MS, IDLE_MS } from '../src/app/components/time/trackingModel.mjs';
 const step = (j, now, lastInput=0, active=true) => advanceJournal(j, now, {active,lastInput});
 const seconds = (j) => j.fragments.reduce((s,f)=>s+f.seconds,0);
 
@@ -109,4 +109,56 @@ test('completion reports only logged blocks and ignores short or unrelated fragm
  assert.equal(logged.completion.status,'logged');assert.equal(logged.completion.seconds,900);
  assert.equal(logged.fragments.find(f=>f.id==='short').status,'pending');
  assert.equal(recordLoggedFragments(journal,[activity],'a').completion.status,'pending');
+});
+
+
+test('stopping automatic recording preserves time and excludes the stopped interval after reload', () => {
+ let j = step(emptyJournal(), 0);
+ j = setAutomaticRecording(j, 12 * 60000, false);
+ assert.equal(j.auto, null);
+ assert.equal(seconds(j), 720);
+ j = recoverJournal(JSON.parse(JSON.stringify(j)));
+ j = step(j, 40 * 60000, 40 * 60000);
+ assert.equal(j.automaticPaused, true);
+ assert.equal(j.auto, null);
+ j = setAutomaticRecording(j, 40 * 60000, true);
+ j = step(j, 40 * 60000, 40 * 60000);
+ assert.equal(j.auto.start, 40 * 60000);
+ j = closeAuto(j, 51 * 60000);
+ assert.equal(seconds(j), 1380);
+});
+
+test('focus sessions still run while automatic recording is stopped', () => {
+ let j = setAutomaticRecording(emptyJournal(), 0, false);
+ j = startFocus(j, 0, {taskId:'task-a', mode:'countdown', minutes:10, autoLog:true});
+ j = step(j, 10 * 60000, 10 * 60000);
+ assert.equal(j.completion.seconds, 600);
+ assert.equal(j.completion.autoLog, true);
+ assert.equal(j.auto, null);
+});
+
+test('eligible automatic blocks publish without refresh and reopen at the exact boundary',async()=>{
+ const {refreshEligibleActivity}=await import('../src/app/components/time/trackingModel.mjs');
+ let j=step(emptyJournal(),0);
+ assert.equal(refreshEligibleActivity(j,599000),j);
+ j=refreshEligibleActivity(j,600000);
+ assert.equal(j.fragments[0].seconds,600);
+ assert.equal(j.auto.start,600000);
+ assert.equal(refreshEligibleActivity(j,600001).fragments.length,1);
+ assert.equal(refreshEligibleActivity({...j,auto:null},1200000).auto,null);
+});
+
+test('cancelling focus keeps recorded work unlogged and never auto-logs it',async()=>{
+ const {cancelFocus}=await import('../src/app/components/time/trackingModel.mjs');
+ let j=startFocus(emptyJournal(),0,{taskId:'x',mode:'countdown',minutes:25,autoLog:true});
+ j=cancelFocus(j,12*60000);
+ assert.equal(j.focus,null);assert.equal(j.completion,null);assert.equal(j.fragments[0].seconds,720);assert.equal(j.fragments[0].status,'pending');assert.equal(j.fragments[0].autoLog,false);
+});
+test('dial configuration only adjusts paused timers and preserves recorded elapsed time',async()=>{
+ const {configureFocus}=await import('../src/app/components/time/trackingModel.mjs');
+ let j=startFocus(emptyJournal(),0,{taskId:'x',mode:'countdown',minutes:25,autoLog:true});
+ assert.throws(()=>configureFocus(j,60000,{mode:'stopwatch',minutes:25}),/Pause/);
+ j=pauseFocus(j,12*60000);j=configureFocus(j,12*60000,{mode:'countdown',minutes:5});
+ assert.equal(j.focus.elapsedMs,12*60000);assert.equal(j.focus.durationMs,13*60000);
+ j=configureFocus(j,12*60000,{mode:'stopwatch',minutes:25});assert.equal(j.focus.mode,'stopwatch');
 });

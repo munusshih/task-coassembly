@@ -1,0 +1,4 @@
+import ProjectTimeSummary from './ProjectTimeSummary';
+export default function ProjectCapacityChart({progress}) {
+ return <section className="project-capacity-card" aria-label="Total project capacity, allocated and logged time"><header><h3>Time at a glance</h3><p>{progress.capacitySeconds?'Every measure uses the full project capacity as its scale.':'Set total project hours to compare with full capacity.'}</p></header><ProjectTimeSummary progress={progress}/><div className="project-capacity-bars">{[['total',progress.capacityFill],['allocated',progress.allocatedFill],['logged',progress.loggedFill]].map(([label,value])=><div key={label}><span>{label}</span><span className="project-capacity-track"><span className={`project-pattern-key--${label}`} style={{width:`${value}%`}}/></span></div>)}</div>{progress.capacityPercent!=null&&<p>{progress.capacityPercent}% of total capacity logged</p>}</section>;
+}

@@ -13,7 +13,7 @@ export default function RationalePile({pile,overrides,onMove,canDrag,children,di
  const kind=noteKind(note),layout={...note.data,...overrides[note.id]};
  const anchored=layout.anchor&&pageAnchor(layout.anchor);
  useEffect(()=>{const update=()=>redraw(value=>value+1);window.addEventListener('scroll',update,true);window.addEventListener('resize',update);const observer=new ResizeObserver(update);observer.observe(document.body);return()=>{window.removeEventListener('scroll',update,true);window.removeEventListener('resize',update);observer.disconnect();clearTimeout(snapTimer.current);};},[]);
- const width=Math.min(280,window.innerWidth-32),height=card.current?.offsetHeight||340;
+ const width=Math.min(280,window.innerWidth-32),height=card.current?.offsetHeight||290;
  let pos=drag;
  if(!pos&&anchored){const bounds=anchored.getBoundingClientRect();pos={left:Math.max(16,Math.min(window.innerWidth-width-16,bounds.right+12)),top:bounds.top};}
  else if(!pos&&layout.position)pos={left:16+layout.position.x*Math.max(1,window.innerWidth-width-32),top:74+layout.position.y*Math.max(1,window.innerHeight-height-100)};

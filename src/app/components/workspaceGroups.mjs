@@ -1,3 +1,4 @@
+import {PROJECT_STATES} from './projectStates.mjs';
 import { WORK_CATEGORIES, workCategory } from './memberRoleMetrics.mjs';
 export function groupProjects(projects, mode='category') {
   if (mode === 'status') {
@@ -29,7 +30,7 @@ export function groupWishes(items, projects, mode='project') {
 export function projectBoardStatus(raw) {
  const normalized=String(raw||'').trim().toLowerCase();
  const aliases={active:'In Progress',done:'Completed',canceled:'Cancelled'};
- return ['Scheduled','In Progress','Waiting for Response','On Hold','Completed','Cancelled'].find(status=>status.toLowerCase()===normalized)||aliases[normalized]||'Scheduled';
+ return PROJECT_STATES.map(state=>state.id).find(status=>status.toLowerCase()===normalized)||aliases[normalized]||'Scheduled';
 }
 export function projectStatusColumns(projects,statuses) {
  const columns=statuses.map(status=>({id:status,title:status,projects:[]}));

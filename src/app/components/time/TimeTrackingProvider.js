@@ -3,8 +3,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { logTaskTime } from "../../../lib/taskTime";
 import {
-  emptyJournal, recoverJournal, advanceJournal, closeAuto, pauseFocus,
-  startFocus, resumeFocus, finishFocus, IDLE_MS, eligibleTimeFragments, recordLoggedFragments,
+  emptyJournal, refreshEligibleActivity, recoverJournal, advanceJournal, closeAuto, pauseFocus, setAutomaticRecording,
+  cancelFocus, configureFocus, startFocus, resumeFocus, finishFocus, IDLE_MS, eligibleTimeFragments, recordLoggedFragments,
 } from "./trackingModel.mjs";
 
 const TimeContext = createContext(null);
@@ -23,6 +23,7 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
   const [state, setState] = useState({ journal: journal.current, now: Date.now(), owner: false });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const takeControlRef = useRef(()=>{});
   const persistRef = useRef(() => {});
   const publish = () => setState({ journal: journal.current, now: Date.now(), owner: owner.current });
   const save = (next) => {
@@ -82,6 +83,9 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
         } catch { setError("Enable browser storage to use the time tracker."); }
       }
     };
+    const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel(`${key}:control`):null;
+    channel && (channel.onmessage=event=>{if(event.data==='take-control'){suspended=true;release();}});
+    takeControlRef.current=()=>{channel?.postMessage('take-control');suspended=false;setTimeout(()=>acquire(),150);};
     journal.current = recoverJournal(read()); publish();
     const tick = () => {
       if (suspended) return;
@@ -89,7 +93,7 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
       const wantsTracker = activeRef.current || journal.current.focus?.status === "running";
       if (wantsTracker) acquire();
       if (owner.current) {
-        journal.current = { ...advanceJournal(journal.current, now, { active: activeRef.current, lastInput: lastInput.current }), lastSeen: now };
+        journal.current = { ...refreshEligibleActivity(advanceJournal(journal.current, now, { active: activeRef.current, lastInput: lastInput.current }), now), lastSeen: now };
         if (!wantsTracker) release();
         else if (now - lastSave >= 5000) {
           if (!navigator.locks) {
@@ -130,7 +134,7 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
     tick();
     const interval = setInterval(tick, 1000);
     return () => {
-      disposed = true; clearInterval(interval); release();
+      disposed = true; clearInterval(interval); release(); channel?.close();
       for (const event of ["pointerdown", "keydown", "wheel", "pointermove"]) window.removeEventListener(event, input);
       window.removeEventListener("storage", storage);
       window.removeEventListener("pagehide", hide);
@@ -182,8 +186,11 @@ export default function TimeTrackingProvider({ memberId, active, children }) {
     if (ids.length) log(ids, completion.taskId);
   }, [completion?.id, state.owner]);
 
-  const value = { ...state, busy, error,
+  const value = { ...state, busy, error, takeControl:()=>takeControlRef.current(),
+    setAutomaticRecording: (recording) => change((j, now) => setAutomaticRecording(j, now, recording)),
     start: (options) => change((j, now) => startFocus(j, now, options)),
+    cancel: () => change(cancelFocus),
+    configure: options => change((j,now)=>configureFocus(j,now,options)),
     pause: () => change(pauseFocus), resume: () => change(resumeFocus), finish: () => change(finishFocus),
     checkpoint: () => { change(closeAuto); return eligibleTimeFragments(journal.current.fragments); },
     dismiss: () => change((j) => ({ ...j, completion: null })),
