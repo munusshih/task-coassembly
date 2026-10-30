@@ -12,6 +12,8 @@ import TabBar from "./ui/TabBar";
 import ProjectCapacityChart from "./ui/ProjectCapacityChart";
 import {projectCapacityProgress} from "./projectProgress.mjs";
 import {durationLabel} from "./time/trackingModel.mjs";
+import ProjectsOverview from './ui/ProjectsOverview';
+import ProjectViewToolbar from './ui/ProjectViewToolbar';
 import ProjectTaskBoard from "./ProjectTaskBoard";
 import {PROJECT_STATES} from "./projectStates.mjs";
 import ProjectCollection from "./ProjectCollection";
@@ -2197,6 +2199,10 @@ export default function ProjectsPage({
     [visibleProjects],
   );
 
+  const [projectFilter,setProjectFilter]=useState('');
+  const [rejectedOnly,setRejectedOnly]=useState(false);
+  const effectiveProjectFilter=collectionProjects.some(project=>project.id===projectFilter)?projectFilter:'';
+  const filteredCollectionProjects=collectionProjects.filter(project=>!effectiveProjectFilter||project.id===effectiveProjectFilter);
   const projectViewOptions = [
     {
       value: "list",
@@ -2228,7 +2234,7 @@ export default function ProjectsPage({
     <TabPage
       className="projects-page"
       title="Projects"
-      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'},{value:'priority',label:'Priority'},{value:'tasks',label:'Tasks'}]} /><div className="project-collection-controls"><span>{showClosedProjects?'All projects':'Active projects'} <span className="task-scope-count">{collectionProjects.length}</span></span>{closedProjectCount>0&&<TimeButton quiet aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?'Hide closed projects':`Show closed projects (${closedProjectCount})`}</TimeButton>}</div></WorkspacePageHero>}
+      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'},{value:'priority',label:'Priority'},{value:'tasks',label:'Tasks'}]} /><ProjectsOverview projects={collectionProjects} tasks={visibleTasks} closedCount={closedProjectCount} showClosed={showClosedProjects} onToggle={()=>setShowClosedProjects(value=>!value)}/></WorkspacePageHero>}
     >
       {!isLimitedViewer ? (
         <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
@@ -2348,7 +2354,8 @@ export default function ProjectsPage({
 
 
       {collectionProjects.length === 0 ? <EmptyState>{visibleProjects.length?'No active projects.':'No projects yet.'}</EmptyState> : <>
-        {viewMode==='tasks'?<ProjectTaskBoard projects={collectionProjects} tasks={visibleTasks} members={members} viewerMemberId={viewerMemberId}/>:<ProjectCollection projects={collectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={viewMode==='priority'?'priority':['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})} renderDetails={project=>(<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid"><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/></ul></section>)}/>}
+        <ProjectViewToolbar projects={collectionProjects} value={effectiveProjectFilter} onChange={setProjectFilter}>{viewMode==='tasks'&&<label><input type="checkbox" checked={rejectedOnly} onChange={event=>setRejectedOnly(event.target.checked)}/> Rejected twice or more</label>}</ProjectViewToolbar>
+        {viewMode==='tasks'?<ProjectTaskBoard rejected={rejectedOnly} projects={filteredCollectionProjects} tasks={visibleTasks} members={members} viewerMemberId={viewerMemberId}/>:<ProjectCollection projects={filteredCollectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={viewMode==='priority'?'priority':['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})} renderDetails={project=>(<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid"><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/></ul></section>)}/>}
 
       </>}
 

@@ -23,13 +23,18 @@ test('note search requires an exact phrase and identifies the matching field', (
   assert.equal(searchableText(fields.content), 'budget & allocation decisions');
   assert.ok(fuzzyMatch({content:'這是工作會議記錄'},'工作會議'));
 });
-test('calendar includes complete Monday-first weeks and leap days', () => {
+test('calendar includes complete Sunday-first weeks and leap days', () => {
   const days=monthDays('2026-10');
-  assert.equal(days[0], '2026-09-28');
-  assert.equal(days.at(-1), '2026-11-01');
+  assert.equal(days[0], '2026-09-27');
+  assert.equal(days.at(-1), '2026-10-31');
   assert.equal(days.length%7, 0);
   assert.ok(monthDays('2024-02').includes('2024-02-29'));
   assert.equal(shiftMonth('2026-12',1),'2027-01');
   assert.equal(shiftMonth('2026-01',-1),'2025-12');
   assert.equal(dateKey('invalid'), '');
+});
+test('note search ignores opaque link fragments and URLs embedded in content',()=>{
+ const url='https://docs.google.com/document/d/opaque-id/edit?tab=abc#heading=he';
+ assert.equal(fuzzyMatch({title:'Meeting',link:url,content:`<p>Document: ${url}</p>`},'he'),null);
+ assert.equal(fuzzyMatch({title:'Meeting',content:'<p><a href="https://example.com/heading">Review the plan</a></p>'},'review').matchType,'content');
 });

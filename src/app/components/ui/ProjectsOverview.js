@@ -1,0 +1,8 @@
+import {projectTimeProgress} from '../projectProgress.mjs';
+import {durationLabel} from '../time/trackingModel.mjs';
+import {projectWorkTone} from '../memberRoleMetrics.mjs';
+export default function ProjectsOverview({projects,tasks,closedCount,showClosed,onToggle}) {
+ const progress=projects.map(project=>({...project,...projectTimeProgress(project.id,tasks)}));
+ const planned=progress.reduce((sum,item)=>sum+item.allocatedSeconds,0),logged=progress.reduce((sum,item)=>sum+item.loggedSeconds,0);
+ return <section className="projects-overview" aria-label="Projects overview"><div className="projects-overview-heading"><div><strong>{projects.length}</strong><span>{showClosed?'All projects':'Active projects'}</span></div><div><strong>{durationLabel(planned)}</strong><span>Planned time</span></div><div><strong>{durationLabel(logged)}</strong><span>Recorded time</span></div>{closedCount>0&&<button type="button" aria-pressed={showClosed} onClick={onToggle}>{showClosed?'Hide closed':`Include ${closedCount} closed`}</button>}</div><div className="projects-overview-strip" role="img" aria-label={`${projects.length} projects. ${durationLabel(logged)} recorded against ${durationLabel(planned)} planned.`}>{progress.map(project=><span key={project.id} style={{flex:Math.max(project.allocatedSeconds,900),'--project-tone':`var(--palette-${projectWorkTone(project.data.kind)})`}} title={`${project.data.name}: ${durationLabel(project.loggedSeconds)} recorded / ${durationLabel(project.allocatedSeconds)} planned${project.allocatedSeconds?` (${project.percent}%)`:''}`}><i style={{width:`${project.fill}%`}}/></span>)}</div><p>Segment widths show planned time. Filled portions show recorded time. Completed estimates are excluded.</p></section>;
+}

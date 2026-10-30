@@ -107,7 +107,7 @@ export default function Navigation({
         </nav>
         <footer className="task-overlay-footer"><div className="navigation-construction"><span><ConstructionIcon/> In progress</span><div><span aria-disabled="true">Finance</span><span aria-disabled="true">Requests</span></div></div>
           <a href={viewHref("settings")} aria-current={activeTab === "settings" ? "page" : undefined} onClick={(event) => navigate(event, "settings")}>Settings</a>
-          <button type="button" className="task-logout" onClick={handleSignOut}>Log out</button>
+          <button type="button" className="task-logout" onClick={() => {if(window.confirm('Log out of Protocol on this browser?'))handleSignOut();}}>Log out</button>
         </footer>
       </dialog>, document.body)}
     </header>

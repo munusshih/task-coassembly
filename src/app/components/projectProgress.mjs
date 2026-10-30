@@ -1,8 +1,8 @@
-import { workedTaskSeconds } from './time/trackingModel.mjs';
+const positive = value => Number.isFinite(Number(value)) ? Math.max(0,Number(value)) : 0;
 export function projectTimeProgress(projectId, tasks) {
   const work = tasks.filter(task => task.data?.projectId === projectId && !task.data.archived);
-  const allocatedSeconds = work.reduce((sum, task) => sum + Math.max(0, Number(task.data.timeUnits) || 0) * 900, 0);
-  const loggedSeconds = work.reduce((sum, task) => sum + workedTaskSeconds(task.data), 0);
+  const allocatedSeconds = work.reduce((sum, task) => sum + positive(task.data.timeUnits) * 900, 0);
+  const loggedSeconds = work.reduce((sum, task) => sum + positive(task.data.trackedSeconds), 0);
   const percent = allocatedSeconds ? Math.round(loggedSeconds / allocatedSeconds * 100) : 0;
   return { allocatedSeconds, loggedSeconds, percent, fill: Math.min(100, Math.max(0, percent)) };
 }

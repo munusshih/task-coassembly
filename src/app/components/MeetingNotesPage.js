@@ -1,6 +1,7 @@
 "use client";
 
 
+import {RichReader} from './RichEditor';
 import FormField from "./ui/FormField";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
@@ -16,7 +17,6 @@ import EditButton from "./ui/EditButton";
 import MetadataPill from "./ui/MetadataPill";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import TaskCreateTrigger from "./TaskCreateTrigger";
-import ShareViewButton from "./ShareViewButton";
 import useUrlState, { isDocumentId } from "../hooks/useUrlState";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -983,59 +983,8 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   }
 
   function renderRoleSummary(noteData) {
-    const roles = normalizeRoleAssignments(noteData);
-    const chips = [];
-
-    for (const field of ROLE_FIELDS) {
-      const memberId = roles[field.key];
-      const name = roleLabel(memberId);
-      if (!name) continue;
-      chips.push(
-        <span key={`${field.key}-${memberId}`} className="note-role-chip">
-          {field.label}: {name}
-        </span>,
-      );
-    }
-
-    const participantIds = normalizeIdList(noteData?.meetingParticipantIds);
-    const absentIds = normalizeIdList(noteData?.absentParticipantIds).filter(
-      (id) => participantIds.includes(id),
-    );
-    if (participantIds.length > 0) {
-      const presentCount = Math.max(
-        0,
-        participantIds.length - absentIds.length,
-      );
-      chips.push(
-        <span
-          key="meeting-count"
-          className="note-role-chip note-role-chip--meeting"
-        >
-          In meeting: {presentCount}/{participantIds.length}
-        </span>,
-      );
-    }
-
-    if (absentIds.length > 0) {
-      chips.push(
-        <span
-          key="meeting-absent"
-          className="note-role-chip note-role-chip--absent"
-        >
-          Absent: {absentIds.map((id) => roleLabel(id)).join(", ")}
-        </span>,
-      );
-    }
-
-    if (chips.length === 0) {
-      return (
-        <span className="note-role-chip note-role-chip--empty">
-          Roles not set
-        </span>
-      );
-    }
-
-    return chips;
+    const roles=normalizeRoleAssignments(noteData);
+    return <dl className="note-meeting-roles">{ROLE_FIELDS.filter(field=>roles[field.key]).map(field=><div key={field.key}><dt>{field.label}</dt><dd><PersonIdentity member={members.find(member=>member.id===roles[field.key])} name={roleLabel(roles[field.key])}/></dd></div>)}</dl>;
   }
 
   function renderMeetingAttendanceDetail(noteData) {
@@ -1050,7 +999,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
     return (
       <div className="note-attendance-block">
         <div className="note-attendance-group">
-          <span className="note-attendance-label">Present</span>
+          <span className="note-attendance-label">Present · {presentIds.length}/{participantIds.length}</span>
           <div className="note-attendance-chips">
             {presentIds.length ? (
               presentIds.map((id) => (
@@ -1389,7 +1338,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       {activeNote && (
         <ModalShell
           title={editingId === activeNote.id ? "Edit note" : "Notes"}
-          headerActions={<ShareViewButton compact />}
+          headerActions={editingId !== activeNote.id && <EditButton label="Edit note" onClick={() => startEditing(activeNote)}/>}
           size="lg"
           fullscreen
           className="note-detail-modal"
@@ -1549,21 +1498,14 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   <h3 className="note-preview-title">
                     {activeNote?.data?.title || "Untitled"}
                   </h3>
-                  <div className="note-audit-grid">{[['Created',activeNote?.data?.createdByUsername,activeNote?.data?.createdAt],['Edited',activeNote?.data?.updatedByUsername||activeNote?.data?.createdByUsername,activeNote?.data?.updatedAt||activeNote?.data?.createdAt]].map(([label,name,date])=><PersonIdentity key={label} label={label} name={formatAuditUser(name,currentUsername)} member={members.find(member=>String(member.data?.name||'').toLowerCase()===String(name||'').toLowerCase())}><time>{formatAuditTimestamp(date)}</time></PersonIdentity>)}</div>
+                  <div className="note-audit-line"><PersonIdentity name={formatAuditUser(activeNote.data.createdByUsername,currentUsername)} member={members.find(member=>String(member.data?.name||'').toLowerCase()===String(activeNote.data.createdByUsername||'').toLowerCase())}/><time>Created {formatAuditTimestamp(activeNote.data.createdAt)}</time>{activeNote.data.updatedAt && activeNote.data.updatedAt !== activeNote.data.createdAt && <time title={`Edited by ${formatAuditUser(activeNote.data.updatedByUsername,currentUsername)}`}>Updated {formatAuditTimestamp(activeNote.data.updatedAt)}</time>}</div>
                 </div>
-                <div className="note-editor-actions note-editor-actions--preview">
-                  <EditButton label="Edit note" onClick={() => startEditing(activeNote)}/>
-                </div>
+
               </div>
 
               <div className="note-preview-meta">
                 <div className="note-meta-line">
-                  <MetadataPill tone="neutral" className="note-scope-chip">
-                    {normalizeScopeType(activeNote?.data?.scopeType) ===
-                    NOTE_SCOPE_PROJECT
-                      ? "project-based"
-                      : "date-based"}
-                  </MetadataPill>
+
                   {!!activeNote?.data?.linkUrl && (
                     <a
                       className="note-linked-doc"
@@ -1572,8 +1514,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                       rel="noopener noreferrer"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      Open linked doc (
-                      {formatLinkLabel(activeNote.data.linkUrl)})
+                      Open document ↗
                     </a>
                   )}
                   {normalizeScopeType(activeNote?.data?.scopeType) ===
@@ -1593,10 +1534,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
               </div>
 
               {activeNote?.data?.content ? (
-                <div
-                  className="note-preview-content"
-                  dangerouslySetInnerHTML={{ __html: activeNote.data.content }}
-                />
+                <RichReader content={activeNote.data.content} title={activeNote.data.title}/>
               ) : (
                 <p className="note-empty">
                   {activeNote?.data?.linkUrl
