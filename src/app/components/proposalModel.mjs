@@ -13,3 +13,22 @@ export function reviewProposal(data,decision,reviewer,reason,expectedRevision,no
  if(!String(reason||'').trim())throw new Error('Add a review reason.');
  return {status:decision,reviews:[...(data.reviews||[]),{revision:data.revision||1,decision,reason:reason.trim(),authorId:reviewer.id,authorName:reviewer.name,createdAt:now}],updatedAt:now};
 }
+
+/** Board movement follows the same authorship, completeness and review rules as the reader. */
+export function moveProposal(data,next,viewer,reason='',expectedRevision=data.revision||1,now=Date.now()) {
+ if(!viewer?.id)throw new Error('An active member must move this proposal.');
+ if(data.archived||data.projectIdCreated)throw new Error('This proposal is closed.');
+ if((data.revision||1)!==expectedRevision)throw new Error('This proposal changed. Reopen its latest revision.');
+ if(next===(data.status||'Draft'))return {};
+ if(next==='In review'){
+  if(data.authorId&&data.authorId!==viewer.id)throw new Error('Only the author can submit this proposal.');
+  validateProposal(data);
+  return {status:next,authorId:data.authorId||viewer.id,authorName:data.authorName||viewer.name,updatedAt:now};
+ }
+ if(next==='Draft'){
+  if(data.authorId&&data.authorId!==viewer.id)throw new Error('Only the author can return this proposal to Draft.');
+  return reviseProposal(data,Object.fromEntries(Object.keys(emptyProposal()).map(key=>[key,data[key]??emptyProposal()[key]])),viewer.id);
+ }
+ if(['Approved','Changes requested'].includes(next))return reviewProposal(data,next,viewer,reason,expectedRevision,now);
+ throw new Error('Create a project from an approved proposal.');
+}

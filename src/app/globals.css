@@ -1,3 +1,4 @@
+@import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 @import "./palette.css";
 
 /* Google Fonts' Instrument Sans, bundled for reliable localhost rendering. */
@@ -10027,3 +10028,97 @@ select.field-select.field-select--inverse { background:var(--ink); color:var(--p
 .settings-grid .section-block-title { font-size:var(--type-heading); }
 .member-avatar.member-avatar--profile:has(.member-avatar-illustration) { grid-template: minmax(0,1fr) / minmax(0,1fr); }
 .member-avatar--profile img.member-avatar-illustration { min-width:0; min-height:0; align-self:stretch; justify-self:stretch; }
+
+/* Shared interaction states use fills and underlines, never focus rings. */
+:is(button,a,input,select,textarea,summary,[role=button],[role=combobox],[tabindex],[contenteditable=true]):focus { outline:0!important; box-shadow:none!important; }
+:is(input,select,textarea,[role=combobox],[contenteditable=true]):focus-visible { background-color:var(--palette-planned)!important; }
+:is(input,select,textarea,[role=combobox]):focus { border-color:transparent!important; }
+:is(label,.workspace-form-field):has(:focus-visible) > :is(span:first-child,.field-label) { text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:5px; }
+:is(button,[role=button],summary):focus-visible { background-color:var(--ink)!important; color:var(--paper)!important; }
+:is(a,select):focus-visible { text-decoration:underline; text-decoration-thickness:3px; text-underline-offset:5px; }
+.shared-close-button:focus,.task-menu-close:focus { border:0!important; }
+.shared-close-button:focus-visible { background:var(--ink)!important; color:var(--paper)!important; }
+.field-select-wrap:has(select:focus-visible) { color:var(--ink); }
+.task-view-picker:has(:focus-visible) { background:var(--palette-planned); }
+.protocol-brand > img,.task-menu-trigger > .protocol-brand--mark img { width:36px; height:36px; animation-duration:36s; }
+.task-navigation-overlay > .protocol-brand { left:30px; top:22px; height:40px; }
+.task-overlay-footer :is(a,button,.navigation-construction,.navigation-construction>span,.navigation-construction>div) { font:400 var(--type-body)/1.4 var(--font-body); }
+.navigation-construction { gap:10px 16px; }
+.navigation-construction > div { gap:16px; }
+@media(max-width:650px){.task-navigation-overlay > .protocol-brand{left:20px;top:18px;}}
+
+/* Shared note reader typography and full-width conversation. */
+.note-detail-modal .note-preview-row,.note-detail-modal .note-preview-content,.note-detail-modal .note-prose,.discussion-thread { width:100%; max-width:none; margin-inline:0; }
+.note-detail-modal .note-preview-title { max-width:none; font:500 var(--type-page)/1.2 var(--font-body); }
+.note-prose { font:400 var(--type-body)/1.5 var(--font-body); }
+.note-prose :is(p,ul,ol,blockquote) { max-width:none; font-size:inherit; line-height:inherit; }
+.note-prose :is(h1,h2,h3) { font-size:var(--type-panel-title); line-height:1.3; margin:28px 0 16px; }
+.note-prose p:empty { min-height:0; margin:0; }
+.note-prose hr { margin:28px 0; }
+.note-header-document { font:400 var(--type-caption)/1.4 var(--font-body); color:var(--ink); white-space:nowrap; text-underline-offset:4px; }
+.note-audit-record { display:flex; flex-wrap:wrap; gap:24px 48px; margin:24px 0 0; }
+.note-audit-record > div { display:grid; gap:8px; }
+.note-audit-record dt { font-size:var(--type-caption); color:var(--muted); }
+.note-audit-record dd { margin:0; font-size:var(--type-caption); }
+.note-audit-record time { display:flex; flex-wrap:wrap; gap:12px; }
+.note-audit-record time span { color:var(--muted); }
+.note-attendance-chips .person-identity { font-size:var(--type-caption); }
+.note-attendance-chips > span > small { display:block; font-size:var(--type-caption); color:var(--muted); }
+.note-attendance-absent { font-size:var(--type-caption); color:var(--muted); margin-bottom:0; }
+.discussion-thread { margin-top:40px; padding-top:24px; border-top:1px solid var(--line); }
+.discussion-chat.cs-main-container { height:clamp(280px,42vh,520px); border:0; margin-top:20px; background:transparent; }
+.discussion-chat :is(.cs-chat-container,.cs-message-list) { background:transparent; }
+.discussion-chat .cs-message-list { padding:0; }
+.discussion-chat .cs-message { margin:0 0 20px; max-width:90%; font:inherit; }
+.discussion-chat .cs-message__header { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:0 0 8px; font:inherit; }
+.discussion-chat .cs-message__header time { font-size:var(--type-caption); color:var(--muted); }
+.discussion-chat .cs-message__content { background:var(--surface-quiet); color:var(--ink); border-radius:var(--radius-panel); padding:16px; font:400 var(--type-body)/1.5 var(--font-body); white-space:pre-wrap; overflow-wrap:anywhere; }
+.discussion-chat .cs-message--outgoing .cs-message__content { background:var(--palette-project); }
+.discussion-chat .cs-message-input { border-top:1px solid var(--line); padding:16px 0 0; background:transparent; font:inherit; }
+.discussion-chat :is(.cs-message-input__content-editor-wrapper,.cs-message-input__content-editor) { background:var(--surface-quiet); color:var(--ink); font:400 var(--type-body)/1.5 var(--font-body); }
+.discussion-chat .cs-message-input__content-editor-wrapper { padding:12px 16px; border-radius:var(--radius-panel); }
+.discussion-chat .cs-button--send { color:var(--ink); padding:12px; }
+.discussion-empty,.discussion-hint { color:var(--muted); font-size:var(--type-caption); margin:12px 0; }
+.discussion-chat .cs-message-input__content-editor[data-placeholder]:empty:before { color:var(--muted); }
+
+/* One form rhythm and field fill in every bottom composer. */
+.bottom-composer :is(.field-input,.field-select,.field-textarea,.member-select-trigger) { background:var(--surface-quiet); border:0; border-radius:var(--radius-panel)!important; min-height:48px; padding:12px 16px; font:400 var(--type-body)/1.4 var(--font-body); }
+.bottom-composer .field-select-wrap > select { padding-right:44px; }
+.bottom-composer .workspace-form-field > span:first-child { font-size:var(--type-caption); }
+.note-create-composer .note-create-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; align-items:start; padding:0; border:0; background:transparent; }
+.note-compose-title,.note-create-row > .note-compose-cover,.note-create-row > p[role=alert] { grid-column:1/-1; }
+.note-create-row > .btn { justify-self:end; align-self:end; }
+.note-create-composer .note-roles-disclosure { margin-top:24px; border:0; border-top:1px solid var(--line); padding-top:20px; }
+.note-create-composer .note-roles-summary { display:flex; justify-content:space-between; font-size:var(--type-caption); padding:0; background:transparent; }
+.note-roles-summary > span { color:var(--muted); }
+.note-create-composer .note-roles-body { margin-top:24px; padding:0; }
+@media(max-width:650px){.note-create-composer .note-create-row{grid-template-columns:1fr;}.note-audit-record{gap:20px 28px;}.note-header-document{font-size:14px;}}
+
+/* Shared board columns and cards, including keyboard movement. */
+.project-status-column > header .heading-count { gap:8px; align-items:center; }
+.kanban-card-open { display:block; width:100%; padding:0; border:0; background:transparent; text-align:left; color:inherit; cursor:pointer; text-decoration:none; }
+.kanban-card-open h3 { margin:12px 0 16px; }
+.kanban-card-meta { display:flex; flex-wrap:wrap; gap:6px; }
+.project-task-card.is-dragging { opacity:.4; }
+.project-task-card > .person-identity { margin-top:16px; }
+.kanban-card-move { display:none; margin-top:16px; font-size:var(--type-caption); }
+.project-task-card:focus-within .kanban-card-move { display:grid; gap:8px; }
+.kanban-card-move select { width:100%; font:inherit; padding:8px; color:var(--ink); background:var(--paper); border:0; border-radius:var(--radius-field); }
+.project-status-column--drop { box-shadow:inset 0 0 0 2px var(--ink); }
+
+/* Member identity and history use the same caption scale. */
+.member-avatar.member-avatar--profile,.member-avatar.member-avatar--profile:has(.member-avatar-illustration) { border-radius:50%!important; background:var(--member-color)!important; aspect-ratio:1; overflow:hidden; }
+.member-avatar--profile img { border-radius:50%; }
+.member-avatar--profile img.member-avatar-illustration { border-radius:0; }
+.member-role-identity :is(.member-pronouns,.member-email,.member-tenure,.member-milestone),.member-role-week-heading,.member-project-category h5,.member-role-caption { font:400 var(--type-caption)/1.5 var(--font-body); }
+.member-role-identity .member-tenure { background:transparent; border:0; padding:0; margin:0; border-radius:0; gap:8px; }
+.member-role-identity .member-pronouns { margin:0; color:var(--muted); }
+.member-role-identity .member-email { overflow-wrap:anywhere; text-underline-offset:3px; }
+.member-role-identity { gap:10px; }
+/* A shared text baseline, independent of illustration height or selector underline. */
+.members-page .task-page-hero { align-items:baseline; }
+.members-page .task-page-hero .task-page-brand { align-items:baseline; }
+.members-page .task-page-hero .task-board-tools { align-self:baseline; align-items:baseline; margin-bottom:0; }
+.members-page .task-page-hero .task-board-view-controls { align-items:baseline; }
+.members-page .task-page-hero .task-view-picker { align-items:baseline; }
+.member-avatar--profile img:not(.member-avatar-illustration) { padding:8px; object-fit:cover; }

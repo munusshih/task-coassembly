@@ -12,5 +12,6 @@ export function MemberAvatarImage({member,className=''}) {
 }
 export default function MemberAvatar({member,onClick,size='profile'}) {
  const name=member.data?.name||member.id;
- return <button type="button" className={`member-avatar member-avatar--${size}`} onClick={onClick} aria-label={`View ${name} profile`}><MemberAvatarImage member={member}/></button>;
+ const color=1+Array.from(member.id||name||'member').reduce((sum,char)=>sum+char.codePointAt(0),0)%6;
+ return <button type="button" className={`member-avatar member-avatar--${size}`} style={{'--member-color':`var(--cover-${color})`}} onClick={onClick} aria-label={`View ${name} profile`}><MemberAvatarImage member={member}/></button>;
 }

@@ -11,3 +11,24 @@ test('review decisions require another member, a reason, and the revision being 
 
 test('unfinished proposals save as drafts, while review still requires a complete brief',()=>{const draft={...emptyProposal(),text:'A project idea'};assert.equal(validateProposalDraft(draft),draft);assert.throws(()=>validateProposal(draft));assert.equal(reviseProposal({...draft,revision:1},draft,'author').status,'Draft');});
 test('work packages sum money and hours, and incomplete packages cannot enter review',()=>{const rows=[{title:'Research',owner:'Mor',cost:'500',hours:'4'},{title:'Print',owner:'Printer',cost:'1500',hours:'1.5'}];assert.deepEqual(proposalPlanTotals(rows),{budget:2000,hours:5.5});assert.equal(validateProposal({...complete,workItems:rows}).workItems.length,2);assert.throws(()=>validateProposal({...complete,workItems:[{...rows[0],owner:''}]}));assert.throws(()=>validateProposal({...complete,workItems:[{...rows[0],hours:-1}]}));});
+
+test('board movement uses the same revision and review safeguards as the proposal reader',async()=>{
+ const {moveProposal}=await import('../src/app/components/proposalModel.mjs');
+ const owner={id:'author',name:'Author'},reviewer={id:'other',name:'Other'};
+ const draft={...complete,authorId:'author',revision:2,status:'Draft'};
+ assert.equal(moveProposal(draft,'In review',owner).status,'In review');
+ assert.throws(()=>moveProposal(draft,'In review',reviewer),/Only the author/);
+ assert.throws(()=>moveProposal({...draft,why:''},'In review',owner),/Complete/);
+ assert.throws(()=>moveProposal(draft,'Approved',reviewer,'Good'),/Submit/);
+ const review={...draft,status:'In review'};
+ assert.throws(()=>moveProposal(review,'Approved',owner,'Good'),/Another member/);
+ assert.throws(()=>moveProposal(review,'Approved',reviewer,''),/reason/);
+ assert.throws(()=>moveProposal(review,'Approved',reviewer,'Good',1),/changed/);
+ assert.equal(moveProposal(review,'Approved',reviewer,'Good',2,100).reviews.at(-1).createdAt,100);
+ assert.equal(moveProposal(review,'Changes requested',reviewer,'Clarify scope',2).status,'Changes requested');
+ const withdrawn=moveProposal(review,'Draft',owner);
+ assert.equal(withdrawn.revision,3);assert.deepEqual(withdrawn.votes,{});
+ assert.throws(()=>moveProposal({...review,archived:true},'Draft',owner),/closed/);
+ assert.throws(()=>moveProposal({...review,projectIdCreated:'p'},'Draft',owner),/closed/);
+ assert.throws(()=>moveProposal(review,'Project created',owner),/approved/);
+});

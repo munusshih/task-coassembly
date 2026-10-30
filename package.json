@@ -11,6 +11,8 @@
     "resources:previews": "node scripts/build-resource-previews.mjs"
   },
   "dependencies": {
+    "@chatscope/chat-ui-kit-react": "^2.1.1",
+    "@chatscope/chat-ui-kit-styles": "^1.4.0",
     "@opentelemetry/api": "^1.9.1",
     "@tiptap/extension-mention": "^3.22.4",
     "@tiptap/extension-typography": "^3.22.4",

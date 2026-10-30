@@ -3,9 +3,6 @@ import {useState} from 'react';
 import PersonIdentity from './ui/PersonIdentity';
 import MetadataPill from './ui/MetadataPill';
 import LetterBadge from './ui/LetterBadge';
-import EditButton from './ui/EditButton';
-import IconButton from './IconButton';
-import {DELETE_ICON} from './icons';
 import {noteCover} from '../lib/notePresentation.mjs';
 export function NoteCover({src,title='',className=''}) {
  const [failed,setFailed]=useState(false);
@@ -19,6 +16,6 @@ export default function EditorialNoteCard({note,index,projectName,author,authorM
   <NoteCover key={cover} src={cover} title={note.data.title}/>
   <h4>{note.data.title||'Untitled'}</h4>
   {note.matchType&&note.matchType!=='title'&&<small className="note-editorial-match">Matched in {note.matchType}: “{note.matchText?.slice(0,note.matchText.toLowerCase().indexOf(note.matchQuery.toLowerCase()))}<mark>{note.matchText?.slice(note.matchText.toLowerCase().indexOf(note.matchQuery.toLowerCase()),note.matchText.toLowerCase().indexOf(note.matchQuery.toLowerCase())+note.matchQuery.length)}</mark>{note.matchText?.slice(note.matchText.toLowerCase().indexOf(note.matchQuery.toLowerCase())+note.matchQuery.length)}”</small>}
-  <footer><div><PersonIdentity member={authorMember} name={author}/><time>{date}</time>{linkedHost&&<span>{linkedHost}</span>}</div><div className="note-editorial-actions"><EditButton label={`Edit ${note.data.title||'note'}`} onClick={event=>{event.stopPropagation();onEdit();}}/><IconButton title={`Delete ${note.data.title||'note'}`} variant="delete" onClick={event=>{event.stopPropagation();onDelete();}}>{DELETE_ICON}</IconButton></div></footer>
+  <footer><div><PersonIdentity member={authorMember} name={author}/><time>{date}</time>{linkedHost&&<span>{linkedHost}</span>}</div></footer>
  </li>;
 }

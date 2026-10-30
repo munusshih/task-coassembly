@@ -35,7 +35,7 @@
 }
 .picker select.select:focus:not(:focus-visible) { outline:none; box-shadow:none; }
 .picker select.select:hover { opacity: .6; }
-.picker select.select:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
+.picker select.select:focus-visible { outline:none; box-shadow:none; background:var(--palette-planned); }
 .picker select.select option { color: var(--ink); background: var(--paper); font: 400 24px/1.4 var(--font-body); letter-spacing: normal; }
 .compact { --picker-size: clamp(36px, 4vw, 64px); flex-shrink: 0; white-space: nowrap; }
 .compact .prefix { font-size: 30px; }
