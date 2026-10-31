@@ -1,14 +1,15 @@
 export const FONT_CHOICES={
  instrument:{label:'Instrument Sans',family:'"Instrument Sans", Arial, sans-serif'},
- assembly:{label:'Assembly',family:'"Assembly", "Instrument Sans", Arial, sans-serif'},
+ assembly:{label:'Assembly Regular',family:'"Assembly", "Instrument Sans", Arial, sans-serif'},
  script:{label:'Assembly Script',family:'"Assembly Script", "Instrument Sans", Arial, sans-serif'},
  typewriter:{label:'Assembly Typewriter',family:'"Assembly Typewriter", "Instrument Sans", Arial, sans-serif'},
  mono:{label:'Assembly Mono',family:'"Assembly Mono", "Instrument Sans", monospace'},
 };
+const roleFonts=['instrument','assembly','script','typewriter','mono'];
 export const TYPE_ROLES=[
- {key:'fontHeading',label:'Headings',description:'Page titles and section headings.',choices:['instrument','assembly','script'],sample:'Make room for good work'},
- {key:'fontBody',label:'Text',description:'Writing, forms, and conversations.',choices:['instrument','assembly','typewriter'],sample:'Plan together, keep decisions clear. 把想法變成共同的行動。'},
- {key:'fontLabel',label:'Small labels',description:'Dates, counts, and supporting details.',choices:['instrument','mono'],sample:'PROJECT / OCT 30 / 25 MIN'},
+ {key:'fontHeading',label:'Headings',description:'Page titles and section headings.',choices:roleFonts,sample:'Make room for good work'},
+ {key:'fontBody',label:'Text',description:'Writing, forms, and conversations.',choices:roleFonts,sample:'Plan together, keep decisions clear. 把想法變成共同的行動。'},
+ {key:'fontLabel',label:'Small labels',description:'Dates, counts, and supporting details.',choices:roleFonts,sample:'PROJECT / OCT 30 / 25 MIN'},
 ];
 export const DEFAULT_TYPOGRAPHY={fontHeading:'assembly',fontBody:'instrument',fontLabel:'mono'};
 export const ORIGINAL_TYPOGRAPHY={fontHeading:'instrument',fontBody:'instrument',fontLabel:'instrument'};

@@ -30,7 +30,7 @@ export default function SettingsPage({viewerName=''}) {
  return <TabPage className={`settings-page ${styles.page}`} header={<WorkspacePageHero title="Settings"/>}>
   <div className={styles.layout}>
    <div className={styles.intro}><p>Make Protocol comfortable for the way you work.</p><span>Preferences apply to this browser</span></div>
-   <section className={styles.section} aria-labelledby="settings-appearance">
+   <section className={`${styles.section} ${styles.appearance}`} aria-labelledby="settings-appearance">
     <header className={styles.sectionHeading}><h2 id="settings-appearance">Appearance</h2><p>Set the colors, type, and spacing of your workspace.</p></header>
     <div className={styles.sectionContent}>
      <div className={styles.settingBlock}><div className={styles.settingTitle}><h3>Color palette</h3><p>Accent colors for projects, planning, and clocks.</p></div>
