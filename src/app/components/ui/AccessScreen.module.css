@@ -1,0 +1,5 @@
+.screen {display:grid;place-items:center;box-sizing:border-box;width:100%;min-height:100dvh;margin:0;padding:24px;background:var(--paper);color:var(--ink);border:0;}
+.content {display:flex;flex-direction:column;align-items:center;gap:20px;width:min(100%,420px);margin:0;padding:0;border:0;box-shadow:none;background:transparent;text-align:center;}
+.brand {display:flex;align-items:center;justify-content:center;gap:12px;font:500 var(--type-heading)/1.2 var(--font-body);}
+.brand img {display:block;width:44px;height:44px;object-fit:contain;}
+.message {width:100%;margin:0;font:400 var(--type-caption)/1.5 var(--font-body);text-align:center;text-wrap:balance;}
