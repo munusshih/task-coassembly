@@ -23,6 +23,15 @@ async function establishSession(user) {
   }
 }
 
+function getSignInMessage(error) {
+  if (error?.code === "auth/popup-closed-by-user" || error?.code === "auth/cancelled-popup-request") return "";
+  if (error?.code === "auth/popup-blocked") return "Your browser blocked the sign-in window. Allow pop-ups and try again.";
+  if (error?.code === "auth/network-request-failed") return "A network error interrupted sign-in. Check your connection and try again.";
+  return error?.message && !String(error.message).startsWith("Firebase:")
+    ? error.message
+    : "Could not complete sign-in. Please try again.";
+}
+
 export default function LoginClient({
   next = "/",
   showError = false,
@@ -79,7 +88,7 @@ export default function LoginClient({
       await establishSession(user);
       window.location.replace(safeDestination);
     } catch (error) {
-      setMessage(error?.message || "Could not sign in with Google.");
+      setMessage(getSignInMessage(error));
     } finally {
       setBusy(false);
     }
@@ -97,7 +106,7 @@ export default function LoginClient({
           Session has expired. Please sign in again.
         </p>
       )}
-      {message ? <p className="login-error">{message}</p> : null}
+      {message ? <p className="login-error" role="alert">{message}</p> : null}
 
       <button
         type="button"

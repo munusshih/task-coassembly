@@ -1,0 +1,9 @@
+.metrics { display:grid; gap:20px; width:100%; }
+.metric { display:grid; gap:10px; }
+.label { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:4px 16px; font:400 var(--type-caption)/1.4 var(--font-body); }
+.label strong { font-weight:500; }
+.label small { color:var(--muted); font:inherit; font-weight:400; }
+.track { height:12px; border-radius:var(--radius-button); overflow:hidden; background:var(--surface-strong); }
+.track > span { display:block; height:100%; border-radius:inherit; }
+.planned { background:var(--ink); }
+.recorded { background:var(--series-2); }

@@ -1,12 +1,22 @@
 "use client";
+import FormActions from './ui/FormActions';
 
 
 import useUrlState from "../hooks/useUrlState";
 import FormField from "./ui/FormField";
+import ProjectStatusPill from "./ui/ProjectStatusPill";
 import MetadataPill from "./ui/MetadataPill";
 import { projectWorkTone } from "./memberRoleMetrics.mjs";
 import WorkspacePageHero from "./ui/WorkspacePageHero";
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
+import TabBar from "./ui/TabBar";
+import ProjectCapacityChart from "./ui/ProjectCapacityChart";
+import {projectCapacityProgress} from "./projectProgress.mjs";
+import {durationLabel} from "./time/trackingModel.mjs";
+
+import ProjectViewToolbar from './ui/ProjectViewToolbar';
+import ProjectTaskBoard from "./ProjectTaskBoard";
+import {PROJECT_STATES} from "./projectStates.mjs";
 import ProjectCollection from "./ProjectCollection";
 import {filterProjectScope} from "./workspaceGroups.mjs";
 import TimeButton from "./ui/TimeButton";
@@ -55,14 +65,7 @@ const PROJECT_KINDS = [
   "Pass-through",
 ];
 
-const PROJECT_STATUSES = [
-  "Scheduled",
-  "In Progress",
-  "Waiting for Response",
-  "On Hold",
-  "Completed",
-  "Cancelled",
-];
+const PROJECT_STATUSES = PROJECT_STATES.map(state=>state.id);
 
 const STATUS_STYLE = {
   Scheduled: { bg: "var(--surface-quiet)", color: "var(--ink)" },
@@ -564,7 +567,7 @@ function StaffingEdit({
                   />
                 </label>
                 <div className="staffing-col staffing-col--pay">
-                  {active ? (pay != null ? fmtTWD(pay) : "—") : "—"}
+                  {active ? (pay != null ? fmtTWD(pay) : "·") : "·"}
                 </div>
               </>
             )}
@@ -664,6 +667,7 @@ function ProjectRow({
     });
   }
   const [editing, setEditing] = useState(false);
+  const [detailTab,setDetailTab]=useState("overview");
 
   // Normalize Firebase data to our form shape
   function normalizeStagePlans(raw) {
@@ -845,6 +849,7 @@ function ProjectRow({
   }
 
   const hours = assignedHours(allTasks, project.id);
+  const timeProgress = projectCapacityProgress(project, allTasks);
   const maxH = d.maxHours ? Number(d.maxHours) : null;
   const selfFunded = isSelfFundedKind(d.kind);
   const selfFundingRaw = Array.isArray(d.selfFunding) ? d.selfFunding : [];
@@ -1201,7 +1206,7 @@ function ProjectRow({
                   />
                   <span>Legacy mode</span>
                   <span className="edit-checkbox-hint">
-                    Past projects — set allocated amounts directly
+                    Past projects · set allocated amounts directly
                   </span>
                 </label>
               </div>
@@ -1323,15 +1328,15 @@ function ProjectRow({
   }
 
   return (
-    <li data-rationale-anchor={`project-detail-${project.id}`} data-rationale-label={d.name || "Project"} className={"project-row" + (open ? " project-row--open" : "")}>
+    <li data-rationale-anchor={`project-detail-${project.id}`} data-rationale-label={d.name || "Project"} data-dashboard-tab={detailTab} className={"project-row project-dashboard" + (open ? " project-row--open" : "")}>
       {/* Summary row */}
-      <div className="project-row-summary" role="button" tabIndex={0} aria-expanded={open} onKeyDown={event => { if(event.target === event.currentTarget && ["Enter"," "].includes(event.key)) { event.preventDefault(); setOpen(value=>!value); } }} onClick={() => setOpen((s) => !s)}>
+      <div className="project-row-summary">
         <div className="project-row-main">
           <span className="project-row-name">{d.name || "Unnamed"}</span>
-          <div className="project-row-badges">{d.status && <MetadataPill>{d.status}</MetadataPill>}{d.kind && <MetadataPill tone={projectWorkTone(d.kind)}>{d.kind}</MetadataPill>}</div>
+          <div className="project-row-badges">{d.status && <ProjectStatusPill status={d.status}/>}{d.kind && <MetadataPill tone={projectWorkTone(d.kind)}>{d.kind}</MetadataPill>}</div>
         </div>
 
-        <div className="project-row-budget-cell">
+        <div className="project-row-budget-cell"><span className="project-metric-label">{internalOrAdmin ? "Projected cost" : "Budget"}</span>
           {internalOrAdmin ? (
             hourly != null ? (
               <>
@@ -1341,7 +1346,7 @@ function ProjectRow({
                     : fmtTWD(burnSoFarTWD)}
                 </span>
                 <span className="project-row-budget-orig">
-                  Burned {burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"} ·{" "}
+                  Burned {burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "·"} ·{" "}
                   {fmtTWD(hourly)}/h
                 </span>
                 {projectedBurnAtMaxTWD != null && (
@@ -1375,27 +1380,18 @@ function ProjectRow({
               )}
             </>
           ) : (
-            <span className="project-row-empty">—</span>
+            <span className="project-row-empty">·</span>
           )}
         </div>
 
-        <div className="project-row-hours-cell">
+        <div className="project-row-hours-cell"><span className="project-metric-label">Allocated time</span>
           <span className="project-row-hours-assigned">{fmtH(hours)}</span>
           {maxH != null && (
             <span className="project-row-hours-max">/ {fmtH(maxH)}</span>
           )}
         </div>
 
-        <div className="project-row-wage-cell">
-          {hourly != null ? (
-            <span className="project-row-wage">
-              {fmtTWD(hourly)}
-              <span className="project-row-wage-unit">/h</span>
-            </span>
-          ) : (
-            <span className="project-row-empty">—</span>
-          )}
-        </div>
+        <div className="project-row-wage-cell"><span className="project-metric-label">Logged time</span><span className="project-row-wage">{durationLabel(timeProgress.loggedSeconds).replace(/ 0m$/, '')}</span><span className="project-row-budget-orig">{timeProgress.capacityPercent==null?'Total capacity not set':`${timeProgress.capacityPercent}% of total capacity`}</span></div>
 
         <div
           className="project-row-actions"
@@ -1426,6 +1422,8 @@ function ProjectRow({
         </div>
       </div>
 
+      <TabBar id={`project-tabs-${project.id}`} label="Project details" value={detailTab} onChange={setDetailTab} panelId={`project-panel-${project.id}`} items={[{value:'overview',label:'Overview'},{value:'team',label:'Team'},{value:'budget',label:'Budget'},{value:'plan',label:'Plan'}]}/>
+      {detailTab==='overview'&&<div id={`project-panel-${project.id}`} role="tabpanel" aria-labelledby={`project-tabs-${project.id}-overview`}><ProjectCapacityChart progress={timeProgress}/></div>}
       {sortedStagePlans.length > 0 && (
         <div
           className="project-row-condensed"
@@ -1438,12 +1436,7 @@ function ProjectRow({
             </div>
             <div className="condensed-phase-meta">
               {d.status && (
-                <span
-                  className="condensed-status"
-                  style={{ background: statusSt.bg, color: statusSt.color }}
-                >
-                  {d.status}
-                </span>
+                <ProjectStatusPill status={d.status}/>
               )}
               <span className="condensed-value condensed-value--highlight">
                 {remainingHours != null
@@ -1487,7 +1480,7 @@ function ProjectRow({
 
       {/* Expanded detail panel */}
       {open && (
-        <div className="project-detail">
+        <div className="project-detail" data-panel={detailTab} id={detailTab!=='overview'?`project-panel-${project.id}`:undefined} role={detailTab!=='overview'?'tabpanel':undefined} aria-labelledby={`project-tabs-${project.id}-${detailTab}`}>
           {/* ── Primary zone: hero + ledger ── */}
           <div className="detail-primary">
             {/* Left: Hero stat (hourly rate) + hours progress */}
@@ -1497,7 +1490,7 @@ function ProjectRow({
                   {internalOrAdmin ? "Burn rate" : "Hourly wage"}
                 </span>
                 <span className="detail-hero-value">
-                  {hourly != null ? fmtTWD(hourly) : "—"}
+                  {hourly != null ? fmtTWD(hourly) : "·"}
                   {hourly != null && (
                     <span className="detail-hero-unit">/h</span>
                   )}
@@ -1651,7 +1644,7 @@ function ProjectRow({
                 <div className="detail-ledger-row">
                   <span className="detail-ledger-label">Projected rate</span>
                   <span className="detail-ledger-val">
-                    {hourly != null ? `${fmtTWD(hourly)}/h` : "—"}
+                    {hourly != null ? `${fmtTWD(hourly)}/h` : "·"}
                   </span>
                 </div>
                 <div className="detail-ledger-row">
@@ -1664,7 +1657,7 @@ function ProjectRow({
                 <div className="detail-ledger-row">
                   <span className="detail-ledger-label">Burned so far</span>
                   <span className="detail-ledger-val">
-                    {burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "—"}
+                    {burnSoFarTWD != null ? fmtTWD(burnSoFarTWD) : "·"}
                   </span>
                 </div>
                 {projectedBurnAtMaxTWD != null && (
@@ -1681,6 +1674,7 @@ function ProjectRow({
             )}
           </div>
 
+          {detailTab==='plan'&&!sortedStagePlans.length&&<p className="dashboard-plan-empty">No stages planned yet. Use the pencil to add a stage plan.</p>}
           {/* ── Stage timeline ── */}
           {sortedStagePlans.length > 0 && (
             <div className="detail-timeline">
@@ -1720,7 +1714,7 @@ function ProjectRow({
           )}
 
           {/* ── Team ── */}
-          <div className="detail-team">
+          <div className="detail-team dashboard-team">
             <div className="detail-section-head">
               <span className="detail-section-label">Team</span>
               {isLegacyMode && (
@@ -1790,17 +1784,17 @@ function ProjectRow({
                         <span className="detail-team-role">
                           {STAFFING_ROLES.find(
                             (sr) => sr.value === (s.roles || [])[0],
-                          )?.label || "—"}
+                          )?.label || "·"}
                         </span>
                       )}
                       <span className="detail-team-hours">
                         {isLegacyMode
                           ? legacyAllocated != null
                             ? fmtTWD(legacyAllocated)
-                            : "—"
+                            : "·"
                           : s.maxHours > 0
                             ? `${s.maxHours}h`
-                            : "—"}
+                            : "·"}
                         {!isLegacyMode && (
                           <span className="detail-team-hours-meta">
                             done {fmtH(finished.week)} this week ·{" "}
@@ -1810,7 +1804,7 @@ function ProjectRow({
                       </span>
                       {!isLegacyMode && (
                         <span className="detail-team-worked">
-                          {workedHours > 0 ? `${workedHours}h` : "—"}
+                          {workedHours > 0 ? `${workedHours}h` : "·"}
                           {workedPay != null && workedPay > 0 && (
                             <span className="detail-team-worked-pay">
                               {" "}
@@ -1820,7 +1814,7 @@ function ProjectRow({
                         </span>
                       )}
                       <span className="detail-team-pay">
-                        {totalPay != null ? fmtTWD(totalPay) : "—"}
+                        {totalPay != null ? fmtTWD(totalPay) : "·"}
                         {!passThrough && isLead && leadBonusTWD != null && (
                           <span className="detail-team-pay-note"> +bonus</span>
                         )}
@@ -1833,7 +1827,7 @@ function ProjectRow({
           </div>
 
           {d.kind === "Self-funded" && (
-            <div className="detail-team">
+            <div className="detail-team dashboard-funding">
               <div className="detail-section-head">
                 <span className="detail-section-label">Self funding</span>
                 <span className="detail-section-meta">
@@ -1889,7 +1883,7 @@ export default function ProjectsPage({
   const [showClosedProjects,setShowClosedProjects]=useState(false);
   const [toasts, setToasts] = useState([]);
   const [focusedProject, setFocusedProject] = useUrlState("project", "");
-  const [viewMode, setViewMode] = useUrlState("projectView", "category", { allowed: ["category", "status", "list", "kanban"] });
+  const [viewMode, setViewMode] = useUrlState("projectView", "category", { allowed: ["category", "status", "priority", "tasks", "list", "kanban"] });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [completeTarget, setCompleteTarget] = useState(null);
   const [completingProjectId, setCompletingProjectId] = useState(null);
@@ -2206,6 +2200,10 @@ export default function ProjectsPage({
     [visibleProjects],
   );
 
+  const [projectFilter,setProjectFilter]=useState('');
+  const [rejectedOnly,setRejectedOnly]=useState(false);
+  const effectiveProjectFilter=collectionProjects.some(project=>project.id===projectFilter)?projectFilter:'';
+  const filteredCollectionProjects=collectionProjects.filter(project=>!effectiveProjectFilter||project.id===effectiveProjectFilter);
   const projectViewOptions = [
     {
       value: "list",
@@ -2236,8 +2234,8 @@ export default function ProjectsPage({
   return (
     <TabPage
       className="projects-page"
-      title="Projects"
-      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'}]} /></WorkspacePageHero>}
+      title="Project"
+      header={<WorkspacePageHero title="Project" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'},{value:'priority',label:'Priority'},{value:'tasks',label:'Task'}]} /></WorkspacePageHero>}
     >
       {!isLimitedViewer ? (
         <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
@@ -2314,7 +2312,7 @@ export default function ProjectsPage({
                 Budget comes from self funding. Donation is disabled.
               </span>
             )}
-            <FormField label="Start date"><InputField
+            <div className="project-date-range"><FormField label="Start date"><InputField
               className="project-field"
               type="date"
               value={form.startDate}
@@ -2327,7 +2325,7 @@ export default function ProjectsPage({
               value={form.endDate}
               onChange={(e) => setField("endDate", e.target.value)}
               title="Project end date"
-            /></FormField>
+            /></FormField></div>
             {isInternalOrAdminKind(form.kind) && (
               <FormField label="Projected hourly rate (TWD)"><InputField
                 className="project-field"
@@ -2342,7 +2340,7 @@ export default function ProjectsPage({
                 title="Projected hourly wage for Internal/Admin projects (TWD)"
               /></FormField>
             )}
-            <div className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></div>
+            <FormActions className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></FormActions>
           </form>
         </BottomComposer>}</>
       ) : (
@@ -2355,10 +2353,12 @@ export default function ProjectsPage({
         </SectionBlock>
       )}
 
-      <div className="project-collection-controls"><span>{showClosedProjects?'All projects':'Active projects'} <span className="task-scope-count">{collectionProjects.length}</span></span>{closedProjectCount>0&&<TimeButton quiet aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?'Hide closed projects':`Show closed projects (${closedProjectCount})`}</TimeButton>}</div>
+
       {collectionProjects.length === 0 ? <EmptyState>{visibleProjects.length?'No active projects.':'No projects yet.'}</EmptyState> : <>
-        <ProjectCollection projects={collectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})}/>
-        {visibleProjects.some(project=>project.id===focusedProject)&&<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid">{visibleProjects.filter(project=>project.id===focusedProject).map(project=><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/>)}</ul></section>}
+        <ProjectViewToolbar projects={collectionProjects} value={effectiveProjectFilter} onChange={setProjectFilter}><div className="project-collection-options">{closedProjectCount>0&&<Button variant="ghost" aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?"Hide closed projects":`Show ${closedProjectCount} closed projects`}</Button>}</div>
+        {viewMode==='tasks'&&<label><input type="checkbox" checked={rejectedOnly} onChange={event=>setRejectedOnly(event.target.checked)}/> Rejected twice or more</label>}</ProjectViewToolbar>
+        {viewMode==='tasks'?<ProjectTaskBoard rejected={rejectedOnly} projects={filteredCollectionProjects} tasks={visibleTasks} members={members} viewerMemberId={viewerMemberId}/>:<ProjectCollection projects={filteredCollectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={viewMode==='priority'?'priority':['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})} renderDetails={project=>(<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid"><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/></ul></section>)}/>}
+
       </>}
 
       <StatusStack className="toast-container" ariaLive="polite">
@@ -2386,16 +2386,7 @@ export default function ProjectsPage({
           onClose={() => setCompleteTarget(null)}
           size="sm"
           footer={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={() => setCompleteTarget(null)}
-                disabled={Boolean(completingProjectId)}
-              >
-                Cancel
-              </Button>
+            <FormActions>
               <Button
                 type="button"
                 size="small"
@@ -2409,7 +2400,16 @@ export default function ProjectsPage({
               >
                 {completingProjectId ? "Completing…" : "Complete project"}
               </Button>
-            </>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setCompleteTarget(null)}
+                disabled={Boolean(completingProjectId)}
+              >
+                Cancel
+              </Button>
+            </FormActions>
           }
         >
           <p className="delete-confirm-body">

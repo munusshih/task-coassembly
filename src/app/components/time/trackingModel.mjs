@@ -6,7 +6,7 @@ export const IDLE_MS = 5 * 60 * 1000;
 export const FRAGMENT_MS = 15 * 60 * 1000;
 export const REMINDER_MS = 15 * 60 * 1000;
 export const newId = () => crypto.randomUUID();
-export const emptyJournal = () => ({ version: 1, fragments: [], auto: null, focus: null, completion: null, nextReminderAt: 0 });
+export const emptyJournal = () => ({ version: 1, fragments: [], auto: null, focus: null, completion: null, automaticPaused: false, nextReminderAt: 0 });
 export const secondsBetween = (start, end) => Math.max(0, Math.floor((end - start) / 1000));
 export function durationLabel(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -27,6 +27,10 @@ export function closeAuto(journal, end) {
     id: auto.id, start: auto.start, end, seconds, source: auto.kind, status: "pending",
   }] : journal.fragments;
   return { ...journal, fragments, auto: null };
+}
+export function setAutomaticRecording(journal, now, recording) {
+  // Close the current block before pausing; restarting never fills the gap.
+  return { ...closeAuto(journal, now), automaticPaused: !recording };
 }
 export function pauseFocus(journal, now, recovered = false) {
   const focus = journal.focus;
@@ -69,7 +73,7 @@ export function advanceJournal(journal, now, { active, lastInput }) {
   if (next.focus?.status === "running" && next.focus.mode === "countdown" && focusElapsed(next.focus, now) >= next.focus.durationMs) {
     next = finishFocus(next, now, "time-up");
   }
-  const capture = active && next.focus?.status !== "running";
+  const capture = active && !next.automaticPaused && next.focus?.status !== "running";
   if (!capture) return closeAuto(next, now);
   const kind = now - lastInput >= IDLE_MS ? "idle" : "activity";
   if (next.auto && next.auto.kind !== kind) {
@@ -122,4 +126,26 @@ export function recordLoggedFragments(journal, fragments, taskId) {
     next.completion = {...next.completion,status:'logged',seconds:next.fragments.filter(fragment=>fragment.sessionId===next.completion.id && fragment.status==='logged').reduce((sum,fragment)=>sum+fragment.seconds,0)};
   }
   return next;
+}
+
+// Publish eligible automatic time without a manual refresh or unrecorded gaps.
+export function refreshEligibleActivity(journal, now) {
+ if (journal.auto?.kind !== 'activity' || secondsBetween(journal.auto.start, now) < MIN_TRACKED_SECONDS) return journal;
+ const closed = closeAuto(journal, now);
+ return {...closed, auto:{id:newId(),start:now,lastSeen:now,kind:'activity'}};
+}
+
+export function cancelFocus(journal, now) {
+ if(!journal.focus)return journal;
+ const next=finishFocus({...journal,focus:{...journal.focus,autoLog:false}},now,'cancelled');
+ return {...next,completion:null};
+}
+export function configureFocus(journal, now, {mode,minutes}) {
+ const focus=journal.focus;
+ if(!focus)return journal;
+ if(focus.status!=='paused')throw new Error('Pause the timer before adjusting it.');
+ if(!['countdown','stopwatch'].includes(mode))throw new Error('Choose a timer mode.');
+ if(!Number.isFinite(minutes)||minutes<1||minutes>240)throw new Error('Choose 1 to 240 minutes.');
+ const durationMs=Math.max(minutes*60000,focus.elapsedMs+60000);
+ return {...journal,focus:{...focus,mode,durationMs}};
 }

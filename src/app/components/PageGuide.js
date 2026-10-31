@@ -16,14 +16,14 @@ const PAGE_GUIDES = {
   },
   settings: {
     title: copy("Settings", "設定"),
-    intro: copy("Workspace settings are coming soon. You can keep using the shared navigation to move between pages.", "工作區設定即將推出。你可以使用共用選單切換頁面。"),
+    intro: copy("Update your contact details, set your focus duration, and adjust motion or card density here.", "在此更新聯絡資料、預設專注時間、動畫和卡片密度。"),
     outro: copy("Open the menu whenever you need to head somewhere else.", "需要前往其他頁面時，請開啟左上方選單。"),
     steps: [],
   },
   members: {
     title: copy("TASK", "任務"),
     intro: copy(
-      "Hi—welcome to the team’s weekly planning hub! This is where a loose piece of work becomes a named task with an owner, project, week, time estimate, deadline, and review status.",
+      "Hi·welcome to the team’s weekly planning hub! This is where a loose piece of work becomes a named task with an owner, project, week, time estimate, deadline, and review status.",
       "嗨，歡迎來到團隊的每週工作規劃中心！在這裡，一件零散的工作會變成有負責人、專案、週次、工時估算、期限與複核狀態的明確任務。",
     ),
     outro: copy(
@@ -48,6 +48,9 @@ const PAGE_GUIDES = {
           "「成員」檢視呈現個人工作量；「專案」檢視依專案重組同一週的任務；「資源」檢視則跨週彙整各專案的任務連結。可用檢視會依你的權限而定。",
         ),
       },
+      {element: '.time-panel--automatic', title: copy('Automatic recording', '自動計時'), description: copy('Automatic records activity while Protocol is open. Idle time is excluded. Stop or restart recording whenever you like. Choose Last 24 hours or Last hour, then select a recorded slice to review it.', '開啟 Protocol 時會自動記錄活動，並排除閒置時間。可以隨時停止或重新開始，切換最近二十四小時或最近一小時，並點選時鐘區塊回顧工時。')},
+      {element: '.time-pending-panel', title: copy('Time ready to log', '可登錄的工時'), description: copy('Blocks appear automatically once they reach ten minutes. Select the blocks you worked, choose a task, and log them. Unlogged time stays on this device; focus time stays with its original task.', '滿十分鐘的工時會自動出現。選擇時段與任務後登錄；未登錄工時只保留在此裝置，專注工時會歸屬原本的任務。')},
+      {element: '.time-panel--focus', title: copy('Make room for focus', '留一段專注時間'), description: copy('Choose a task and a countdown or stopwatch. Pause and resume as needed. Finish logs eligible focus time to that task; sessions under ten minutes do not count.', '選擇任務與倒數或碼錶，可以暫停、繼續，完成時自動登錄滿十分鐘的工時。')},
       {
         element: ".members-page .week-select",
         title: copy("Move through weekly snapshots", "切換每週工作快照"),
@@ -85,7 +88,7 @@ const PAGE_GUIDES = {
   memberDirectory: {
     title: copy("Members", "成員名錄"),
     intro: copy(
-      "Hi, worker-owner—welcome to the team directory! This is the administrative home for member identity, Google sign-in access, membership type, and workload history.",
+      "Hi, worker-owner·welcome to the team directory! This is the administrative home for member identity, Google sign-in access, membership type, and workload history.",
       "嗨，社員你好，歡迎來到成員名錄！這裡集中管理成員身分、Google 登入權限、成員類型與工作量紀錄。",
     ),
     outro: copy(
@@ -124,7 +127,7 @@ const PAGE_GUIDES = {
   projects: {
     title: copy("Projects", "專案"),
     intro: copy(
-      "Hi—welcome to the project control room! Each project connects delivery status with its budget, cooperative contribution, dates, staffing capacity, task hours, and projected member pay.",
+      "Hi·welcome to the project control room! Each project connects delivery status with its budget, cooperative contribution, dates, staffing capacity, task hours, and projected member pay.",
       "嗨，歡迎來到專案控制室！每個專案都會把執行狀態與預算、合作社提撥、起訖日期、人力配置、任務工時及成員預估報酬串在一起。",
     ),
     outro: copy(
@@ -175,62 +178,18 @@ const PAGE_GUIDES = {
     ],
   },
   backlog: {
-    title: copy("Wishes", "願望清單"),
-    intro: copy(
-      "Hi—welcome to the team’s idea garden! Wishes are valuable ideas that are not scheduled commitments yet, so they can gather context, reactions, and discussion before becoming work.",
-      "嗨，歡迎來到團隊的想法花園！願望是有價值、但尚未排入工作承諾的想法；它們可以先累積脈絡、回應與討論，再變成正式任務。",
-    ),
-    outro: copy(
-      "You’re ready! Add an idea to the closest project now; only push it to the weekly board once its owner and timing are clear.",
-      "準備好了！現在先把想法加入最相關的專案欄；等負責人與執行時間明確後，再推到每週工作台。",
-    ),
+    title: copy("Wishes", "提案"),
+    intro: copy("Shape an idea into a proposal with a purpose, scope, budget, work breakdown, time estimate, and timeline.", "把想法整理成提案，說明目的、範圍、預算、工作拆解、工時和時程。"),
+    outro: copy("Discuss and revise the proposal. Another member records a review decision before an approved revision becomes a project.", "透過討論和修訂完善提案，由另一位成員記錄複核決定，通過後再建立專案。"),
     steps: [
-      {
-        element: ".backlog-page .page-header",
-        title: copy("Search the idea pool", "搜尋想法池"),
-        description: copy(
-          "The total shows the size of the current pool. Search checks wish text across every project column.",
-          "數量標籤顯示目前想法池的規模；搜尋功能會檢查所有專案欄位中的願望文字。",
-        ),
-        side: "bottom",
-      },
-      {
-        element: ".backlog-page .backlog-grid",
-        title: copy("Ideas stay with their context", "讓想法保留專案脈絡"),
-        description: copy(
-          "Wishes are grouped by project, with an Unassigned column for ideas that do not have a home yet. Add new wishes directly to the relevant column.",
-          "願望會依專案分組；還沒有歸屬的想法會放在「未指派」欄。請直接在對應專案欄中新增願望。",
-        ),
-      },
-      {
-        element: ".backlog-page .backlog-add-row",
-        reveal: {
-          trigger: ".backlog-page .backlog-create-trigger",
-          openSelector: ".backlog-page .backlog-add-row",
-          closeTrigger:
-            ".backlog-page .backlog-add-row button:last-child",
-        },
-        title: copy("Capture an idea in place", "直接在專案欄中記下想法"),
-        description: copy(
-          "The Add wish row opens automatically here so you can see where an unscheduled idea is captured. It closes without saving when the tour moves on.",
-          "這一步會自動展開「新增願望」欄位，示範尚未排程的想法要記在哪裡。繼續導覽時會自動關閉，而且不會儲存。",
-        ),
-      },
-      {
-        element: ".backlog-page .wish-item",
-        title: copy("React, discuss, then push to the board", "回應、討論，再排入工作台"),
-        description: copy(
-          "Reactions help surface interest, comments preserve discussion, and Push to board turns the wish into a weekly task assigned to a member.",
-          "表情回應可顯示關注度，留言會保留討論脈絡；「推到工作台」則會把願望轉成指派給成員的每週任務。",
-        ),
-        side: "top",
-      },
+      {element:'.proposal-toolbar',title:copy('Find a proposal','搜尋提案'),description:copy('Search titles and purpose, or filter by review status.','搜尋標題與目的，或依審核狀態篩選。')},
+      {element:'.proposal-grid',title:copy('Open the complete proposal','開啟完整提案'),description:copy('Each proposal keeps votes, discussion, revision history, and review reasons together. Revisions reset votes and need a fresh review.','每份提案保留投票、討論、修訂歷程與審核理由。修訂後會重置投票並重新審核。')},
     ],
   },
   finance: {
     title: copy("Finance", "財務"),
     intro: copy(
-      "Hi—welcome to Protocol’s financial picture! This page compares accountant-recorded cash flow with project forecasts so the team can understand what should be received, paid, retained, or reconciled.",
+      "Hi·welcome to Protocol’s financial picture! This page compares accountant-recorded cash flow with project forecasts so the team can understand what should be received, paid, retained, or reconciled.",
       "嗨，歡迎查看 Protocol 的財務全貌！這個頁面會比較會計帳上的實際現金流與專案預測，讓團隊理解應收、應付、保留與待核對的金額。",
     ),
     outro: copy(
@@ -277,7 +236,7 @@ const PAGE_GUIDES = {
   payouts: {
     title: copy("Requests", "請款申請"),
     intro: copy(
-      "Hi—welcome to the request desk! This page tracks money moving between a member and the cooperative, including who owes whom, the reason, amount, receipt evidence, approval, and payment.",
+      "Hi·welcome to the request desk! This page tracks money moving between a member and the cooperative, including who owes whom, the reason, amount, receipt evidence, approval, and payment.",
       "嗨，歡迎來到請款櫃台！這個頁面會追蹤成員與合作社之間的金流，包括誰需要付給誰、款項原因、金額、收據證明、核准與付款狀態。",
     ),
     outro: copy(
@@ -330,7 +289,7 @@ const PAGE_GUIDES = {
   meetingNotes: {
     title: copy("Notes", "筆記"),
     intro: copy(
-      "Hi—welcome to the team library! A note can be a collaborative document, a meeting record, or a quick external link, with project scope, roles, attendance, and live editing when needed.",
+      "Hi·welcome to the team library! A note can be a collaborative document, a meeting record, or a quick external link, with project scope, roles, attendance, and live editing when needed.",
       "嗨，歡迎來到團隊資料庫！一則筆記可以是協作文件、會議紀錄或外部連結，也能依需要加入專案範圍、會議分工、出席狀況與即時編輯。",
     ),
     outro: copy(
@@ -381,11 +340,11 @@ const PAGE_GUIDES = {
   resources: {
     title: copy("Resource", "資源庫"),
     intro: copy(
-      "Hi—welcome to the shared resource shelf! This is where the team keeps reusable references, tools, vendors, services, and project material so useful knowledge does not disappear inside old tasks.",
+      "Hi·welcome to the shared resource shelf! This is where the team keeps reusable references, tools, vendors, services, and project material so useful knowledge does not disappear inside old tasks.",
       "嗨，歡迎來到共用資源架！團隊可在這裡保存能重複使用的參考資料、工具、廠商、服務與專案素材，避免重要知識埋在舊任務裡。",
     ),
     outro: copy(
-      "You’re ready! Add one resource with a clear name, a sentence explaining when to use it, the right category, and any closely related sub-links.",
+      "You’re ready! Add one resource with a clear name, a sentence explaining when to use it, the right category.",
       "準備好了！新增資源時，請填寫清楚的名稱、一句使用情境說明、正確分類，以及密切相關的子連結。",
     ),
     steps: [
@@ -407,7 +366,7 @@ const PAGE_GUIDES = {
         },
         title: copy("Save enough context to reuse it", "補足資訊，讓資源能再次使用"),
         description: copy(
-          "Add the main URL, a clear name and description, a category, and any related sub-links so teammates know what the resource is for.",
+          "Add the main URL, a clear name and description, a category so teammates know what the resource is for.",
           "請加入主要網址、清楚的名稱與說明、分類，以及相關子連結，讓其他成員知道這項資源適合用在什麼情境。",
         ),
       },
@@ -424,7 +383,7 @@ const PAGE_GUIDES = {
         element: ".resources-page .resource-sticky",
         title: copy("Open, edit, or expand a resource", "開啟、編輯或延伸資源"),
         description: copy(
-          "A resource card links to its main destination and any sub-links. Use its controls when the description, category, or destination changes.",
+          "A resource card links to its main destination. Use its controls when the description, category, or destination changes.",
           "資源卡會連到主要網址與所有子連結。當說明、分類或目的地改變時，可使用卡片上的控制項更新內容。",
         ),
         side: "top",

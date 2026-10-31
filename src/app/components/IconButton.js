@@ -1,5 +1,7 @@
 "use client";
 
+import ControlSurface from "./ui/ControlSurface";
+
 export default function IconButton({
   type = "button",
   variant,
@@ -9,5 +11,5 @@ export default function IconButton({
   const variantClass = variant ? `icon-btn--${variant}` : "";
   const classes = ["icon-btn", variantClass, className].filter(Boolean).join(" ");
 
-  return <button type={type} className={classes} {...props} />;
+  return <ControlSurface type={type} className={classes} {...props} />;
 }

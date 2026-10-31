@@ -1,0 +1,18 @@
+.prose.prose,.prose.prose :global(.note-prose) { color:var(--ink); font:400 var(--type-body)/1.6 var(--font-body); overflow-wrap:anywhere; }
+.prose.prose :is(h1,h2,h3,h4) { margin:28px 0 16px; font:500 var(--type-panel-title)/1.3 var(--font-body); letter-spacing:var(--tracking-tight); }
+.prose.prose :is(p,ul,ol,blockquote,pre,table) { max-width:none; margin:0 0 1em; font-size:inherit; line-height:inherit; }
+.prose.prose :is(ul,ol) { padding-inline-start:1.5em; }
+.prose.prose li > p { margin-block:.25em; }
+.prose.prose a { color:inherit; text-decoration:underline; text-underline-offset:4px; overflow-wrap:anywhere; }
+.prose.prose > :first-child,.prose.prose :global(.note-prose) > :first-child { margin-top:0; }
+.prose.prose hr { border:0; border-top:1px solid var(--line); margin:28px 0; }
+.prose.prose p:empty { display:none; }
+/* One continuous sheet; all vertical spacing follows its baseline grid. */
+.paper.paper.paper { --writing-line-height:calc(var(--type-body) * 1.6); display:flow-root; background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--writing-line-height) - 1px),color-mix(in srgb,var(--ink) 9%,transparent) calc(var(--writing-line-height) - 1px),color-mix(in srgb,var(--ink) 9%,transparent) var(--writing-line-height)); }
+.paper .prose.prose,.paper .prose.prose :global(.note-prose) { line-height:var(--writing-line-height); }
+.paper .prose.prose :is(h1,h2,h3,h4) { line-height:var(--writing-line-height); margin-block:var(--writing-line-height); }
+.paper .prose.prose :is(p,ul,ol,blockquote,pre,table) { line-height:var(--writing-line-height); margin-block:0 var(--writing-line-height); }
+.paper .prose.prose li { line-height:var(--writing-line-height); margin-block:0; }
+.paper .prose.prose li > :is(p,ul,ol) { margin-block:0; }
+.paper .prose.prose hr { margin-block:var(--writing-line-height); border:0; height:var(--writing-line-height); }
+.paper .prose.prose > :first-child,.paper .prose.prose :global(.note-prose) > :first-child { margin-top:0; }

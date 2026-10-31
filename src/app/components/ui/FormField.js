@@ -1,3 +1,4 @@
-export default function FormField({ label, hint, children }) {
-  return <label className="workspace-form-field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
+export default function FormField({ label, hint, children, className = "" }) {
+  const classes = ["workspace-form-field", className].filter(Boolean).join(" ");
+  return <label className={classes}><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
 }

@@ -1,0 +1,348 @@
+.detail.detail :global(.edit-modal-header) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 64px;
+  padding: 12px clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.detail.detail :global(.edit-modal-body) {
+  height: calc(100dvh - 64px);
+  padding: 0;
+  overflow-y: auto;
+  background: var(--surface-quiet);
+}
+
+.detail.detail :global(.note-preview-row) {
+  display: grid;
+  width: min(100%, 1080px);
+  max-width: 1080px;
+  gap: 0;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
+}
+
+.detail.detail :global(.note-preview-cover) {
+  width: 100%;
+  max-height: min(50vh, 480px);
+  margin: 0 0 32px;
+  border-radius: var(--radius-panel);
+  object-fit: cover;
+}
+
+.detail.detail :global(.note-preview-header) {
+  margin: 0;
+}
+
+.detail.detail :global(.note-preview-title) {
+  max-width: 24ch;
+  margin: 0;
+  font: 500 clamp(32px, 4vw, 52px)/1.12 var(--font-body);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.detail.detail :global(.note-preview-title-block) {
+  display: grid;
+  gap: 16px;
+}
+
+.detail.detail :global(.note-preview-meta) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 32px;
+  margin: 28px 0 36px;
+  padding: 20px 0;
+  border-block: 1px solid var(--line);
+}
+
+.detail.detail :global(.note-preview-meta > .note-meta-line) {
+  width: auto;
+  grid-column: 1 / -1;
+}
+
+.detail.detail :global(.note-role-line),
+.detail.detail :global(.note-attendance-block) {
+  min-width: 0;
+}
+
+.detail.detail :global(.note-preview-content) {
+  width: min(100%, 72ch);
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+}
+
+.detail.detail :global(.note-prose) {
+  font: 400 var(--type-body)/1.75 var(--font-body);
+}
+
+.detail.detail :global(.note-discussion) {
+  width: min(100%, 72ch);
+  max-width: 72ch;
+  margin: 56px auto 0;
+}
+
+.editor {
+  display: grid;
+  grid-template-areas:
+    "details"
+    "content"
+    "actions";
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 24px clamp(16px, 3vw, 40px) 100px;
+  background: transparent;
+}
+
+.editorMeta {
+  grid-area: details;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+.sectionHeading {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink);
+  font: 500 var(--type-heading)/1.3 var(--font-body);
+  letter-spacing: var(--tracking-tight);
+}
+
+.editorMeta > :global(.note-meta-field) {
+  grid-column: span 6;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.editorMeta > :global(.note-meta-field--wide),
+.editorMeta > :global(.note-role-grid),
+.optionalFields {
+  grid-column: 1 / -1;
+}
+
+.editorMeta :global(.note-meta-field > span),
+.editorMeta :global(.note-role-grid > .note-meta-field > span) {
+  color: var(--muted);
+  font: 500 var(--type-caption)/1.35 var(--font-body);
+}
+
+.editorMeta :global(.note-meta-input),
+.editorMeta :global(input.note-meta-input),
+.editorMeta :global(select.note-meta-input) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--paper);
+  font: 400 var(--type-caption)/1.35 var(--font-body);
+}
+
+.editorMeta :global(input.note-meta-input) {
+  text-overflow: ellipsis;
+}
+
+.optionalFields :global(small[role="alert"]) {
+  color: var(--muted);
+  font: 400 var(--type-caption)/1.4 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.editorMeta :global(.note-role-grid) {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.editorMeta :global(.note-role-grid > .note-meta-field) {
+  display: grid;
+  grid-column: auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.editorMeta :global(.note-role-grid > .note-meta-field--wide) {
+  grid-column: 1 / -1;
+}
+
+.editorMeta :global(.meeting-attendees-list) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 180px;
+  gap: 2px;
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.editorMeta :global(.meeting-attendee-row) {
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.editorMeta :global(.meeting-attendee-main span) {
+  overflow-wrap: anywhere;
+}
+
+.editorMeta :global(.meeting-attendee-main),
+.editorMeta :global(.meeting-attendee-absent) {
+  font: 400 var(--type-caption)/1.4 var(--font-body);
+}
+
+.optionalFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.optionalFields > summary {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font: 500 var(--type-caption)/1.4 var(--font-body);
+  cursor: pointer;
+}
+
+.optionalFields > :global(.note-meta-field) {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.writingPanel {
+  grid-area: content;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.editorActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  grid-area: actions;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-inline: calc(clamp(16px, 3vw, 40px) * -1);
+  padding: 14px clamp(16px, 3vw, 40px);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+@media (max-width: 900px) {
+  .editor {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "details"
+      "content"
+      "actions";
+  }
+
+  .detail.detail :global(.edit-modal-body) {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .detail.detail :global(.note-preview-row) {
+    width: 100%;
+  }
+
+  .detail.detail :global(.note-preview-meta) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .editorMeta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 16px;
+  }
+
+  .editorMeta > :global(.note-meta-field) {
+    grid-column: 1 / -1;
+  }
+
+  .editorMeta :global(.note-role-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editorMeta :global(.meeting-attendees-list),
+  .optionalFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editorActions {
+    margin-inline: -16px;
+  }
+}
+
+/* Read and edit share the same width, type scale, and quiet surface. */
+.detail.detail :global(.edit-modal-body) { padding:24px clamp(16px,3vw,40px) 72px; background:var(--paper); }
+.detail.detail :global(.note-preview-row),.detail.detail :global(.note-preview-content) { width:100%; max-width:none; margin-inline:0; }
+.detail.detail :global(.note-preview-title) { max-width:36ch; font:500 var(--type-page)/1.2 var(--font-body); text-wrap:balance; }
+.detail.detail :global(.note-preview-meta) { margin:24px 0 32px; }
+.detail.detail :global(.note-prose) { font:400 var(--type-body)/1.6 var(--font-body); }
+.editor { width:100%; padding:0; }
+.editorMeta { border:0; padding:0 0 24px; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+.editorMeta :global(.note-meta-input) { background:var(--surface-quiet); border:0; border-radius:var(--radius-field); font-size:var(--type-body); }
+.peopleFields { grid-column:1/-1; padding-top:16px; border-top:1px solid var(--line); }
+.peopleFields > summary { cursor:pointer; font:400 var(--type-caption)/1.4 var(--font-body); }
+.peopleFields[open] > summary { margin-bottom:20px; }
+.editorActions { margin-inline:0; padding:16px 0; }
+.editorActions > :global(.note-autosave-status) { margin-right:auto; font-size:var(--type-caption); }
+@media(max-width:600px){.editorMeta :global(.note-meta-input){font-size:var(--type-caption);}.editorActions{flex-wrap:wrap;}}
+.detail.detail :global(.note-preview-meta) { padding:20px 24px; background:var(--palette-planned); border:0; border-radius:var(--radius-panel); }
+.detail.detail :global(.note-preview-meta > *) { border:0; }
+
+.detail { --note-page-gutter:clamp(16px,3vw,40px); }
+.detail.detail :global(.edit-modal-body:has(.note-preview-row)) { padding-bottom:0; }
+
+/* Writing fills the viewport; only the document panes scroll. */
+.detail.detail :global(.edit-modal-body:has(.note-editor-row)) {padding:0;overflow:hidden;}
+.editor.editor {align-items:stretch;height:100%;max-width:none;display:flex;flex-direction:column;gap:0;padding:0;}
+.metadataDisclosure {flex:none;background:#080808;color:#fff;max-height:45%;overflow:auto;}
+.metadataDisclosure > summary {display:flex;align-items:center;gap:20px;padding:14px 24px;cursor:pointer;font:400 13px/1.4 var(--font-label);}
+.metadataDisclosure > summary::after {content:'⌄';margin-left:auto;}
+.metadataDisclosure[open] > summary::after {content:'⌃';}
+.metadataDisclosure > summary strong {font:500 16px/1.4 var(--font-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.metadataDisclosure > summary > span {color:#aaa;white-space:nowrap;}
+.editorMeta.editorMeta {padding:8px 24px 20px;border:0;gap:12px 20px;color:#fff;background:transparent;}
+.editorMeta.editorMeta .sectionHeading {display:none;}
+.editorMeta.editorMeta > :global(.note-meta-field) {grid-column:span 4;}
+.editorMeta.editorMeta > :global(.note-meta-field--wide) {grid-column:1/-1;}
+.editorMeta.editorMeta :global(.note-meta-field > span),.editorMeta.editorMeta summary {color:#aaa;font-size:13px;}
+.editorMeta.editorMeta :global(.note-meta-input) {background:#242424;color:#fff;border:1px solid #444;min-height:36px;border-radius:6px;font-size:15px;}
+.editorMeta.editorMeta :global(option) {background:#242424;color:white;}
+.optionalFields {border-color:#333;padding-top:10px;}
+.writingPanel.writingPanel {flex:1;display:block;min-height:0;}
+.editorActions.editorActions {position:static;flex:none;margin:0;padding:10px 24px;min-height:60px;border-top:1px solid var(--line);background:var(--paper);}
+.editorActions.editorActions > :global(.note-autosave-status) {font-size:13px;}
+.detail.detail :global(.note-preview-header),.detail.detail :global(.note-preview-meta),.detail.detail :global(.note-preview-content) {width:min(100%,780px);max-width:780px;margin-inline:auto;}
+.detail.detail :global(.note-preview-cover) {max-width:780px;margin-inline:auto;}
+@media(max-width:600px){.metadataDisclosure > summary{gap:12px;padding-inline:16px}.metadataDisclosure > summary > span:last-of-type{display:none}.editorMeta.editorMeta{padding-inline:16px}.editorMeta.editorMeta > :global(.note-meta-field){grid-column:1/-1}.editorActions.editorActions{padding:8px 16px}}
+.editorMeta.editorMeta :global(.field-select-chevron) {color:#fff;}
+.editorMeta.editorMeta :global(input[type=date]) {color-scheme:dark;}

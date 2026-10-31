@@ -1,4 +1,4 @@
-import { taskWeekKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToProject } from './taskBoardRules.js';
+import { taskWeekKey, weekStartForDateKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToProject } from './taskBoardRules.js';
 
 export const WORK_CATEGORIES = [
   { key: 'rd', label: 'R&D', tone: 'project' },
@@ -11,7 +11,7 @@ export function workCategory(kind) {
   const value = String(kind || '').trim().toLowerCase();
   if (['internal', 'self-funded', 'grant', 'rd', 'r&d'].includes(value)) return 'rd';
   if (['commissioned', 'pass-through', 'commercial'].includes(value)) return 'work';
-  if (value === 'admin') return 'admin';
+  if (['admin','service','common pool'].includes(value)) return 'admin';
   return 'unclassified';
 }
 
@@ -26,8 +26,8 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), m
   });
   const rangeWeeks = [];
   if (mode === "weekly" && /^\d{4}-\d{2}-\d{2}$/.test(range.start || "")) {
-    const first = new Date(`${range.start}T00:00:00Z`);
-    const last = new Date(`${range.end || range.start}T00:00:00Z`);
+    const first = new Date(`${weekStartForDateKey(range.start)}T00:00:00Z`);
+    const last = new Date(`${weekStartForDateKey(range.end || range.start)}T00:00:00Z`);
     for (let date = new Date(first); date <= last; date.setUTCDate(date.getUTCDate() + 7)) {
       rangeWeeks.push({ key: date.toISOString().slice(0, 10), units: 0, projects: new Map() });
     }
@@ -59,6 +59,7 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), m
   return {
     assigned, completed, mode,
     projectTotals:[...totals.values()].filter(project => project.units > 0).sort((a,b) => b.units-a.units),
+    historicalProjects: projects.filter(project=>tasks.some(task=>task.data?.memberId===memberId&&task.data?.projectId===project.id)&&!current.has(project.id)),
     currentProjects: [...current.values()].sort((a, b) => String(a.data?.name || a.id).localeCompare(String(b.data?.name || b.id))),
     weeks: weeks.map(w => ({ ...w, projects: [...w.projects.values()].filter(project => project.units > 0).sort((a, b) => b.units - a.units) })),
     categories: WORK_CATEGORIES.filter(c => c.key !== 'unclassified' || categories[c.key] > 0).map(c => ({ ...c, units: categories[c.key], percent: total ? categories[c.key] / total * 100 : 0 })),

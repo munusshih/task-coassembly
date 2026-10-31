@@ -1,4 +1,6 @@
 "use client";
+import MemberWeekRange from "./ui/MemberWeekRange";
+import {memberTimeSummary} from "./memberTimeSummary.mjs";
 import WeekSelect from "./ui/WeekSelect";
 
 
@@ -479,11 +481,11 @@ function taskMetricAnchorTs(taskData) {
 }
 
 export default function MemberDirectoryPage() {
-  const [directoryView, setDirectoryView] = useUrlState("memberView", "role", { allowed: ["role", "weekly", "overall"] });
+  const [directoryView, setDirectoryView] = useUrlState("memberView", "role", { allowed: ["role", "weekly"] });
   const currentWeek = weekStartDateForTs(Date.now()).toISOString().slice(0, 10);
   const [memberWeek] = useUrlState("memberWeek", currentWeek, { validate: isDateKey });
   const [memberEndWeek] = useUrlState("memberEndWeek", "", { validate: isDateKey });
-  const endWeek = memberEndWeek >= memberWeek ? memberEndWeek : currentWeek >= memberWeek ? currentWeek : memberWeek;
+  const endWeek = memberEndWeek >= memberWeek ? memberEndWeek : memberWeek;
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -495,7 +497,7 @@ export default function MemberDirectoryPage() {
     return () => clearInterval(timer);
   }, []);
   const [highlightedMember, setHighlightedMember] = useState(null);
-  const [profileId, setProfileId] = useState(null);
+  const [profileId, setProfileId] = useUrlState("memberProfile", "");
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(() => emptyMemberForm());
   const [notice, setNotice] = useState(null);
@@ -961,11 +963,12 @@ export default function MemberDirectoryPage() {
   const activeDirectoryMembers = directoryMembers.filter(member => member.data?.active !== false);
   const inactiveDirectoryMembers = directoryMembers.filter(member => member.data?.active === false);
 
-  const weekOptions = [...new Set([currentWeek, memberWeek, endWeek, ...tasks.map(task => taskWeekKey(task.data)).filter(Boolean)])].sort().reverse();
-  const periodLabel = directoryView === "overall" ? "All recorded weeks" : directoryView === "weekly" ? (memberWeek === endWeek ? formatWeekKeyLabel(memberWeek) : `${formatWeekKeyLabel(memberWeek)} to ${formatWeekKeyLabel(endWeek)}`) : "Last four weeks";
+  const periodLabel = directoryView === "weekly" ? (memberWeek === endWeek ? memberWeek : `${memberWeek} to ${endWeek}`) : "Last four weeks";
   const chartAllocations = directoryView === "role"
     ? MEMBER_TYPE_OPTIONS.map(option => ({ id: option.value, name: option.label, units: activeDirectoryMembers.filter(member => normalizeMemberRole(member.data.role) === option.value).reduce((sum, member) => sum + roleMetricsById[member.id].total, 0) }))
-    : (directoryView === "overall" ? directoryMembers : activeDirectoryMembers).map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total }));
+    : activeDirectoryMembers.map(member => ({ id: member.id, name: member.data?.name || member.id, units: roleMetricsById[member.id].total }));
+  const summaryWeeks = Object.values(roleMetricsById).flatMap(metric=>metric.weeks.map(week=>week.key)).sort();
+  const timeFootnote=memberTimeSummary(chartAllocations.reduce((sum,item)=>sum+item.units,0),summaryWeeks[0],summaryWeeks[summaryWeeks.length-1]);
   const highlightKey = member => directoryView === "role" ? normalizeMemberRole(member.data?.role) : member.id;
 
   function renderMemberGroup(title, group, key) {
@@ -990,8 +993,8 @@ export default function MemberDirectoryPage() {
   return (
     <TabPage
       className={`member-directory-page member-directory-page--${directoryView}`}
-      title="Members"
-      header={<WorkspacePageHero title="Members" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }, { value: "overall", label: "Overall" }]} /></WorkspacePageHero>}
+      title="Member"
+      header={<WorkspacePageHero title="Member" illustration="member-team"><WorkspaceViewPicker label="Member view" value={directoryView} onChange={setDirectoryView} options={[{ value: "role", label: "Role" }, { value: "weekly", label: "Weekly" }]} /></WorkspacePageHero>}
     >
       <WorkspaceCreateDock label="New member" expanded={addMemberOpen} onClick={() => setAddMemberOpen(true)} />
       {notice && (
@@ -1008,12 +1011,10 @@ export default function MemberDirectoryPage() {
 
 
 
-      {directoryView === "weekly" && <div data-rationale-anchor="member-period" data-rationale-label="Member allocation period" className="member-week-controls" aria-label="Member allocation period">
-        <label className="task-week-control"><span>From</span><WeekSelect aria-label="Member start week" value={memberWeek} onChange={event => updateUrlState({memberWeek: event.target.value, memberEndWeek: memberEndWeek && memberEndWeek >= event.target.value ? memberEndWeek : null})}>{weekOptions.map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
-        <label className="task-week-control"><span>Through</span><WeekSelect aria-label="Member end week" value={endWeek} onChange={event => updateUrlState({memberEndWeek: event.target.value || null})}>{weekOptions.filter(week => week >= memberWeek).map(week => <option key={week} value={week}>{week === currentWeek ? "This week" : `${formatWeekKeyLabel(week)} · ${week.slice(0,4)}`}</option>)}</WeekSelect></label>
-      </div>}
+      {directoryView === "weekly" && <MemberWeekRange start={memberWeek} end={endWeek} onChange={(start,end)=>updateUrlState({memberWeek:start,memberEndWeek:end===start?null:end})}/>}
+
       <section className="member-allocation-overview" aria-label={`${periodLabel} allocation by ${directoryView === "role" ? "role" : "member"}`}>
-        <AllocationClock variant="member" subject={directoryView === "role" ? "Role" : "Member"} valueMode={directoryView === "role" ? "percent" : "time"} periodLabel={periodLabel} allocations={chartAllocations.sort((a,b) => b.units-a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
+        <AllocationClock variant="member" subject={directoryView === "role" ? "Role" : "Member"} valueMode={directoryView === "role" ? "percent" : "time"} totalLabel="allocated" footnote={timeFootnote} periodLabel={periodLabel} allocations={chartAllocations.sort((a,b) => b.units-a.units || a.name.localeCompare(b.name))} formatTime={formatUnitsAsHours} highlightedId={highlightedMember} onHighlight={setHighlightedMember} />
       </section>
 
       {membersSorted.length === 0 ? <EmptyState>No members yet.</EmptyState> : <div className="member-role-sections">

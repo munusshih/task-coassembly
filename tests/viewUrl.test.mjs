@@ -9,7 +9,7 @@ const compact = (path, changes) => {
 
 test("defaults are omitted, dates stay pinned, and legacy links normalize", () => {
   assert.equal(compact("/?tab=members&week=2026-10-12&taskView=member"), "/tasks?week=2026-10-12");
-  assert.equal(compact("/?tab=meetingNotes&notesGroup=date&notesLayout=grid"), "/notes");
+  assert.equal(compact("/?tab=meetingNotes&notesGroup=date&notesLayout=calendar"), "/notes");
   assert.equal(compact("/?tab=finance&year=overall&quarter=overall&financeView=project&financeCategory=projects"), "/finance");
   assert.equal(compact("/?tab=projects&projectView=list"), "/projects");
 });
@@ -20,7 +20,7 @@ test("switching tabs discards irrelevant filters", () => {
 });
 test("document paths keep complete stable IDs and drop note list controls", () => {
   const id = "bW0y5a1kJH6vZQ2L8cxP";
-  assert.equal(compact("/notes?q=hello&group=project&layout=shelf", { note: id }), `/notes/${id}`);
+  assert.equal(compact("/notes?q=hello&group=project&layout=grid", { note: id }), `/notes/${id}`);
   assert.equal(compact(`/?tab=meetingNotes&note=${id}`), `/notes/${id}`);
   assert.equal(compact(`/notes/${id}`, { note: null }), "/notes");
   assert.equal(compact("/projects", { project: id }), `/projects/${id}`);
@@ -30,7 +30,7 @@ test("document paths keep complete stable IDs and drop note list controls", () =
 });
 test("short query keys restore the matching tab's controls", () => {
   assert.deepEqual(readViewUrl(url("/tasks?week=2026-10-12&view=project")), { tab: "members", week: "2026-10-12", taskView: "project" });
-  assert.deepEqual(readViewUrl(url("/notes?q=hello&layout=shelf&group=project")), { tab: "meetingNotes", notesSearch: "hello", notesGroup: "project", notesLayout: "shelf" });
+  assert.deepEqual(readViewUrl(url("/notes?q=hello&layout=grid&group=project")), { tab: "meetingNotes", notesSearch: "hello", notesGroup: "project", notesLayout: "grid" });
   assert.equal(compact("/finance?year=2026&view=person&category=non-projects"), "/finance?view=person&category=non-projects&year=2026");
 });
 test("invalid values and paths are rejected", () => {
@@ -95,4 +95,11 @@ test('member week ranges survive view changes and remain separate from Task week
 
 test('Notes retains calendar as an explicit layout alongside editorial grid',()=>{
  assert.equal(readViewUrl(url('/notes?layout=calendar')).notesLayout,'calendar');
+});
+
+
+test('Notes defaults to Calendar and retires the List layout',()=>{
+ assert.equal(compact('/notes', {notesLayout:'calendar'}),'/notes');
+ assert.equal(compact('/notes?layout=shelf'),'/notes');
+ assert.equal(compact('/notes', {notesLayout:'grid'}),'/notes?layout=grid');
 });

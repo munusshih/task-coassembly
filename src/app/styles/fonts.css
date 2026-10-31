@@ -1,0 +1,10 @@
+@font-face { font-family:'Assembly'; src:url('/fonts/assembly-regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Assembly Mono'; src:url('/fonts/assembly-mono.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Assembly Script'; src:url('/fonts/assembly-script.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Assembly Typewriter'; src:url('/fonts/assembly-typewriter.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+:root { --font-heading:'Assembly','Instrument Sans',Arial,sans-serif; --font-label:'Assembly Mono','Instrument Sans',monospace; }
+/* Three font roles apply to shared UI and portaled dialogs alike. */
+:is(.page-shell,.edit-modal,.rationale-board,.bottom-composer) :is(h1,h2,h3,h4,h5,h6,.project-preview-title,.edit-modal-title) { font-family:var(--font-heading)!important; }
+.workspace-page-hero .task-view-picker :is(span,select),.task-overlay-links :is(a,button) { font-family:var(--font-heading)!important; }
+:is(.page-shell,.edit-modal,.rationale-board,.bottom-composer) :is(small,time,dt,th,.count-badge,.metadata-pill,.member-week-time,.field-label,.workspace-form-field > span:first-child) { font-family:var(--font-label)!important; }
+.settings-page .section-block:has([aria-label="Typography"]) { grid-column:1/-1; }

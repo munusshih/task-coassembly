@@ -920,7 +920,7 @@ export default function BacklogPage({ viewerName = "" }) {
 
   if (loadError) {
     return (
-      <TabPage title="Wishes">
+      <TabPage title="Wish">
         <p className="error-message" role="alert">
           {loadError.code === "permission-denied"
             ? "Wishes could not be loaded. The current Firebase rules do not allow access to backlogItems."
@@ -933,8 +933,8 @@ export default function BacklogPage({ viewerName = "" }) {
   return (
     <TabPage
       className="backlog-page"
-      title="Wishes"
-      header={<WorkspacePageHero title="Wishes" illustration="wishes-catcher"><WorkspaceViewPicker label="Wish grouping" value={groupMode} onChange={setGroupMode} options={[{value:'project',label:'Projects'},{value:'date',label:'Date'}]} /></WorkspacePageHero>}
+      title="Wish"
+      header={<WorkspacePageHero title="Wish" illustration="wishes-catcher"><WorkspaceViewPicker label="Wish grouping" value={groupMode} onChange={setGroupMode} options={[{value:'project',label:'Project'},{value:'date',label:'Date'}]} /></WorkspacePageHero>}
     >
       <WorkspaceCreateDock label="New wish" expanded={composerOpen} onClick={()=>setComposerOpen(true)} />
       <div className="workspace-search"><SearchField ariaLabel="Search wishes" placeholder="Find a wish…" value={searchQuery} onChange={event=>setSearchQuery(event.target.value)} onClear={()=>setSearchQuery("")} /></div>

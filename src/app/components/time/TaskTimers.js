@@ -4,11 +4,11 @@ import TimeButton from "../ui/TimeButton";
 import UnloggedTimeList from "./UnloggedTimeList";
 import CloseButton from "../ui/CloseButton";
 import SelectField from "../ui/SelectField";
-import InputField from "../ui/InputField";
 import FormField from "../ui/FormField";
-import TimePanel from "./TimePanel";
+import InputField from "../ui/InputField";
+import ClockTimePanel from "./ClockTimePanel";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTaskTime } from "./TimeTrackingProvider";
 import { durationLabel, focusElapsed, eligibleTimeFragments, MIN_TRACKED_SECONDS } from "./trackingModel.mjs";
 import { historySegments, bandPath, historyWindow, focusAllocation } from "./dialModel.mjs";
@@ -18,10 +18,11 @@ const clockText = (ms) => {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 };
 function Dial({ now, focus, elapsed = 0, minutes, journal, onSegment, range = "today", allocations = [], tasks = [], onTask }) {
+  const hatch=useId().replace(/:/g,'');
   const date = new Date(now);
   const minute = date.getMinutes() + date.getSeconds() / 60;
   const window = historyWindow(now, range);
-  const markerPosition = range === "today" ? (now - window.start) / window.cycle : minute / 60;
+  const markerPosition = range === "day" ? (date.getHours()*3600000+date.getMinutes()*60000+date.getSeconds()*1000)/window.cycle : range !== "hour" ? (now - window.start) / window.cycle : minute / 60;
   const markerAngle = markerPosition * Math.PI * 2 - Math.PI / 2;
   const markerX = 100 + Math.cos(markerAngle) * 94;
   const markerY = 100 + Math.sin(markerAngle) * 94;
@@ -33,23 +34,20 @@ function Dial({ now, focus, elapsed = 0, minutes, journal, onSegment, range = "t
   const readoutLabel=isTimer?(focus?focus.status==="paused"?"Paused":focus.mode==="countdown"?"Remaining":"Elapsed":"Ready to focus"):"Local time";
   const sourceLabel = (entry) => entry.status === "logged" ? "Logged" : entry.source === "idle" ? "Idle" : entry.source === "focus" ? "Focus" : "Activity";
   return <div className={`time-dial ${isTimer ? "time-dial--focus" : ""}`}>
-    <svg viewBox="0 0 200 200" aria-label={isTimer ? "Focus progress" : `Current time ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}, with ${range === "today" ? "today’s activity" : "activity over the last hour"}`} role="group">
-      <desc>{isTimer ? "The filled sector shows elapsed session time. Inner segments show focus time by task today; select a segment to choose its task." : `${durationLabel(recorded)} tracked ${range === "today" ? "today" : "over the last hour"}. The selected scale shows the recorded activity for that range. Solid sectors are unlogged; muted sectors are logged. The tapered hand marks now.`}</desc>
-      {isTimer ? <circle cx="100" cy="100" r="94" className="time-history-track" aria-hidden="true" /> : <circle cx="100" cy="100" r="94" className="time-orbit-face" aria-hidden="true" />}
-      {!isTimer&&<g className="time-dial-scale" aria-hidden="true"><text x="100" y="23" textAnchor="middle">00</text><text x="178" y="102" textAnchor="middle">{range==="today"?"06":"15"}</text><text x="100" y="184" textAnchor="middle">{range==="today"?"12":"30"}</text><text x="22" y="102" textAnchor="middle">{range==="today"?"18":"45"}</text></g>}
+    <svg viewBox="0 0 200 200" aria-label={isTimer ? "Focus progress" : `Current time ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}, with ${range !== "hour" ? "activity over the last 24 hours" : "activity over the last hour"}`} role="group">
+      <defs><pattern id={hatch} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="var(--ink)" strokeWidth="1"/></pattern></defs>
+      <desc>{isTimer ? "The filled sector shows elapsed session time. The hand shows session progress." : `${durationLabel(recorded)} tracked ${range === "day" ? "over the last 24 hours" : range === "today" ? "today" : "over the last hour"}. The selected scale shows the recorded activity for that range. Solid sectors are unlogged; hatched sectors are logged. The tapered hand marks now.`}</desc>
+      {isTimer ? <circle cx="100" cy="100" r="94" className="time-orbit-face" aria-hidden="true" /> : <circle cx="100" cy="100" r="94" className="time-orbit-face" aria-hidden="true" />}
+      {!isTimer&&<g className="time-dial-scale" aria-hidden="true"><text x="100" y="23" textAnchor="middle">00</text><text x="178" y="102" textAnchor="middle">{range!=="hour"?"06":"15"}</text><text x="100" y="184" textAnchor="middle">{range!=="hour"?"12":"30"}</text><text x="22" y="102" textAnchor="middle">{range!=="hour"?"18":"45"}</text></g>}
       <g className="time-disc-ticks" aria-hidden="true">{Array.from({length:24},(_,index)=><line key={index} x1="100" y1={index%6===0?"9":"8"} x2="100" y2={index%6===0?"15":"11"} transform={`rotate(${index*15} 100 100)`}/>)}</g>
       {isTimer ? <>
         {progress > 0 ? <path d={bandPath(0, Math.min(1,progress), 90, 8)} className="time-disc-progress" aria-hidden="true" /> : null}
-        {allocations.map((entry) => {
-          const task = tasks.find((task) => task.id === entry.taskId);
-          const label = `${task?.data.title || "Unavailable task"} · ${durationLabel(entry.seconds)} focus today`;
-          return <path key={entry.taskId} d={bandPath(entry.position, entry.span, 82, 76)} className={`time-task-allocation time-task-allocation--${[...entry.taskId].reduce((sum, letter) => sum + letter.charCodeAt(0), 0) % 4}`} role={task && onTask ? "button" : "img"} tabIndex={task && onTask ? 0 : undefined} aria-label={label} onClick={task && onTask ? () => onTask(entry.taskId) : undefined} onKeyDown={task && onTask ? (event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); onTask(entry.taskId); } } : undefined}><title>{label}</title></path>;
-        })}
+
       </> : <g>
         {segments.map((entry) => {
           const canReview = entry.status === "pending" && !entry.live && Boolean(onSegment);
           const label = `${sourceLabel(entry)} · ${durationLabel(entry.seconds)}${canReview ? " · review fragment" : ""}`;
-          return <path key={entry.id} d={bandPath(entry.position, entry.span, 90, 8)} className={`time-orbit-sector time-orbit-sector--${entry.status === "logged" ? "logged" : entry.source} ${canReview ? "is-interactive" : ""}`} role={canReview ? "button" : "img"} aria-hidden={entry.status === "logged" || entry.live ? true : undefined} aria-label={label} tabIndex={canReview ? 0 : undefined} onClick={canReview ? () => onSegment(entry.id) : undefined} onKeyDown={canReview ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSegment(entry.id); } } : undefined}><title>{label}</title></path>;
+          return <path key={entry.id} d={bandPath(entry.position, entry.span, 90, 8)} style={entry.status==='logged'?{fill:`url(#${hatch})`}:undefined} className={`time-orbit-sector time-orbit-sector--${entry.status === "logged" ? "logged" : entry.source} ${canReview ? "is-interactive" : ""}`} role={canReview ? "button" : "img"} aria-hidden={entry.status === "logged" || entry.live ? true : undefined} aria-label={label} tabIndex={canReview ? 0 : undefined} onClick={canReview ? () => onSegment(entry.id) : undefined} onKeyDown={canReview ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSegment(entry.id); } } : undefined}><title>{label}</title></path>;
         })}
 
       </g>}
@@ -122,17 +120,16 @@ function ReviewTime({ tracker, tasks, initial, onClose }) {
 export default function TaskTimers({ tasks }) {
   const tracker = useTaskTime();
   const [mode, setMode] = useState("countdown");
-  const [range, setRange] = useState("today");
+  const [range, setRange] = useState("day");
   const [minutes, setMinutes] = useState(25);
   const [taskId, setTaskId] = useState("");
-  const [autoLog, setAutoLog] = useState(true);
   const [review, setReview] = useState(null);
+  useEffect(()=>{try{const value=JSON.parse(localStorage.getItem("protocol-preferences")||"{}");if(Number(value.focusMinutes)>=1&&Number(value.focusMinutes)<=240)setMinutes(Number(value.focusMinutes));}catch{}},[]);
   if (!tracker) return null;
   const { journal, now, owner, busy } = tracker;
   const focus = journal.focus;
   const elapsed = focusElapsed(focus, now);
   const pending = eligibleTimeFragments(journal.fragments);
-  const liveSeconds = journal.auto?.kind === "activity" ? Math.floor((now-journal.auto.start)/1000) : 0;
   const total = pending.reduce((sum,f)=>sum+f.seconds,0);
   const selectedTask = focus?.taskId || taskId || tasks[0]?.id || "";
   const allocations = focusAllocation(journal, now);
@@ -144,31 +141,24 @@ export default function TaskTimers({ tasks }) {
   const openReview = (id) => { const entries = tracker.checkpoint(); setReview(typeof id === "string" ? entries.filter((entry) => entry.id === id).map((entry) => ({ ...entry, explicit: true })) : entries); tracker.snooze(); };
   const completion = journal.completion;
   return <>
-    {!owner&&<p className="time-tracking-handoff" role="status">Time tracking is active in another Protocol tab. Use that tab to start focus or log time.</p>}
+    {!owner&&<p className="time-tracking-handoff" role="status">Time tracking is active in another Protocol tab. <button type="button" onClick={tracker.takeControl}>Use tracker here</button></p>}
     <section className="task-timers" aria-label="Time tracking">
-      <TimePanel anchor="automatic-clock" label="Automatic clock" title="Automatic" description="Records activity while Protocol is open." status={!owner?'Another tab':focus?.status==='running'?'Focus is running':'Recording'} active={owner} className="time-panel--automatic">
-        <div className="time-panel-dial"><Dial now={now} journal={journal} onSegment={owner ? openReview : null} range={range}/></div>
-        <div className="time-panel-controls">
-          <FormField label="Activity shown"><SelectField chevron aria-label="Automatic clock range" value={range} onChange={event=>setRange(event.target.value)}><option value="today">Today · 24 hours</option><option value="hour">Last hour · 60 minutes</option></SelectField></FormField>
-          <div className="time-dial-legend"><span><i/>Unlogged</span><span><i/>Logged</span></div>
-          <p className="time-panel-note">Select an unlogged area to review it. Idle time and blocks under 10 minutes stay out of your total.</p>
-        </div>
-      </TimePanel>
-      <TimePanel anchor="focus-clock" label="Focus clock" title="Focus" description="Choose a task and make some room for it." status={focus?focus.status==='paused'?'Paused':'Running':'Ready'} active={focus?.status==='running'} className="time-panel--focus">
-        <div className="time-panel-dial"><Dial now={now} focus={focus} elapsed={elapsed} allocations={allocations} tasks={tasks} onTask={owner&&!busy?selectTask:null} minutes={!focus?mode==='countdown'?clockText(Number(minutes||25)*60000):'00:00':null}/>{focus&&<span className="time-focus-readout" role="timer" aria-live="off">{clockText(focus.mode==='countdown'?focus.durationMs-elapsed:elapsed)} {focus.status==='paused'?'paused':focus.mode==='countdown'?'remaining':'elapsed'}</span>}</div>
-        <div className="time-panel-controls time-focus-controls">
-          <FormField label="Task"><SelectField chevron aria-label="Focus task" title={focus?'Choosing another task finishes this session and keeps its time with the original task.':'Choose a task to focus on'} value={selectedTask} onChange={event=>selectTask(event.target.value)} disabled={!owner||busy}>{focus&&!tasks.some(task=>task.id===focus.taskId)&&<option value={focus.taskId}>Current task unavailable — finish or switch</option>}{!tasks.length&&!focus?<option value="">No open tasks</option>:tasks.map(task=><option key={task.id} value={task.id}>{task.data.title}{allocations.find(entry=>entry.taskId===task.id)?` · ${durationLabel(allocations.find(entry=>entry.taskId===task.id).seconds)} today`:''}</option>)}</SelectField></FormField>
+      <ClockTimePanel anchor="automatic-clock" label="Automatic clock" title="Automatic" status={journal.automaticPaused?'Stopped':!owner?'Another tab':focus?.status==='running'?'Focus is running':'Recording'} active={owner&&!journal.automaticPaused&&focus?.status!=='running'} className="time-panel--automatic" legend={<div className="time-dial-legend"><span><svg viewBox="0 0 24 18" aria-hidden="true"><path d="M3 15a9 9 0 0 1 18 0"/></svg>Unlogged</span><span><svg viewBox="0 0 24 18" aria-hidden="true"><path d="M3 15a9 9 0 0 1 18 0" strokeDasharray="2 2"/></svg>Logged</span></div>} dial={<Dial now={now} journal={journal} onSegment={owner ? openReview : null} range={range}/>}>
+
+          <FormField label="Activity shown"><SelectField chevron aria-label="Automatic clock range" value={range} onChange={event=>setRange(event.target.value)}><option value="day">Last 24 hours</option><option value="hour">Last hour · 60 minutes</option></SelectField></FormField>
+          <TimeButton disabled={!owner||busy} onClick={()=>tracker.setAutomaticRecording(Boolean(journal.automaticPaused))}>{journal.automaticPaused?'Start recording':'Stop recording'}</TimeButton>
+      </ClockTimePanel>
+      <UnloggedTimeList tracker={tracker} tasks={tasks} fragments={pending} total={total}/>
+      <ClockTimePanel anchor="focus-clock" label="Focus clock" title="Focus" status={focus?focus.status==='paused'?'Paused':'Running':'Ready'} active={focus?.status==='running'} className="time-panel--focus" dial={<> <Dial now={now} focus={focus} elapsed={elapsed} allocations={allocations} tasks={tasks} onTask={owner&&!busy?selectTask:null} minutes={!focus?mode==='countdown'?clockText(Number(minutes||25)*60000):'00:00':null}/>{focus&&<span className="time-focus-readout" role="timer" aria-live="off">{clockText(focus.mode==='countdown'?focus.durationMs-elapsed:elapsed)} {focus.status==='paused'?'paused':focus.mode==='countdown'?'remaining':'elapsed'}</span>} </>}>
+          <FormField label="Task"><SelectField chevron aria-label="Focus task" title={focus?'Choosing another task finishes this session and keeps its time with the original task.':'Choose a task to focus on'} value={selectedTask} onChange={event=>selectTask(event.target.value)} disabled={!owner||busy}>{focus&&!tasks.some(task=>task.id===focus.taskId)&&<option value={focus.taskId}>Current task unavailable · finish or switch</option>}{!tasks.length&&!focus?<option value="">No open tasks</option>:tasks.map(task=><option key={task.id} value={task.id}>{task.data.title}{allocations.find(entry=>entry.taskId===task.id)?` · ${durationLabel(allocations.find(entry=>entry.taskId===task.id).seconds)} today`:''}</option>)}</SelectField></FormField>
+
+
           <div className="time-focus-options"><FormField label="Timer"><SelectField chevron aria-label="Focus timer mode" value={focus?.mode||mode} onChange={event=>setMode(event.target.value)} disabled={Boolean(focus)||!owner||busy}><option value="countdown">Countdown</option><option value="stopwatch">Stopwatch</option></SelectField></FormField>{(focus?.mode||mode)==='countdown'&&<FormField label="Duration"><span className="time-duration-field"><InputField aria-label="Focus minutes" type="number" min="1" max="240" value={focus?focus.durationMs/60000:minutes} onChange={event=>setMinutes(event.target.value)} disabled={Boolean(focus)||!owner||busy}/><span>min</span></span></FormField>}</div>
-          <label className="time-auto-log"><input type="checkbox" checked={focus?.autoLog??autoLog} onChange={event=>setAutoLog(event.target.checked)} disabled={Boolean(focus)||!owner||busy}/>Log to this task when finished</label>
-          {focus?.recovered&&<p className="time-panel-note">Paused when Protocol closed. Resume when ready.</p>}
-          {!focus&&mode==='countdown'&&Number(minutes)<10&&<p className="time-panel-note">Sessions under 10 minutes won’t be added to logged time.</p>}
-          <div className="time-actions">{focus?<><TimeButton quiet onClick={focus.status==='running'?tracker.pause:tracker.resume} disabled={!owner||busy}>{focus.status==='running'?'Pause':'Resume'}</TimeButton><TimeButton onClick={tracker.finish} disabled={!owner||busy}>Finish &amp; {focus.autoLog?'log':'review'}</TimeButton></>:<TimeButton disabled={!selectedTask||!owner||busy||(mode==='countdown'&&(!Number.isFinite(Number(minutes))||Number(minutes)<1||Number(minutes)>240))} onClick={()=>tracker.start({taskId:selectedTask,mode,minutes:Number(minutes),autoLog})}>Start focus</TimeButton>}</div>
-        </div>
-      </TimePanel>
-      <UnloggedTimeList tracker={tracker} tasks={tasks} fragments={pending} total={total} liveSeconds={liveSeconds} onRefresh={()=>tracker.checkpoint()}/>
+          <div className="time-actions">{focus?<><TimeButton quiet onClick={focus.status==='running'?tracker.pause:tracker.resume} disabled={!owner||busy}>{focus.status==='running'?'Pause':'Resume'}</TimeButton><TimeButton quiet title="Stop this timer and keep recorded time in Unlogged time" onClick={tracker.cancel} disabled={!owner||busy}>Cancel</TimeButton><TimeButton onClick={tracker.finish} disabled={!owner||busy}>Finish &amp; {focus.autoLog?'log':'review'}</TimeButton></>:<TimeButton disabled={!selectedTask||!owner||busy||(mode==='countdown'&&(!Number.isFinite(Number(minutes))||Number(minutes)<1||Number(minutes)>240))} onClick={()=>tracker.start({taskId:selectedTask,mode,minutes:Number(minutes),autoLog:true})}>Start focus</TimeButton>}</div>
+      </ClockTimePanel>
     </section>
     {tracker.error && !review ? <p className="time-error" role="alert">{tracker.error}</p> : null}
-    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : ["empty","too-short"].includes(completion.status) ? "— no blocks of ten minutes to count." : busy ? "— saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <TimeButton quiet disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</TimeButton> : null}{completion.status === "pending" ? <TimeButton quiet onClick={openReview} disabled={!owner || busy}>Review & log</TimeButton> : null}<TimeButton quiet onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</TimeButton></div></div> : null}
+    {completion ? <div className="time-notice" role="alert"><span><strong>{completion.reason === "time-up" ? "Time’s up." : "Session complete."}</strong> {durationLabel(completion.seconds)} {completion.status === "logged" ? "logged to your task." : ["empty","too-short"].includes(completion.status) ? "· no blocks of ten minutes to count." : busy ? "· saving to your task…" : "ready to log."}</span><div className="time-actions">{completion.reason === "time-up" ? <TimeButton quiet disabled={!owner || busy} onClick={() => tracker.start({ taskId: completion.taskId, mode: "stopwatch", minutes: 25, autoLog: completion.autoLog })}>Keep going</TimeButton> : null}{completion.status === "pending" ? <TimeButton quiet onClick={openReview} disabled={!owner || busy}>Review & log</TimeButton> : null}<TimeButton quiet onClick={tracker.dismiss} disabled={!owner || busy}>Dismiss</TimeButton></div></div> : null}
     {review ? <ReviewTime tracker={tracker} tasks={tasks} initial={review} onClose={() => setReview(null)} /> : null}
   </>;
 }

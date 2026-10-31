@@ -1,5 +1,11 @@
 "use client";
+import InputField from './ui/InputField';
+import FormActions from './ui/FormActions';
 
+import {useContext} from "react";
+import {ComposerDismissContext} from "./ui/BottomComposer";
+import {planningProjectGroups} from "./projectPriority.mjs";
+import MemberSelect from "./ui/MemberSelect";
 import FormField from "./ui/FormField";
 import TimeButton from "./ui/TimeButton";
 import TaskClockIcon from "./ui/TaskClockIcon";
@@ -13,6 +19,12 @@ export function emptyTaskCreateDraft(projectId = "") {
 }
 
 export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: submitAdd, onCancel: cancelAdd, inputRef, projects: assignableProjects, remainingHint: addRemainingHint, unitOptions: UNIT_OPTIONS, formatUnitOption, members, assigneeId, onAssigneeChange }) {
+  const dismissComposer=useContext(ComposerDismissContext);
+  const cancel=()=>dismissComposer?dismissComposer():cancelAdd();
+  async function saveTask() {
+    const saved=await submitAdd();
+    if(saved)dismissComposer?.();
+  }
   const { addTitle, addTime, addProject, addDeadline, addSubtasks, addLinks } = draft;
   function setAddSubtask(index, field, value) {
     const next = [...addSubtasks];
@@ -57,17 +69,14 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                   placeholder="Task title…"
                   onChange={(e) => patchUi({ addTitle: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") cancelAdd();
+                    if (e.key === "Escape") cancel();
                   }}
                 /></FormField>
               </div>
               <div className="notepad-add-meta">
                 <span />
                 <div className="notepad-add-fields">
-                  {members ? <FormField label="Assigned to"><SelectField chevron className="meta-select" aria-label="Task assignee" value={assigneeId} onChange={(event) => onAssigneeChange(event.target.value)} required>
-                    <option value="">Member…</option>
-                    {members.map((member) => <option key={member.id} value={member.id}>{member.data?.name || member.id}</option>)}
-                  </SelectField></FormField> : null}
+                  {members ? <FormField label="Assigned to"><MemberSelect members={members} value={assigneeId} onChange={onAssigneeChange} label="Task assignee" placeholder="Member…"/></FormField> : null}
                   <FormField label="Planned time"><SelectField chevron
                     className="meta-select"
                     icon={<TaskClockIcon />}
@@ -92,16 +101,12 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                     onChange={(e) => patchUi({ addProject: e.target.value })}
                   >
                     <option value="">Project</option>
-                    {assignableProjects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.data.name || p.id}
-                      </option>
-                    ))}
+                    {planningProjectGroups(assignableProjects).map(group=><optgroup key={group.key} label={group.label}>{group.projects.map(p=><option key={p.id} value={p.id}>{['Urgent','High'].includes(p.data.priority)?`${p.data.priority} · `:''}{p.data.name||p.id}</option>)}</optgroup>)}
                   </SelectField></FormField>
                   {addRemainingHint ? (
                     <span className="meta-helper-chip">{addRemainingHint}</span>
                   ) : null}
-                  <FormField label="Date"><input
+                  <FormField label="Date"><InputField
                     type="date"
                     className="meta-date"
                     aria-label="Task date"
@@ -112,13 +117,13 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
               </div>
 
               <div className="notepad-add-sections">
-                <details
+                <section className="task-compose-section"><h3>Subtasks</h3><details
                   className="todo-edit-disclosure"
                   open={addSubtasks.length > 0}
                 >
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">
-                      Subtasks ({addSubtasks.length})
+                      {addSubtasks.length ? `${addSubtasks.length} added` : 'None yet'}
                     </span>
                     <Button
                       type="button"
@@ -168,15 +173,15 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                       </div>
                     )}
                   </div>
-                </details>
+                </details></section>
 
-                <details
+                <section className="task-compose-section"><h3>Links</h3><details
                   className="todo-edit-disclosure"
                   open={addLinks.length > 0}
                 >
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">
-                      Links ({addLinks.length})
+                      {addLinks.length ? `${addLinks.length} added` : 'None yet'}
                     </span>
                     <Button
                       type="button"
@@ -231,13 +236,13 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                       </div>
                     )}
                   </div>
-                </details>
+                </details></section>
               </div>
 
-              <div className="notepad-add-actions">
-                <TimeButton onClick={submitAdd} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
-                <TimeButton quiet onClick={cancelAdd}>Cancel</TimeButton>
-              </div>
+              <FormActions className="notepad-add-actions">
+                <TimeButton onClick={saveTask} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
+                <TimeButton quiet onClick={cancel}>Cancel</TimeButton>
+              </FormActions>
             </div>
   );
 }

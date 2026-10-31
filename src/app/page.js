@@ -39,19 +39,15 @@ import DataViewPage from "./components/DataViewPage";
 import MeetingNotesPage from "./components/MeetingNotesPage";
 import PayoutsPage from "./components/PayoutsPage";
 import ResourcesPage from "./components/ResourcesPage";
-import BacklogPage from "./components/BacklogPage";
+import BacklogPage from "./components/ProposalsPage";
+import SettingsPage from "./components/SettingsPage";
 import TbdPage from "./components/TbdPage";
 
 const VIEWER_IDENTITY_KEY_PREFIX = "coassembly-viewer-v3";
 const DATA_TABS = ["meetingNotes"];
 const TBD_TABS = ["homepage", "settings"];
 
-const LOCAL_ROLE_PREVIEW_OPTIONS = [
-  { value: "worker-owner", label: "Worker-owner" },
-  { value: "associate", label: "Associate" },
-  { value: "flying-member", label: "Flying member" },
-  { value: "external-collaborator", label: "External collaborator" },
-];
+
 
 const TAB_ORDER = [
   "homepage",
@@ -133,17 +129,6 @@ export default function Home() {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [presenceRows, setPresenceRows] = useState([]);
   const [commentRows, setCommentRows] = useState([]);
-  const [previewRole, setPreviewRole] = useState(null);
-  const rolePreviewRef = useRef(null);
-  useEffect(() => {
-    function closeRolePreview(event) {
-      if (rolePreviewRef.current && !rolePreviewRef.current.contains(event.target)) {
-        rolePreviewRef.current.open = false;
-      }
-    }
-    document.addEventListener("pointerdown", closeRolePreview);
-    return () => document.removeEventListener("pointerdown", closeRolePreview);
-  }, []);
   const cursorRef = useRef({ x: 120, y: 120 });
   const lastCursorWriteAtRef = useRef(0);
   const lastCursorPointRef = useRef({ x: 0, y: 0 });
@@ -225,10 +210,7 @@ export default function Home() {
   }, []);
 
   const actualRole = normalizeMemberRoleValue(currentMember?.role);
-  const canPreviewRoles =
-    process.env.NODE_ENV === "development" && isWorkerOwner(currentMember);
-  const effectiveRole =
-    canPreviewRoles && previewRole ? previewRole : actualRole;
+  const effectiveRole = actualRole;
   const effectiveMember = useMemo(
     () =>
       currentMember
@@ -253,38 +235,6 @@ export default function Home() {
     }
     return TAB_ORDER;
   }, [hasLimitedAccess]);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    if (typeof window === "undefined") return;
-    if (!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname))
-      return;
-
-    const rawRole = new URLSearchParams(window.location.search)
-      .get("role")
-      ?.trim()
-      .replace(/^["']|["']$/g, "");
-    const normalizedRole = rawRole
-      ? normalizeMemberRoleValue(rawRole)
-      : null;
-    const isKnownRole = LOCAL_ROLE_PREVIEW_OPTIONS.some(
-      (option) => option.value === normalizedRole,
-    );
-    setPreviewRole(isKnownRole ? normalizedRole : null);
-  }, []);
-
-  function handlePreviewRoleChange(nextRole) {
-    if (!canPreviewRoles || typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (nextRole) {
-      url.searchParams.set("role", nextRole);
-      setPreviewRole(nextRole);
-    } else {
-      url.searchParams.delete("role");
-      setPreviewRole(null);
-    }
-    window.history.replaceState({}, "", url);
-  }
 
   useEffect(() => {
     if (!firebaseReady || !authReady || !currentMember) {
@@ -587,7 +537,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">Protocol</div>
+          <div className="splash-brand"><img className="splash-icon" src="/icon.svg" alt=""/>Protocol</div>
           <div className="splash-dots" aria-hidden="true">
             <span />
             <span />
@@ -603,7 +553,7 @@ export default function Home() {
     return (
       <main className="page-shell page-shell--single splash-screen">
         <div className="splash-card">
-          <div className="splash-brand">Protocol</div>
+          <div className="splash-brand"><img className="splash-icon" src="/icon.svg" alt=""/>Protocol</div>
           <p className="splash-label">
             Sign in with your approved Google account to continue.
           </p>
@@ -661,6 +611,7 @@ export default function Home() {
     if (activeTab === "resources") return <ResourcesPage currentMember={currentMember} members={sharedMembers || []} />;
     if (DATA_TABS.includes(activeTab))
       return <DataViewPage tabKey={activeTab} />;
+    if (activeTab === "settings") return <SettingsPage viewerName={currentMember.name||""}/>;
     if (TBD_TABS.includes(activeTab)) return <TbdPage tabKey={activeTab} />;
     return null;
   }
@@ -681,40 +632,6 @@ export default function Home() {
         allowedTabs={allowedTabs}
       />
       <div className="page-main">
-        {canPreviewRoles ? (
-          <details className={`role-preview-float${previewRole ? " role-preview-float--active" : ""}`} ref={rolePreviewRef} onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.currentTarget.open = false;
-              event.currentTarget.querySelector("summary")?.focus();
-            }
-          }}>
-            <summary aria-label="Toggle local role preview">Role preview{previewRole ? <span className="role-preview-active-dot" aria-label="Preview active" /> : null}</summary>
-            <div className="role-preview-bar">
-            <label className="role-preview-label" htmlFor="local-role-preview">Local role preview</label>
-            <select
-              className="role-preview-select"
-              id="local-role-preview"
-              value={previewRole || ""}
-              onChange={(event) =>
-                handlePreviewRoleChange(event.target.value)
-              }
-              aria-label="Preview dashboard as role"
-            >
-              <option value="">Actual role ({actualRole})</option>
-              {LOCAL_ROLE_PREVIEW_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {previewRole ? (
-              <span className="role-preview-note">
-                UI only · signed in as {currentMember.name || currentMember.email}
-              </span>
-            ) : null}
-            </div>
-          </details>
-        ) : null}
         <section className="page-content" key={activeTab}>
           {renderPage()}
         </section>

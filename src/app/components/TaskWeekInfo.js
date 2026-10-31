@@ -9,17 +9,17 @@ import { isWorkerOwner } from "../../authAccess";
 
 const DUTIES = ["facilitator", "notetaker", "time keeper"];
 
-export default function TaskWeekInfo({ week = new Date().toISOString().slice(0, 10), members = [], pageKey = "members" }) {
+export default function TaskWeekInfo({ week = new Date().toISOString().slice(0, 10), members = [], pageKey = "members", showWeekContext = true }) {
   const pageInfo = {
     resources: ["Resource", "Our shared shelf for useful links, references, and tools. Browse by category or date to find something useful. Each folder keeps a locally saved preview alongside its contributor and submission date."],
-    projects: ["Projects", "Keep the team’s projects, people, and plans together. Open a project to see its details and update the work as it develops."],
+    projects: ["Project", "Keep the team’s projects, people, and plans together. Open a project to see its details and update the work as it develops."],
     finance: ["Finance", "A shared view of project budgets and team finances. Use the filters to explore a period or compare how work is allocated."],
-    payouts: ["Requests", "Create and follow up on payment requests here. Requests live under Finance so the money side of the work stays together."],
-    backlog: ["Wishes", "Keep possibilities and future work here until there’s room to plan them together."],
-    meetingNotes: ["Notes", "A shared memory of our meetings. Find a conversation, revisit a decision, or add the next set of notes."],
-    memberDirectory: ["Members", "Meet the people behind the work and keep team information up to date. Explore people by role, weekly workload, or overall contributions."],
+    payouts: ["Request", "Create and follow up on payment requests here. Requests live under Finance so the money side of the work stays together."],
+    backlog: ["Wish", "Keep possibilities and future work here until there’s room to plan them together."],
+    meetingNotes: ["Note", "A shared memory of our meetings. Find a conversation, revisit a decision, or add the next set of notes."],
+    memberDirectory: ["Member", "Meet the people behind the work and keep team information up to date. Explore people by role, weekly workload."],
     homepage: ["Homepage", "Our shared starting point is coming soon."],
-    settings: ["Settings", "Workspace settings are coming soon."],
+    settings: ["Settings", "Profile, focus, and display preferences."],
   }[pageKey] || ["Tasks", "Plan the week together."];
   const {notes,allNotes,loaded,error}=usePageRationales(pageKey,pageInfo);
   const countId=useId();
@@ -42,9 +42,9 @@ export default function TaskWeekInfo({ week = new Date().toISOString().slice(0, 
 
   return (
     <div className="task-week-info">
-      <button type="button" className="task-info-asterisk" aria-label={isTask ? "Week information" : `${pageInfo[0]} information`} aria-expanded={open} aria-describedby={countId} onClick={() => setOpen((value) => !value)}><img src="/illustrations/asterisk.svg" alt="" /><span className="task-info-count" id={countId} aria-label={`${notes.length} shared notes`}>{notes.length}</span></button>
+      <button type="button" className="task-info-asterisk" aria-label={isTask ? "Week information" : `${pageInfo[0]} information`} aria-expanded={open} aria-describedby={countId} onClick={() => setOpen((value) => !value)}><img src="/illustrations/asterisk.svg" alt="" /><span className="task-info-count" aria-hidden="true">{notes.length}</span><span className="sr-only" id={countId}>{notes.length} shared notes</span></button>
       <PageGuide tabKey={pageKey} className="task-header-help" icon="/illustrations/help-hat.svg" iconOnly />
-      {open && <RationaleBoard allNotes={allNotes} notes={notes} loaded={loaded} loadError={error} pageKey={pageKey} pageInfo={pageInfo} onClose={() => setOpen(false)} context={isTask ? <section className="rationale-week"><span className="rationale-eyebrow">This week</span><h3>{remainingWeeks} {remainingWeeks === 1 ? "week" : "weeks"} until Q{quarter} ends</h3><p>Our meeting crew this month</p><dl>{["time keeper", "facilitator", "notetaker"].map(duty => <div key={duty}><dt>{assignments[duty] || "Unassigned"}</dt><dd>{duty}</dd></div>)}</dl></section> : null} />}
+      {open && <RationaleBoard allNotes={allNotes} notes={notes} loaded={loaded} loadError={error} pageKey={pageKey} pageInfo={pageInfo} onClose={() => setOpen(false)} context={isTask&&showWeekContext ? <section className="rationale-week" data-countdown={`${remainingWeeks} ${remainingWeeks===1?"week":"weeks"} until Q${quarter} ends`}><h3>Our meeting crew this month</h3><dl>{["time keeper", "facilitator", "notetaker"].map(duty => <div key={duty}><dt>{assignments[duty] || "Unassigned"}</dt><dd>{duty}</dd></div>)}</dl></section> : null} />}
 
     </div>
   );

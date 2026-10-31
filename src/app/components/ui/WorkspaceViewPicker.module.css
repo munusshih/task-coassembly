@@ -1,0 +1,56 @@
+.picker {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+  max-width: none;
+  color: var(--ink);
+  cursor: pointer;
+  --picker-size: clamp(44px, 6vw, 84px);
+}
+.prefix { font: 400 clamp(24px, 3vw, 40px)/1 var(--font-body); }
+/* One underline, offset, and hover treatment; independent of page-specific fields. */
+.picker select.select {
+  appearance: none;
+  -webkit-appearance: none;
+  field-sizing: content;
+  flex-shrink: 0;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 0 .1em .08em 0;
+  overflow: visible;
+  border: 0;
+  border-bottom: var(--underline-width) solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: 400 var(--picker-size)/1.15 var(--font-body);
+  letter-spacing: -.05em;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+.picker select.select:focus:not(:focus-visible) { outline:none; box-shadow:none; }
+.picker select.select:hover { opacity: .6; }
+.picker select.select:focus-visible { outline:none; box-shadow:none; }
+.picker select.select option { color: var(--ink); background: var(--paper); font: 400 24px/1.4 var(--font-body); letter-spacing: normal; }
+@media (max-width: 650px) {
+  .picker { --picker-size: 48px; gap: 10px; }
+  .prefix { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .picker select.select { transition: none; } }
+
+.control { display:inline-grid; min-width:0; font:400 var(--picker-size)/1.2 var(--font-body); letter-spacing:-.05em; }
+.measure { grid-area:1/1; visibility:hidden; white-space:pre; padding:0 .3em .12em .02em; }
+.picker .control select.select { grid-area:1/1; width:100%; padding:0 .3em .12em .02em; box-sizing:border-box; font:inherit; letter-spacing:inherit; }
+
+/* The visible label supplies the text baseline; the native select covers its whole hit area. */
+.control { display:inline-block; position:relative; vertical-align:baseline; line-height:1.1; }
+.measure { display:inline-block; visibility:visible; padding:0 .2em 0 .02em; border-bottom:var(--underline-width) solid currentColor; }
+.picker .control select.select { position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; padding:0; cursor:pointer; }
+:global(html[data-input-modality=keyboard]) .picker:has(select:focus-visible) .measure { outline:2px solid var(--focus-color); outline-offset:3px; }
+.picker select.select:hover { opacity:0; }
+.picker:hover .measure { opacity:var(--hover-opacity,.72); }

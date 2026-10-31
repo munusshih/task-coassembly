@@ -1,8 +1,10 @@
 "use client";
 
+import IconButton from "../IconButton";
 import CrossIcon from "./CrossIcon";
-
 import InputField from "./InputField";
+import SearchIcon from "./SearchIcon";
+import styles from "./SearchField.module.css";
 
 export default function SearchField({
   value,
@@ -14,12 +16,13 @@ export default function SearchField({
   clearTitle = "Clear search",
   ariaLabel = "Search",
 }) {
-  const wrapperClasses = ["search-field", className].filter(Boolean).join(" ");
-  const classes = ["search-input", inputClassName].filter(Boolean).join(" ");
+  const wrapperClasses = ["search-field", styles.field, className].filter(Boolean).join(" ");
+  const classes = ["search-input", styles.input, inputClassName].filter(Boolean).join(" ");
   const hasValue = Boolean(value);
 
   return (
     <div className={wrapperClasses}>
+      <SearchIcon />
       <InputField
         type="text"
         aria-label={ariaLabel}
@@ -29,9 +32,9 @@ export default function SearchField({
         className={classes}
       />
       {hasValue ? (
-        <button type="button" className="search-clear" onClick={onClear} title={clearTitle}>
+        <IconButton type="button" className={`search-clear ${styles.clear}`} onClick={onClear} title={clearTitle}>
           <CrossIcon />
-        </button>
+        </IconButton>
       ) : null}
     </div>
   );

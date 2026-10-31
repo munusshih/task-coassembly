@@ -1,0 +1,4 @@
+.actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:16px; margin-top:28px; padding:0; width:100%; }
+.actions > :is(button,a) { font:400 var(--type-body)/1.4 var(--font-body); }
+.actions.actions > :is(button,a) { min-height:44px; padding:8px 18px; font:400 var(--type-body)/1.4 var(--font-body); }
+:global(.edit-modal-footer) > .actions { margin-top:0; }

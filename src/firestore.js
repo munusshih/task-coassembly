@@ -211,3 +211,27 @@ export function subscribeDocument(collectionName, id, onData) {
     },
   );
 }
+
+// Apply discussion and review changes against the latest document, preserving concurrent edits.
+export async function transformDocument(collectionName,id,transform) {
+ const ref=doc(getDb(),collectionName,id);
+ return runTransaction(getDb(),async transaction=>{
+  const snapshot=await transaction.get(ref);
+  if(!snapshot.exists())throw new Error('This item is no longer available.');
+  transaction.update(ref,transform(snapshot.data()));
+ });
+}
+
+export async function convertProposalToProject(id,kind) {
+ const proposalRef=doc(getDb(),'backlogItems',id), projectRef=doc(getDb(),'projects',`proposal-${id}`);
+ return runTransaction(getDb(),async transaction=>{
+  const snapshot=await transaction.get(proposalRef);
+  if(!snapshot.exists())throw new Error('Proposal unavailable.');
+  const data=snapshot.data();
+  if(data.projectIdCreated)return data.projectIdCreated;
+  if(data.status!=='Approved')throw new Error('Approve the current proposal revision first.');
+  transaction.set(projectRef,{name:data.text,kind,status:'Planning',priority:'Normal',description:data.why,proposalId:id,proposalRevision:data.revision||1,budget:Number(data.budget)||0,estimatedHours:Number(data.hours)||0,maxHours:Number(data.hours)||null,budgetCurrency:"TWD",projectedHourlyWage:["Internal","Admin"].includes(kind)?200:null,staffing:[],stages:[],stagePlans:[],createdAt:Date.now(),updatedAt:Date.now()});
+  transaction.update(proposalRef,{projectIdCreated:projectRef.id,status:'Project created',updatedAt:Date.now()});
+  return projectRef.id;
+ });
+}

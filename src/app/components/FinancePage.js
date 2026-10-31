@@ -1702,7 +1702,7 @@ function FinanceDashboard({ data }) {
 
         <section className="finance-dashboard-card finance-dashboard-card--wide">
           <header className="finance-dashboard-card-header">
-            <h4>Spending — by category vs by item</h4>
+            <h4>Spending · by category vs by item</h4>
             <span>
               {expenseRows.length} categories · {expenseDescriptionRows.length}{" "}
               items
@@ -1735,7 +1735,7 @@ function FinanceDashboard({ data }) {
 
         <section className="finance-dashboard-card finance-dashboard-card--wide">
           <header className="finance-dashboard-card-header">
-            <h4>Revenue — by category vs by item</h4>
+            <h4>Revenue · by category vs by item</h4>
             <span>
               {incomeRows.length} categories · {incomeDescriptionRows.length}{" "}
               items
@@ -1816,7 +1816,7 @@ function FinanceDashboard({ data }) {
                               </em>
                             </span>
                           ) : (
-                            "—"
+                            "·"
                           )}
                         </td>
                       </tr>
@@ -1986,9 +1986,9 @@ function FinanceDashboard({ data }) {
                 {recentTransactions.map((t, i) => (
                   <tr key={`${t.date}-${i}`}>
                     <td>{t.date}</td>
-                    <td>{t.description || "—"}</td>
-                    <td>{t.category || "—"}</td>
-                    <td>{t.project || "—"}</td>
+                    <td>{t.description || "·"}</td>
+                    <td>{t.category || "·"}</td>
+                    <td>{t.project || "·"}</td>
                     <td
                       className={
                         t.amount >= 0 ? "finance-plus" : "finance-minus"
@@ -2061,7 +2061,7 @@ export default function FinancePage() {
   }, []);
 
   useEffect(() => {
-    // Hardcoded fallback rates (TWD per 1 unit) — used if fetch fails
+    // Hardcoded fallback rates (TWD per 1 unit) · used if fetch fails
     const FALLBACK_RATES = {
       USD: 32,
       JPY: 0.21,
@@ -2840,7 +2840,7 @@ export default function FinancePage() {
         // fxRates[currency] = TWD per 1 unit of that currency
         amtTWD = amt * fxRates[currency];
       } else {
-        // Rate not available — track raw amount separately so we can still show it
+        // Rate not available · track raw amount separately so we can still show it
         const sign = dir === "owed_to_me" ? 1 : -1;
         map[mid].unconverted.push({ amt: sign * amt, currency });
       }
@@ -3513,8 +3513,8 @@ export default function FinancePage() {
                                       <tr
                                         key={`all-project-tx-${tx.serialNumber || "na"}-${idx}`}
                                       >
-                                        <td>{tx.date || "—"}</td>
-                                        <td>{tx.description || "—"}</td>
+                                        <td>{tx.date || "·"}</td>
+                                        <td>{tx.description || "·"}</td>
                                         <td
                                           className={
                                             Number(tx.amount) >= 0
@@ -3524,8 +3524,8 @@ export default function FinancePage() {
                                         >
                                           {formatTWD(tx.amount)}
                                         </td>
-                                        <td>{tx.payee || "—"}</td>
-                                        <td>{tx.serialNumber || "—"}</td>
+                                        <td>{tx.payee || "·"}</td>
+                                        <td>{tx.serialNumber || "·"}</td>
                                       </tr>
                                     ))
                                 )}
@@ -3761,8 +3761,8 @@ export default function FinancePage() {
                                           <tr
                                             key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}
                                           >
-                                            <td>{tx.date || "—"}</td>
-                                            <td>{tx.description || "—"}</td>
+                                            <td>{tx.date || "·"}</td>
+                                            <td>{tx.description || "·"}</td>
                                             <td
                                               className={
                                                 Number(tx.amount) >= 0
@@ -3772,8 +3772,8 @@ export default function FinancePage() {
                                             >
                                               {formatTWD(tx.amount)}
                                             </td>
-                                            <td>{tx.payee || "—"}</td>
-                                            <td>{tx.serialNumber || "—"}</td>
+                                            <td>{tx.payee || "·"}</td>
+                                            <td>{tx.serialNumber || "·"}</td>
                                           </tr>
                                         ),
                                       )
@@ -3882,8 +3882,8 @@ export default function FinancePage() {
                                           <tr
                                             key={`${row.category}-tx-${tx.serialNumber || "na"}-${idx}`}
                                           >
-                                            <td>{tx.date || "—"}</td>
-                                            <td>{tx.description || "—"}</td>
+                                            <td>{tx.date || "·"}</td>
+                                            <td>{tx.description || "·"}</td>
                                             <td
                                               className={
                                                 Number(tx.amount) >= 0
@@ -3893,8 +3893,8 @@ export default function FinancePage() {
                                             >
                                               {formatTWD(tx.amount)}
                                             </td>
-                                            <td>{tx.payee || "—"}</td>
-                                            <td>{tx.serialNumber || "—"}</td>
+                                            <td>{tx.payee || "·"}</td>
+                                            <td>{tx.serialNumber || "·"}</td>
                                           </tr>
                                         ),
                                       )
@@ -3996,7 +3996,7 @@ export default function FinancePage() {
                                     ))}
                                   </>
                                 ) : (
-                                  "—"
+                                  "·"
                                 )}
                               </td>
                               <td
@@ -4036,7 +4036,7 @@ export default function FinancePage() {
                                     ))}
                                   </ul>
                                 ) : (
-                                  "—"
+                                  "·"
                                 )}
                               </td>
                             </tr>

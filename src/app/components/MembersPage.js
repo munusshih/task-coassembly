@@ -1,5 +1,12 @@
 "use client";
+import InputField from './ui/InputField';
+import TaskStateColumns from './ui/TaskStateColumns';
+import FormActions from './ui/FormActions';
+import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import TaskReviewControls from "./ui/TaskReviewControls";
+import {planningProjectGroups} from "./projectPriority.mjs";
+import MemberAvatar from "./ui/MemberAvatar";
+import {Fragment} from "react";
 import TaskDecisionHistory from "./TaskDecisionHistory";
 import WeekSelect from "./ui/WeekSelect";
 import TaskTimers from "./time/TaskTimers";
@@ -57,7 +64,6 @@ import {
   isUnfinishedTaskOutsideWeek,
   isProjectClosed,
   isProjectIdAssignable,
-  previousWeekKey,
   taskWeekKey,
   weekStartDateForTs,
 } from "./taskBoardRules";
@@ -237,7 +243,7 @@ function formatUnitOption(units) {
 }
 
 function formatHourAmount(hours) {
-  if (hours == null) return "—";
+  if (hours == null) return "·";
   const totalMinutes = Math.max(0, Math.round(hours * 60));
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
@@ -498,11 +504,7 @@ function TaskItem({
               onChange={(e) => onEditFieldChange("projectId", e.target.value)}
             >
               <option value="">Project</option>
-              {editProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.data.name || p.id}
-                </option>
-              ))}
+              {planningProjectGroups(editProjects).map(group=><optgroup key={group.key} label={group.label}>{group.projects.map(p=><option key={p.id} value={p.id}>{['Urgent','High'].includes(p.data.priority)?`${p.data.priority} · `:''}{p.data.name||p.id}</option>)}</optgroup>)}
               {showUnassignedSelectedProject && (
                 <option value={draftProjectId} disabled>
                   {(selectedProject?.data?.name || draftProjectId) +
@@ -513,8 +515,9 @@ function TaskItem({
             {remainingHint ? (
               <span className="meta-helper-chip">{remainingHint}</span>
             ) : null}
-            <input
+            <InputField
               type="date"
+              aria-label="Task date"
               className="meta-date"
               value={draft.deadline}
               onChange={(e) => onEditFieldChange("deadline", e.target.value)}
@@ -645,7 +648,7 @@ function TaskItem({
           </details>
 
           <TaskDecisionHistory data={todo.data} members={members}/>
-          <div className="todo-edit-actions">
+          <FormActions className="todo-edit-actions">
             <Button
               type="button"
               size="small"
@@ -662,14 +665,14 @@ function TaskItem({
             >
               Cancel
             </Button>
-          </div>
+          </FormActions>
         </div>
       </li>
     );
   }
 
   return (
-      <li data-rationale-anchor={`task-${todo.id}`} data-rationale-label={title} className={`todo-item${focusedTaskId === todo.id ? " todo-item--focused" : ""}`}>
+      <li id={`task-${todo.id}`} data-rationale-anchor={`task-${todo.id}`} data-rationale-label={title} className={`todo-item${focusedTaskId === todo.id ? " todo-item--focused" : ""}`}>
         <div className="todo-checkbox-cell">
           {canTakeDoneDecision ? <TaskReviewControls onReview={() => onReviewDoneTask(todo)} onReject={() => onRejectDoneTask(todo)} /> : <input
             type="checkbox"
@@ -1168,7 +1171,7 @@ function MemberCard({
     <EntityCard as="article" className="member-card">
       {showHeader ? <div className="member-card-header">
         <div className="member-card-head-main">
-          <h4 className="card-name">{member.data.name || "Unnamed"}</h4>
+          <div className="task-member-person"><MemberAvatar member={member} size="inline" onClick={()=>window.location.assign(`/members?profile=${member.id}`)}/><h4 className="card-name">{member.data.name || "Unnamed"}</h4></div>
           <span className="member-week-time" aria-label={`${workedLabel} worked / ${allocatedLabel} allocated`}>
             {workedLabel}
             <TaskClockIcon />
@@ -1178,12 +1181,8 @@ function MemberCard({
       </div> : null}
 
       {isEditableWeek ? (
-        <Surface>
-          <ul className="todo-list">
-            {weekTodos.length === 0 && reviewedTodos.length === 0 && (
-              <li className="todo-empty">No tasks yet.</li>
-            )}
-            {[...weekTodos, ...reviewedTodos].map((todo) => (
+        <Surface className="task-review-surface">
+          <TaskStateColumns tasks={[...weekTodos,...reviewedTodos]} renderTask={todo=>(
               <TaskItem
                 members={members}
                 key={todo.id}
@@ -1213,8 +1212,7 @@ function MemberCard({
                 onOvertimeSave={onOvertimeSave}
                 getProjectRemaining={onProjectRemaining}
               />
-            ))}
-          </ul>
+          )}/>
 
           {!hideCreate && (!addActive ? (
             <TaskCreateTrigger onClick={activateAdd} />
@@ -1314,6 +1312,7 @@ export default function MembersPage({
   const [composerMember, setComposerMember] = useState(viewerMemberId || "");
   const [members, setMembers] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
+  useEffect(()=>{const id=window.location.hash.slice(1);if(!id.startsWith('task-')||!allTasks.length)return;const frame=requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'center'}));return()=>cancelAnimationFrame(frame);},[allTasks.length]);
   const [projects, setProjects] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [selectedWeek, setSelectedWeek] = useUrlState("week", currentWeekKey, { validate: isDateKey });
@@ -1455,7 +1454,7 @@ export default function MembersPage({
       sortedProjectsForView.map((project) => project.id),
     );
 
-    for (const task of visibleTasks) {
+    for (const task of sortTodos(visibleTasks)) {
       const projectId = task.data.projectId;
       if (!projectId || !visibleProjectIds.has(projectId)) continue;
 
@@ -1471,16 +1470,6 @@ export default function MembersPage({
         });
       });
     }
-
-    Object.values(grouped).forEach((resources) => {
-      resources.sort((left, right) => {
-        const leftLabel =
-          left.link.name || formatLinkLabel(left.link.url) || left.link.url;
-        const rightLabel =
-          right.link.name || formatLinkLabel(right.link.url) || right.link.url;
-        return leftLabel.localeCompare(rightLabel);
-      });
-    });
 
     return grouped;
   }, [sortedProjectsForView, visibleTasks]);
@@ -1501,15 +1490,6 @@ export default function MembersPage({
       ),
     [resourcesByProject],
   );
-
-  // Always offer the two editable weeks, plus older weeks that have tasks.
-  const availableWeeks = useMemo(() => {
-    const weeks = new Set([currentWeekKey(), previousWeekKey(), selectedWeek]);
-    for (const t of visibleTasks) {
-      weeks.add(taskWeekKey(t.data));
-    }
-    return [...weeks].sort().reverse(); // newest first
-  }, [visibleTasks, selectedWeek]);
 
   const movableUnfinishedCount = useMemo(() => {
     const targetWeek = currentWeekKey();
@@ -2113,7 +2093,7 @@ export default function MembersPage({
     {
       value: "member",
       title: "Group tasks by person",
-      label: "People",
+      label: "Person",
     },
     ...(isLimitedViewer
       ? []
@@ -2121,7 +2101,7 @@ export default function MembersPage({
           {
             value: "project",
             title: "Group tasks by project",
-            label: "Projects",
+            label: "Project",
           },
           {
             value: "resources",
@@ -2143,11 +2123,11 @@ export default function MembersPage({
       <WorkspacePageHero title="Task" illustration="task-maker" className="task-page-hero">
         <div className="task-board-tools" aria-label="Task board controls">
         <div className="task-week-toolbar">
-          <label className="task-week-control"><span>Weeks</span><WeekSelect aria-label="Task week" value={selectedWeek} onChange={(event) => setSelectedWeek(event.target.value)}>{availableWeeks.map((week) => <option key={week} value={week}>{weekLabel(new Date(week + "T00:00:00"))}</option>)}</WeekSelect></label>
-          <TaskWeekInfo week={selectedWeek} members={visibleMembers} />
+          {memberViewMode==='resources'?<span className="task-links-period">Across all weeks</span>:<label className="task-week-control"><span>Week of</span><WeekSelect weekPicker aria-label="Task week" value={selectedWeek} onChange={(event) => setSelectedWeek(event.target.value)} /></label>}
+          <TaskWeekInfo week={selectedWeek} members={visibleMembers} showWeekContext={memberViewMode!=='resources'}/>
         </div>
         <div className="task-board-view-controls">
-          {memberViewOptions.length > 1 ? <label className="task-view-picker"><span>by</span><select className="task-view-selector" style={{ width: memberViewMode === "project" ? "4.4em" : memberViewMode === "resources" ? "3em" : "3.9em" }} aria-label="Task view" value={memberViewMode} onChange={(event) => setMemberViewMode(event.target.value)}>{memberViewOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> : null}
+          {memberViewOptions.length > 1 ? <WorkspaceViewPicker label="Task view" value={memberViewMode} onChange={setMemberViewMode} options={memberViewOptions} /> : null}
         </div>
         </div>
       </WorkspacePageHero>
@@ -2158,7 +2138,8 @@ export default function MembersPage({
           const draft = composerDraft;
           if (!draft.addTitle.trim() || !draft.addTime || !draft.addProject || !composerMember) return;
           const created = await handleCreate(composerMember, {title:draft.addTitle.trim(),timeUnits:Number(draft.addTime),projectId:draft.addProject,deadline:draft.addDeadline||null,subtasks:draft.addSubtasks,links:draft.addLinks},selectedWeek);
-          if(created) { setComposerOpen(false); setComposerDraft(emptyTaskCreateDraft()); }
+          if(created) { setComposerDraft(emptyTaskCreateDraft()); return true; }
+          return false;
         }} />
       </BottomComposer>}
       <div className="task-workspace">
@@ -2248,15 +2229,7 @@ export default function MembersPage({
           onClose={() => setActionConfirm(null)}
           size="sm"
           footer={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={() => setActionConfirm(null)}
-              >
-                Cancel
-              </Button>
+            <FormActions>
               <Button
                 type="button"
                 size="small"
@@ -2270,7 +2243,15 @@ export default function MembersPage({
               >
                 {actionConfirm.confirmLabel || "Confirm"}
               </Button>
-            </>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setActionConfirm(null)}
+              >
+                Cancel
+              </Button>
+            </FormActions>
           }
         >
           <p className="delete-confirm-body">{actionConfirm.message}</p>

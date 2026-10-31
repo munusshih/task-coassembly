@@ -3,7 +3,7 @@ export const HISTORY_MS = 60 * 60 * 1000;
 export function historyWindow(now, range = "hour") {
   const start = new Date(now); start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + 1);
-  return range === "today" ? { start: +start, cycle: +end - start } : { start: now - HISTORY_MS, cycle: HISTORY_MS };
+  return range === "day" ? {start:now-24*HISTORY_MS,cycle:24*HISTORY_MS} : range === "today" ? { start: +start, cycle: +end - start } : { start: now - HISTORY_MS, cycle: HISTORY_MS };
 }
 export function historySegments(journal, now, range = "hour") {
   const window = historyWindow(now, range);
@@ -22,7 +22,7 @@ export function historySegments(journal, now, range = "hour") {
     if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 1000) return null;
     const date = new Date(start);
     return { ...entry, start, end, seconds: Math.floor((end - start) / 1000),
-      position: range === "today" ? (start - window.start) / window.cycle : (date.getMinutes() * 60000 + date.getSeconds() * 1000 + date.getMilliseconds()) / HISTORY_MS,
+      position: range === "day" ? (date.getHours()*3600000+date.getMinutes()*60000+date.getSeconds()*1000)/window.cycle : range === "today" ? (start - window.start) / window.cycle : (date.getMinutes() * 60000 + date.getSeconds() * 1000 + date.getMilliseconds()) / HISTORY_MS,
       span: Math.min(1, (end - start) / window.cycle),
     };
   }).filter(Boolean);

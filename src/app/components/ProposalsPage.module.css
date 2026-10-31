@@ -1,0 +1,65 @@
+.modal :global(.edit-modal-body) {
+  padding: clamp(20px, 4vw, 48px);
+}
+
+.detail {
+  width: min(100%, 840px);
+  margin: 0 auto;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.review {
+  display: grid;
+  gap: 16px;
+  margin: 40px 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.review h2 {
+  margin: 0;
+  font: 500 var(--type-panel-title)/1.25 var(--font-body);
+}
+
+.review > p {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--muted);
+  font: 400 var(--type-caption)/1.5 var(--font-body);
+}
+
+.reviewEntry {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.reviewEntry p {
+  white-space: pre-wrap;
+}
+
+.history {
+  margin: 40px 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.history summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.history article {
+  padding: 16px 0;
+}
+
+.history article p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,34 @@
+export const PROPOSAL_TYPES=['Nice to have','R&D','Work','Service','Common Pool'];
+export const emptyProposal=()=>({text:'',proposalType:'Nice to have',why:'',outcome:'',scope:'',budget:'',breakdown:'',hours:'',timeline:'',risks:'',leadId:'',workItems:[{title:'',owner:'',cost:'',hours:''}]});
+export function validateProposalDraft(draft){if(!String(draft.text||'').trim())throw new Error('Give the proposal a title.');if(!PROPOSAL_TYPES.includes(draft.proposalType))throw new Error('Choose a proposal type.');return draft;}
+export function proposalPlanTotals(rows){return rows.reduce((sum,row)=>({budget:sum.budget+Math.max(0,Number(row.cost)||0),hours:sum.hours+Math.max(0,Number(row.hours)||0)}),{budget:0,hours:0});}
+export function validateProposal(draft){validateProposalDraft(draft);if(draft.workItems?.length&&draft.workItems.some(row=>!String(row.title||'').trim()||!String(row.owner||'').trim()||[row.cost,row.hours].some(value=>String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0)))throw new Error('Complete each work item with an owner and nonnegative cost and hours.');for(const key of ['text','why','outcome','scope','breakdown','timeline'])if(!String(draft[key]||'').trim())throw new Error('Complete the title, purpose, outcome, scope, breakdown, and timeline.');for(const key of ['budget','hours'])if(!String(draft[key]).trim()||!Number.isFinite(Number(draft[key]))||Number(draft[key])<0)throw new Error('Enter a nonnegative budget and time estimate.');if(!PROPOSAL_TYPES.includes(draft.proposalType))throw new Error('Choose a proposal type.');return draft;}
+export function proposalKind(type){return {'R&D':'Internal',Work:'Commissioned',Service:'Admin','Common Pool':'Admin','Nice to have':'Internal'}[type]||'Internal';}
+export function reviseProposal(data,draft,author){validateProposalDraft(draft);return {...draft,revision:(data.revision||1)+1,status:'Draft',votes:{},reviews:[...(data.reviews||[])],revisions:[...(data.revisions||[]),{revision:data.revision||1,snapshot:{text:data.text,why:data.why||'',outcome:data.outcome||'',scope:data.scope||'',budget:data.budget??'',breakdown:data.breakdown||'',hours:data.hours??'',timeline:data.timeline||'',risks:data.risks||'',leadId:data.leadId||'',workItems:data.workItems||[]},author,createdAt:Date.now()}],updatedAt:Date.now()};}
+export function reviewProposal(data,decision,reviewer,reason,expectedRevision,now=Date.now()) {
+ if(!['Approved','Changes requested'].includes(decision))throw new Error('Choose a review decision.');
+ if(data.projectIdCreated||data.status!=='In review')throw new Error('Submit this revision for review first.');
+ if((data.revision||1)!==expectedRevision)throw new Error('The proposal changed. Review the latest revision.');
+ if(!reviewer?.id||reviewer.id===data.authorId)throw new Error('Another member must review your proposal.');
+ if(!String(reason||'').trim())throw new Error('Add a review reason.');
+ return {status:decision,reviews:[...(data.reviews||[]),{revision:data.revision||1,decision,reason:reason.trim(),authorId:reviewer.id,authorName:reviewer.name,createdAt:now}],updatedAt:now};
+}
+
+/** Board movement follows the same authorship, completeness and review rules as the reader. */
+export function moveProposal(data,next,viewer,reason='',expectedRevision=data.revision||1,now=Date.now()) {
+ if(!viewer?.id)throw new Error('An active member must move this proposal.');
+ if(data.archived||data.projectIdCreated)throw new Error('This proposal is closed.');
+ if((data.revision||1)!==expectedRevision)throw new Error('This proposal changed. Reopen its latest revision.');
+ if(next===(data.status||'Draft'))return {};
+ if(next==='In review'){
+  if(data.authorId&&data.authorId!==viewer.id)throw new Error('Only the author can submit this proposal.');
+  validateProposal(data);
+  return {status:next,authorId:data.authorId||viewer.id,authorName:data.authorName||viewer.name,updatedAt:now};
+ }
+ if(next==='Draft'){
+  if(data.authorId&&data.authorId!==viewer.id)throw new Error('Only the author can return this proposal to Draft.');
+  return reviseProposal(data,Object.fromEntries(Object.keys(emptyProposal()).map(key=>[key,data[key]??emptyProposal()[key]])),viewer.id);
+ }
+ if(['Approved','Changes requested'].includes(next))return reviewProposal(data,next,viewer,reason,expectedRevision,now);
+ throw new Error('Create a project from an approved proposal.');
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import prose from './ui/NoteProse.module.css';
 import { seriesColorForKey } from "./ui/palette";
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -512,6 +513,7 @@ export default function RichEditor({
     {
       extensions: [
         StarterKit.configure({
+          underline:false,
           paragraph: { HTMLAttributes: { class: "editor-paragraph" } },
           heading: { levels: [1, 2, 3] },
           bulletList: { HTMLAttributes: { class: "editor-list" } },
@@ -618,4 +620,25 @@ export default function RichEditor({
       <EditorContent editor={editor} className="editor-content" />
     </div>
   );
+}
+
+/** The note reader uses the same document schema as the editor. */
+export function RichReader({content,title=''}) {
+  const editor=useEditor({
+    immediatelyRender:false,
+    editable:false,
+    extensions:[StarterKit.configure({underline:false}),Underline,Typography,MentionExtension.configure({HTMLAttributes:{class:'mention-pill'}})],
+    content:'',
+    editorProps:{attributes:{class:'note-prose',role:'document','aria-label':'Note content'}},
+  });
+  useEffect(()=>{
+    if(!editor)return;
+    const doc=new DOMParser().parseFromString(normalizeLegacyMentionMarkup(content),'text/html');
+    const normalized=value=>String(value||'').normalize('NFKC').replace(/\(CoA\)\s*$/i,'').replace(/[\s「」“”"']/g,'').toLowerCase();
+    const first=doc.body.firstElementChild;
+    // Hide only an exact, repeated leading title. Stored content is untouched.
+    if(first&&/^(H[1-6]|P)$/.test(first.tagName)&&normalized(first.textContent)===normalized(title))first.remove();
+    editor.commands.setContent(doc.body.innerHTML,{emitUpdate:false});
+  },[editor,content,title]);
+  return <div className={`note-preview-content ${prose.paper}`}><EditorContent className={prose.prose} editor={editor}/></div>;
 }

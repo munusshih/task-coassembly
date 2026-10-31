@@ -1,4 +1,6 @@
 import LoginClient from "./LoginClient";
+import ProtocolLogo from "../components/ui/ProtocolLogo";
+import styles from "./LoginPage.module.css";
 
 function safeNext(nextParam) {
   if (!nextParam || typeof nextParam !== "string") return "/";
@@ -23,13 +25,10 @@ export default async function LoginPage({ searchParams }) {
   const showDenied = params?.error === "not-authorized";
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-label="Sign in">
-        <div className="login-brand" aria-hidden="true">
-          <span className="login-brand-text">Protocol</span>
-        </div>
-        <h1 className="login-title">Protocol</h1>
-        <p className="login-subtitle">Members only.</p>
+    <main className={`${styles.page} login-page`}>
+      <section className={`${styles.card} login-card`} aria-label="Sign in">
+        <ProtocolLogo className={`${styles.brand} login-brand`} />
+        <h1 className="login-title">A workspace for worker-owners</h1>
 
         <LoginClient
           next={next}

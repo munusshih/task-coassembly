@@ -54,11 +54,12 @@ service cloud.firestore {
       }
       allow read: if signedIn();
       allow create: if signedIn() && validNote() && activeMember()
-        && (activeOwner() || (request.resource.data.archived == true && noteId.matches('(members-(shared-plan|why-time|share-results|estimates))|((members|memberDirectory|projects|backlog|resources|meetingNotes|finance|payouts|settings|homepage)-(welcome|our-reasons))')))
+        && (activeOwner() || request.resource.data.kind == 'question' || (request.resource.data.archived == true && noteId.matches('(members-(shared-plan|why-time|share-results|estimates))|((members|memberDirectory|projects|backlog|resources|meetingNotes|finance|payouts|settings|homepage)-(welcome|our-reasons))')))
         && request.resource.data.createdBy == request.resource.data.editorMemberId
         && request.resource.data.revision == 1 && request.resource.data.deleted == false;
       allow update: if signedIn() && validNote() && activeMember()
-        && (resource.data.createdBy == request.resource.data.editorMemberId
+        && ((resource.data.createdBy == request.resource.data.editorMemberId
+          && (activeOwner() || request.resource.data.kind == 'question'))
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived','updatedAt','editorMemberId','editedByName','revision']))
         && request.resource.data.pageKey == resource.data.pageKey
         && request.resource.data.createdBy == resource.data.createdBy

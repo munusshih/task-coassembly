@@ -1,0 +1,135 @@
+.reader {
+  display: grid;
+  width: min(100%, 840px);
+  gap: 20px;
+  margin: 0 auto;
+  padding: 8px 0 40px;
+}
+
+.header {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 12px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font: 500 var(--type-caption)/1.4 var(--font-body);
+}
+
+.eyebrow > span {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+}
+
+.header h1 {
+  margin: 0;
+  font: 500 clamp(30px, 4vw, 48px)/1.12 var(--font-body);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.summary > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-quiet);
+}
+
+.summary dt,
+.packages dt {
+  color: var(--muted);
+  font: 500 var(--type-caption)/1.35 var(--font-body);
+}
+
+.summary dd {
+  margin: 0;
+  font: 500 var(--type-heading)/1.3 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.section {
+  padding: 24px 0 8px;
+  border-top: 1px solid var(--line);
+}
+
+.section > span {
+  color: var(--muted);
+  font: 500 var(--type-caption)/1.4 var(--font-body);
+}
+
+.section h2 {
+  margin: 8px 0 16px;
+  font: 500 var(--type-panel-title)/1.25 var(--font-body);
+  letter-spacing: var(--tracking-tight);
+}
+
+.section h3 {
+  margin: 24px 0 8px;
+  font: 500 var(--type-heading)/1.35 var(--font-body);
+}
+
+.section p {
+  max-width: 72ch;
+  margin: 0;
+  font: 400 var(--type-body)/1.65 var(--font-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.packages {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.packages > li {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.packages h3 {
+  margin: 0 0 16px;
+}
+
+.packages dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0;
+}
+
+.packages dl > div {
+  display: grid;
+  gap: 4px;
+}
+
+.packages dd {
+  margin: 0;
+  font: 500 var(--type-body)/1.4 var(--font-body);
+}
+/* The reader follows the same three sections and type scale as the editor. */
+.header h1 { font-size:var(--type-page); line-height:1.2; text-wrap:balance; }
+.summary dd { font-size:var(--type-body); }
+.section h2 { font-size:var(--type-heading); }
+.section p { max-width:none; line-height:1.5; }
+.packages > li { background:var(--surface-quiet); border:0; }
