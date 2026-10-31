@@ -1,4 +1,5 @@
 "use client";
+import AccessScreen from "./components/ui/AccessScreen";
 import { WorkspaceIdentityContext } from "./components/WorkspaceIdentity";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -534,32 +535,11 @@ export default function Home() {
   }
 
   if (!authReady) {
-    return (
-      <main className="page-shell page-shell--single splash-screen">
-        <div className="splash-card">
-          <div className="splash-brand"><img className="splash-icon" src="/icon.svg" alt=""/>Protocol</div>
-          <div className="splash-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <p className="splash-label">Checking access…</p>
-        </div>
-      </main>
-    );
+    return <AccessScreen>Checking access…</AccessScreen>;
   }
 
   if (!currentMember) {
-    return (
-      <main className="page-shell page-shell--single splash-screen">
-        <div className="splash-card">
-          <div className="splash-brand"><img className="splash-icon" src="/icon.svg" alt=""/>Protocol</div>
-          <p className="splash-label">
-            Sign in with your approved Google account to continue.
-          </p>
-        </div>
-      </main>
-    );
+    return <AccessScreen>Sign in with your approved Google account to continue.</AccessScreen>;
   }
 
   function renderPage() {

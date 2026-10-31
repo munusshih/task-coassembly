@@ -1,5 +1,6 @@
 "use client";
 
+import AccessScreen from "../../components/ui/AccessScreen";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../../firebase";
@@ -26,13 +27,7 @@ export default function ShareLinkClient({ id }) {
     });
     return () => { cancelled = true; unsubscribe(); };
   }, [id]);
-  return (
-    <main className="page-shell page-shell--single splash-screen">
-      <div className="splash-card">
-        <div className="splash-brand">Protocol</div>
-        <p className="splash-label" role="status">{error || "Opening shared view…"}</p>
-        {error ? <a href="/tasks">Go to Task</a> : null}
-      </div>
-    </main>
-  );
+  return <AccessScreen action={error ? <a href="/tasks">Go to Task</a> : null}>
+    {error || "Opening shared view…"}
+  </AccessScreen>;
 }
