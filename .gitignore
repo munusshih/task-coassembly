@@ -41,3 +41,6 @@ coassembly-finance-136ad8cbfec8.json
 
 # Local authenticated resource preview cache (URLs and generated images)
 /.cache/resource-previews/
+
+# Local browser verification artifacts
+/.playwright-mcp/

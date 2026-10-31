@@ -1,0 +1,6 @@
+/* Keyboard focus is shared across native controls, tours, editors, and libraries. */
+:root { --focus-color:#1674ed; }
+html[data-input-modality=keyboard] body :is(button,a,input,select,textarea,summary,[role=button],[role=combobox],[tabindex],[contenteditable=true]):focus-visible:focus-visible:focus-visible { outline:2px solid var(--focus-color)!important; outline-offset:3px!important; box-shadow:none!important; text-decoration:none; }
+.task-view-picker:has(select:focus-visible) { background:transparent; }
+
+html[data-input-modality=pointer] body :is(button,a,input,select,textarea,summary,[role=button],[role=combobox],[tabindex],[contenteditable=true]):focus-visible:focus-visible:focus-visible { outline:0!important; box-shadow:none!important; }

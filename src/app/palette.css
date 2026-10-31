@@ -27,7 +27,7 @@
   --cover-4: #c3bbdf;
   --cover-5: #e5b8ce;
   --cover-6: #b9ced9;
-  --radius-panel: 16px;
+  --radius-panel: 24px;
   --radius-button: 999px;
   --radius-field: 999px;
   --folder-progress: color-mix(in srgb, var(--ink) 16%, transparent);

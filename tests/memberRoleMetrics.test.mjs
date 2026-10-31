@@ -55,3 +55,12 @@ test('selected weekly periods include both boundary weeks and exclude surroundin
  const overall = memberRoleMetrics('m',tasks,projects,now,'overall',{start:'2026-10-12',end:'2026-10-19'});
  assert.equal(overall.total,124);
 });
+
+test('arbitrary date ranges include intersecting allocation weeks without losing non-Monday boundaries',()=>{
+ const tasks=[task('a','2026-10-19',4),task('a','2026-10-26',8),task('a','2026-11-02',16)];
+ const range=memberRoleMetrics('m',tasks,[project('a','Internal')],Date.parse('2026-10-30'),'weekly',{start:'2026-10-22',end:'2026-10-29'});
+ assert.equal(range.total,12);
+ assert.deepEqual(range.weeks.map(week=>week.key),['2026-10-26','2026-10-19']);
+ const single=memberRoleMetrics('m',tasks,[project('a','Internal')],Date.parse('2026-10-30'),'weekly',{start:'2026-10-25',end:'2026-10-25'});
+ assert.equal(single.total,4);
+});

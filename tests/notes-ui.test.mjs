@@ -4,9 +4,9 @@ import { fuzzyMatch, searchableText } from '../src/app/lib/noteSearch.mjs';
 import { dateKey, monthDays, shiftMonth } from '../src/app/lib/noteCalendar.mjs';
 import { formatPronouns, pronounsForInput } from '../src/app/lib/pronouns.mjs';
 test('pronouns format legacy arrays and editable strings without merging labels', () => {
-  assert.equal(formatPronouns(['he/him', 'they/them']), 'he/him · they/them');
+  assert.equal(formatPronouns(['he/him', 'they/them']), 'he/him, they/them');
   assert.equal(pronounsForInput(['he/him', 'they/them']), 'he/him, they/them');
-  assert.equal(formatPronouns('he/him, they/them; he/him'), 'he/him · they/them');
+  assert.equal(formatPronouns('he/him, they/them; he/him'), 'he/him, they/them');
   assert.equal(formatPronouns(null), '');
 });
 test('note search requires an exact phrase and identifies the matching field', () => {

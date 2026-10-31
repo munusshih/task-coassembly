@@ -1,4 +1,5 @@
 "use client";
+import FormActions from './ui/FormActions';
 
 import WorkspaceViewPicker from "./ui/WorkspaceViewPicker";
 import CrossIcon from "./ui/CrossIcon";
@@ -48,9 +49,7 @@ const EMPTY_FORM = {
   description: "",
   category: "general",
   customCategory: "",
-  subLinks: [],
 };
-const EMPTY_SUBLINK = { label: "", url: "" };
 
 function normalizeCategory(value) {
   const next = (value || "").trim().toLowerCase();
@@ -64,54 +63,6 @@ function toLinkHref(rawUrl) {
   return `https://${value}`;
 }
 
-function SubLinkEditor({ subLinks, onChange }) {
-  function update(i, key, val) {
-    const next = subLinks.map((s, idx) =>
-      idx === i ? { ...s, [key]: val } : s,
-    );
-    onChange(next);
-  }
-  function add() {
-    onChange([...subLinks, { ...EMPTY_SUBLINK }]);
-  }
-  function remove(i) {
-    onChange(subLinks.filter((_, idx) => idx !== i));
-  }
-
-  return (
-    <div className="resource-sublinks-editor">
-      {subLinks.map((sl, i) => (
-        <div key={i} className="resource-sublink-row">
-          <InputField
-            className="resource-input resource-input--sm"
-            type="text"
-            placeholder="Label"
-            value={sl.label}
-            onChange={(e) => update(i, "label", e.target.value)}
-          />
-          <InputField
-            className="resource-input resource-input--sm"
-            type="url"
-            placeholder="https://…"
-            value={sl.url}
-            onChange={(e) => update(i, "url", e.target.value)}
-          />
-          <button
-            type="button"
-            className="resource-sublink-remove"
-            onClick={() => remove(i)}
-            aria-label="Remove"
-          >
-            <CrossIcon />
-          </button>
-        </div>
-      ))}
-      <button type="button" className="resource-sublink-add" onClick={add}>
-        + sub-link
-      </button>
-    </div>
-  );
-}
 
 function ResourceForm({
   form,
@@ -174,12 +125,7 @@ function ResourceForm({
         value={form.description}
         onChange={(e) => setForm({ ...form, description: e.target.value })}
       /></FormField>
-      <div className="resource-form-sublinks-label">Sub-links</div>
-      <SubLinkEditor
-        subLinks={form.subLinks}
-        onChange={(sl) => setForm({ ...form, subLinks: sl })}
-      />
-      <div className="resource-form-actions">
+      <FormActions className="resource-form-actions">
         <Button
           onClick={() => onSave(form, effectiveCategory)}
           disabled={!form.name.trim() || !form.url.trim()}
@@ -191,7 +137,7 @@ function ResourceForm({
             Cancel
           </Button>
         )}
-      </div>
+      </FormActions>
     </div>
   );
 }
@@ -206,7 +152,7 @@ function ResourceCard({ link, onEdit, onDelete, members = [] }) {
     <div className="resource-list-copy"><div className="resource-list-meta">{author!=='Unknown contributor'&&<span>{author}</span>}{date&&<time dateTime={date.toISOString()}>{date.toLocaleDateString('en-US',{month:'short',year:'numeric',timeZone:'UTC'})}</time>}</div>
       <a className="resource-list-title resource-card-main-link" href={toLinkHref(link.data.url)} target="_blank" rel="noopener noreferrer">{link.data.name}</a>
       {link.data.description&&<p>{link.data.description}</p>}
-      {link.data.subLinks?.some(item=>item.url)&&<div className="resource-list-links">{link.data.subLinks.filter(item=>item.url).map((item,index)=><a key={index} href={toLinkHref(item.url)} target="_blank" rel="noopener noreferrer">{item.label||'Related link'}</a>)}</div>}
+
       <div className="resource-list-actions"><EditButton label={`Edit ${link.data.name}`} onClick={()=>onEdit(link)}/><IconButton aria-label={`Delete ${link.data.name}`} title="Delete resource" onClick={()=>onDelete(link)}>{DELETE_ICON}</IconButton></div>
     </div>
   </article>;
@@ -324,7 +270,6 @@ export default function ResourcesPage({ currentMember, members = [] }) {
         url: form.url.trim(),
         description: form.description.trim(),
         category,
-        subLinks: form.subLinks.filter((s) => s.url.trim()),
         createdAt: Date.now(),
         updatedAt: Date.now(),
         ...(currentMember?.id ? { submittedBy: { id: currentMember.id, name: currentMember.name || "Unnamed member" } } : {}),
@@ -344,7 +289,6 @@ export default function ResourcesPage({ currentMember, members = [] }) {
         url: form.url.trim(),
         description: form.description.trim(),
         category,
-        subLinks: form.subLinks.filter((s) => s.url.trim()),
         updatedAt: Date.now(),
       });
       setEditingId(null);
@@ -371,7 +315,6 @@ export default function ResourcesPage({ currentMember, members = [] }) {
       description: d.description || "",
       category: normalizeCategory(d.category),
       customCategory: "",
-      subLinks: Array.isArray(d.subLinks) ? d.subLinks : [],
     });
     setPendingDelete(null);
   }

@@ -35,18 +35,22 @@
 }
 .picker select.select:focus:not(:focus-visible) { outline:none; box-shadow:none; }
 .picker select.select:hover { opacity: .6; }
-.picker select.select:focus-visible { outline:none; box-shadow:none; background:var(--palette-planned); }
+.picker select.select:focus-visible { outline:none; box-shadow:none; }
 .picker select.select option { color: var(--ink); background: var(--paper); font: 400 24px/1.4 var(--font-body); letter-spacing: normal; }
-.compact { --picker-size: clamp(36px, 4vw, 64px); flex-shrink: 0; white-space: nowrap; }
-.compact .prefix { font-size: 30px; }
 @media (max-width: 650px) {
   .picker { --picker-size: 48px; gap: 10px; }
-  .compact { --picker-size: 32px; }
   .prefix { font-size: 28px; }
-  .compact .prefix { font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .picker select.select { transition: none; } }
 
 .control { display:inline-grid; min-width:0; font:400 var(--picker-size)/1.2 var(--font-body); letter-spacing:-.05em; }
 .measure { grid-area:1/1; visibility:hidden; white-space:pre; padding:0 .3em .12em .02em; }
 .picker .control select.select { grid-area:1/1; width:100%; padding:0 .3em .12em .02em; box-sizing:border-box; font:inherit; letter-spacing:inherit; }
+
+/* The visible label supplies the text baseline; the native select covers its whole hit area. */
+.control { display:inline-block; position:relative; vertical-align:baseline; line-height:1.1; }
+.measure { display:inline-block; visibility:visible; padding:0 .2em 0 .02em; border-bottom:var(--underline-width) solid currentColor; }
+.picker .control select.select { position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; padding:0; cursor:pointer; }
+:global(html[data-input-modality=keyboard]) .picker:has(select:focus-visible) .measure { outline:2px solid var(--focus-color); outline-offset:3px; }
+.picker select.select:hover { opacity:0; }
+.picker:hover .measure { opacity:var(--hover-opacity,.72); }

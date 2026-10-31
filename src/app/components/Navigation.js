@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import FocusModality from './ui/FocusModality';
 import ConstructionIcon from "./ui/ConstructionIcon";
 import ProtocolLogo from "./ui/ProtocolLogo";
 import {applyPreferences} from "./SettingsPage";
@@ -15,12 +16,12 @@ import { auth } from "../../firebase";
 
 const TABS = [
   { key: "members", label: "Task" },
-  { key: "memberDirectory", label: "Members" },
-  { key: "projects", label: "Projects" },
-  { key: "backlog", label: "Wishes" },
+  { key: "memberDirectory", label: "Member" },
+  { key: "projects", label: "Project" },
+  { key: "backlog", label: "Wish" },
   { key: "finance", label: "Finance" },
-  { key: "payouts", label: "Requests" },
-  { key: "meetingNotes", label: "Notes" },
+  { key: "payouts", label: "Request" },
+  { key: "meetingNotes", label: "Note" },
   { key: "resources", label: "Resource" },
 ];
 
@@ -84,7 +85,7 @@ export default function Navigation({
   }
 
   return (
-    <header className="task-navigation">
+    <header className="task-navigation"><FocusModality/>
       {activeTab !== "members" && <div className="task-week-toolbar"><TaskWeekInfo pageKey={activeTab} /></div>}
       <button type="button" className="task-menu-trigger" aria-label="Open workspace navigation" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><ProtocolLogo markOnly/></button>
       {portalReady && createPortal(<dialog ref={overlayRef} className={`task-navigation-overlay${menuClosing ? " task-navigation-overlay--closing" : ""}`} aria-label="Workspace navigation" onCancel={(event) => { event.preventDefault(); closeNavigation(); }} onClose={() => setMenuOpen(false)} onClick={(event) => {

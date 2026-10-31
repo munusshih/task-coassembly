@@ -1,0 +1,120 @@
+.page:global(.login-page) {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 48px);
+  background: var(--paper);
+}
+
+.card:global(.login-card) {
+  display: grid;
+  gap: 0;
+  width: min(100%, 440px);
+  padding: clamp(28px, 5vw, 48px);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--paper);
+  box-shadow: 0 16px 48px color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.brand:global(.login-brand) {
+  width: fit-content;
+  height: auto;
+  justify-content: flex-start;
+  gap: 12px;
+  margin: 0 0 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.brand:global(.login-brand) > img {
+  width: 44px;
+  height: 44px;
+}
+
+.brand:global(.login-brand) > span {
+  transform: none;
+  margin: 0;
+}
+
+.card :global(.login-title) {
+  margin: 0 0 24px;
+  color: var(--ink);
+  font-size: clamp(32px, 5vw, 42px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+}
+
+.card :global(.login-subtitle) {
+  margin: 12px 0 32px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.card :global(.login-form) {
+  gap: 14px;
+}
+
+.card :global(.login-submit) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 14px 22px;
+  border-radius: var(--radius-button);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.card :global(.login-submit:hover:not(:disabled)) {
+  opacity: 0.82;
+}
+
+.card :global(.login-error) {
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, #a32626 22%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, #a32626 6%, var(--paper));
+  color: #842020;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.card :global(.login-help) {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .page:global(.login-page) {
+    padding: 16px;
+  }
+
+  .card:global(.login-card) {
+    padding: 28px 24px;
+    border-radius: 24px;
+  }
+
+  .brand:global(.login-brand) {
+    margin-bottom: 36px;
+  }
+}
+
+/* The sign-in uses the same centered brand and quiet surface as access loading. */
+.card:global(.login-card) { border:0; box-shadow:none; background:transparent; padding:24px; text-align:center; }
+.brand:global(.login-brand) { justify-self:center; justify-content:center; margin-bottom:28px; }
+.card :global(.login-title) { font:400 var(--type-heading)/1.4 var(--font-body); letter-spacing:normal; text-wrap:balance; margin-bottom:32px; }
+.card :global(.login-submit) { font:400 var(--type-body)/1.4 var(--font-body); min-height:48px; }
+.card :global(.login-submit:hover:not(:disabled)) { opacity:var(--hover-opacity,.72); background:var(--ink); }

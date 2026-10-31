@@ -1,25 +1,83 @@
 'use client';
-import {useState} from 'react';
-import TabBar from './ui/TabBar';
-import SectionBlock from './ui/SectionBlock';
 import FormField from './ui/FormField';
 import InputField from './ui/InputField';
 import SelectField from './ui/SelectField';
 import MemberSelect from './ui/MemberSelect';
 import TextareaField from './ui/TextareaField';
 import Button from './Button';
+import IconButton from './IconButton';
+import {DELETE_ICON} from './icons';
 import {PROPOSAL_TYPES,proposalPlanTotals} from './proposalModel.mjs';
+import styles from './ProposalEditor.module.css';
+
 export default function ProposalEditor({draft,onChange,members,onSave,busy,canSave}) {
- const [step,setStep]=useState('brief');
- const steps=[{value:'brief',label:'Idea'},{value:'delivery',label:'Delivery'},{value:'cost',label:'Time & cost'}];
  const patch=values=>onChange({...draft,...values});
  const rows=draft.workItems||[];
- function updateRows(next){const totals=proposalPlanTotals(next);patch({workItems:next,budget:String(totals.budget),hours:String(totals.hours),breakdown:next.map(row=>`${row.title||'Work item'} · ${row.owner||'Owner needed'} · NT$ ${row.cost||0} · ${row.hours||0}h`).join('\n')});}
- function row(index,values){updateRows(rows.map((item,position)=>position===index?{...item,...values}:item));}
- const textField=(key,label,placeholder)=><FormField label={label}><TextareaField value={draft[key]||''} placeholder={placeholder} rows={3} onChange={event=>patch({[key]:event.target.value})}/></FormField>;
- return <form className="proposal-brief" onSubmit={event=>{event.preventDefault();onSave();}}><div className="proposal-brief-main"><TabBar id="proposal-step" label="Proposal sections" value={step} items={steps} onChange={setStep} panelId="proposal-step-panel"/><div id="proposal-step-panel" role="tabpanel" aria-labelledby={`proposal-step-${step}`} className={`proposal-step-panel proposal-step-panel--${step}`}>
-  <SectionBlock title="What’s the idea?"><div className="proposal-form-grid"><FormField label="Proposal title"><InputField value={draft.text} placeholder="A clear name for the proposed project" onChange={event=>patch({text:event.target.value})}/></FormField><FormField label="Type"><SelectField value={draft.proposalType} onChange={event=>patch({proposalType:event.target.value})}>{PROPOSAL_TYPES.map(type=><option key={type}>{type}</option>)}</SelectField></FormField></div>{textField('why','Problem and beneficiaries','What is happening now? Who needs this, and what evidence supports it?')}{textField('outcome','Proposed outcome and success criteria','What are we deciding to create or change? How will we know it worked?')}</SectionBlock>
-  <SectionBlock title="How will it happen?"><FormField label="Proposal lead"><MemberSelect members={members.filter(member=>member.data.active!==false)} value={draft.leadId||''} onChange={leadId=>patch({leadId})} label="Proposal lead" placeholder="Who is accountable for delivery?"/></FormField>{textField('scope','Deliverables and boundaries','List concrete outputs. State what is included and what is outside this proposal.')}{textField('timeline','Milestones and timing','Start date → first deliverable → review milestone → target completion')}{textField('risks','Dependencies, risks, and alternatives','What needs to happen first? What could go wrong? What other approach did you consider?')}</SectionBlock>
-  <SectionBlock title="What will it take?" actions={<Button variant="ghost" type="button" onClick={()=>updateRows([...rows,{title:'',owner:'',cost:0,hours:0}])}>Add work item</Button>}><p className="proposal-section-note">Break the proposal into work packages. Include people’s time and outside costs. Enter zero when no spending is needed.</p>{rows.length>0?<div className="proposal-cost-table"><table><thead><tr><th>Work / deliverable</th><th>Owner</th><th>Cost · TWD</th><th>Hours</th><th/></tr></thead><tbody>{rows.map((item,index)=><tr key={index}><td><InputField aria-label={`Work item ${index+1}`} value={item.title} placeholder="Research, design, printing…" onChange={event=>row(index,{title:event.target.value})}/></td><td><InputField aria-label={`Owner for item ${index+1}`} value={item.owner} placeholder="Person / supplier" onChange={event=>row(index,{owner:event.target.value})}/></td><td><InputField aria-label={`Cost for item ${index+1}`} type="number" min="0" step="any" value={item.cost} onChange={event=>row(index,{cost:event.target.value})}/></td><td><InputField aria-label={`Hours for item ${index+1}`} type="number" min="0" step="any" value={item.hours} onChange={event=>row(index,{hours:event.target.value})}/></td><td><Button variant="ghost" type="button" aria-label={`Remove work item ${index+1}`} onClick={()=>updateRows(rows.filter((_,position)=>position!==index))}>×</Button></td></tr>)}</tbody></table></div>:<><div className="proposal-form-grid"><FormField label="Total requested · TWD"><InputField type="number" min="0" step="any" value={draft.budget} onChange={event=>patch({budget:event.target.value})}/></FormField><FormField label="Total team hours"><InputField type="number" min="0" step="any" value={draft.hours} onChange={event=>patch({hours:event.target.value})}/></FormField></div>{textField('breakdown','Existing breakdown','Add work items above, or describe costs, people, rates, and hours here.')}</>}</SectionBlock>
- </div><div className="proposal-step-actions">{step!=='brief'&&<Button type="button" variant="ghost" onClick={()=>setStep(steps[steps.findIndex(item=>item.value===step)-1].value)}>Back</Button>}{step!=='cost'&&<Button type="button" onClick={()=>setStep(steps[steps.findIndex(item=>item.value===step)+1].value)}>Continue</Button>}</div></div><aside className="proposal-brief-summary"><h3>Decision requested</h3><dl><div><dt>Budget</dt><dd>{draft.budget!==''?`NT$ ${Number(draft.budget).toLocaleString()}`:'Not estimated'}</dd></div><div><dt>Team time</dt><dd>{draft.hours!==''?`${draft.hours} hours`:'Not estimated'}</dd></div></dl><p>Save a draft at any stage. Submit for review when the outcome, scope, costs, and timeline are complete.</p><Button type="submit" disabled={busy||!canSave||!draft.text.trim()}>{busy?'Saving…':'Save draft'}</Button></aside></form>;
+ function updateRows(next) {
+  const totals=proposalPlanTotals(next);
+  patch({
+   workItems:next,
+   budget:String(totals.budget),
+   hours:String(totals.hours),
+   breakdown:next.map(row=>`${row.title||'Work item'} · ${row.owner||'Owner needed'} · NT$ ${row.cost||0} · ${row.hours||0}h`).join('\n'),
+  });
+ }
+ function updateRow(index,values) {
+  updateRows(rows.map((item,position)=>position===index?{...item,...values}:item));
+ }
+ const textField=(key,label,placeholder,required=false)=><FormField label={label} key={key}><TextareaField value={draft[key]||''} placeholder={placeholder} rows={3} onChange={event=>patch({[key]:event.target.value})}/>{required&&<span className={styles.hint}>Needed before submitting for review</span>}</FormField>;
+
+ return <form className={styles.editor} onSubmit={event=>{event.preventDefault();onSave();}}>
+  <header className={styles.intro}>
+   <span>Proposal</span>
+   <h2>Make the idea clear enough to decide on.</h2>
+   <p>Describe the need, the change you propose, who will do the work, and what it will take. Save a draft while details are still being worked out.</p>
+  </header>
+
+  <section className={styles.section} aria-labelledby="proposal-case">
+   <div className={styles.sectionHeading}><span>01</span><div><h3 id="proposal-case">The case for change</h3><p>What is happening, and who would benefit?</p></div></div>
+   <div className={styles.fields}>
+    <FormField label="Proposal title"><InputField value={draft.text} placeholder="A short, specific name" onChange={event=>patch({text:event.target.value})}/></FormField>
+    <FormField label="Kind of work"><SelectField value={draft.proposalType} onChange={event=>patch({proposalType:event.target.value})}>{PROPOSAL_TYPES.map(type=><option key={type}>{type}</option>)}</SelectField></FormField>
+    {textField('why','Need and evidence','What problem or opportunity are we responding to? Include who is affected and what you know.',true)}
+    {textField('outcome','What should change?','Describe the result and how the team will recognize that it worked.',true)}
+   </div>
+  </section>
+
+  <section className={styles.section} aria-labelledby="proposal-plan">
+   <div className={styles.sectionHeading}><span>02</span><div><h3 id="proposal-plan">The proposed work</h3><p>Make the scope and responsibility tangible.</p></div></div>
+   <div className={styles.fields}>
+    <FormField label="Proposal lead"><MemberSelect members={members.filter(member=>member.data.active!==false)} value={draft.leadId||''} onChange={leadId=>patch({leadId})} label="Proposal lead" placeholder="Choose a person responsible for coordination"/></FormField>
+    {textField('scope','Deliverables and boundaries','What will be made or done? What is explicitly out of scope?',true)}
+    {textField('timeline','Timing and milestones','When could work start? Note a first milestone and a realistic target date.',true)}
+    {textField('risks','Dependencies and open questions','What needs to happen first? What could change the plan?',false)}
+   </div>
+  </section>
+
+  <section className={styles.section} aria-labelledby="proposal-resources">
+   <div className={styles.sectionHeading}><span>03</span><div><h3 id="proposal-resources">People, time, and money</h3><p>Estimate the work so members can assess the trade-offs.</p></div></div>
+   {rows.length>0?<div className={styles.workItems}>
+    {rows.map((item,index)=><fieldset className={styles.workItem} key={index}>
+     <legend>Work package {index+1}</legend>
+     <FormField label="Deliverable"><InputField aria-label={`Work item ${index+1}`} value={item.title} placeholder="e.g. Research and recommendations" onChange={event=>updateRow(index,{title:event.target.value})}/></FormField>
+     <FormField label="Owner"><InputField aria-label={`Owner for item ${index+1}`} value={item.owner} placeholder="Person or supplier" onChange={event=>updateRow(index,{owner:event.target.value})}/></FormField>
+     <FormField label="Cost · TWD"><InputField aria-label={`Cost for item ${index+1}`} type="number" min="0" step="any" value={item.cost} placeholder="0" onChange={event=>updateRow(index,{cost:event.target.value})}/></FormField>
+     <FormField label="Team hours"><InputField aria-label={`Hours for item ${index+1}`} type="number" min="0" step="any" value={item.hours} placeholder="0" onChange={event=>updateRow(index,{hours:event.target.value})}/></FormField>
+     <IconButton type="button" variant="delete" title={`Remove work package ${index+1}`} aria-label={`Remove work package ${index+1}`} onClick={()=>updateRows(rows.filter((_,position)=>position!==index))}>{DELETE_ICON}</IconButton>
+    </fieldset>)}
+    <Button variant="ghost" type="button" onClick={()=>updateRows([...rows,{title:'',owner:'',cost:'',hours:''}])}>+ Add work package</Button>
+   </div>:<div className={styles.fields}>
+    <p className={styles.guidance}>No work packages yet. Add one to estimate by deliverable, or enter totals for an early draft.</p>
+    <FormField label="Total requested · TWD"><InputField type="number" min="0" step="any" value={draft.budget} placeholder="0" onChange={event=>patch({budget:event.target.value})}/></FormField>
+    <FormField label="Total team hours"><InputField type="number" min="0" step="any" value={draft.hours} placeholder="0" onChange={event=>patch({hours:event.target.value})}/></FormField>
+    {textField('breakdown','How was this estimated?','Note the people, rates, quantities, or assumptions behind the totals.',true)}
+    <Button variant="ghost" type="button" onClick={()=>updateRows([{title:'',owner:'',cost:'',hours:''}])}>Break this estimate into work packages</Button>
+   </div>}
+  </section>
+
+  <footer className={styles.actions}>
+   <p>A draft can be incomplete. The review step checks that the proposal has enough detail to discuss.</p>
+   <Button type="submit" disabled={busy||!canSave||!draft.text.trim()}>{busy?'Saving…':'Save draft'}</Button>
+  </footer>
+ </form>;
 }

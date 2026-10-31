@@ -3,6 +3,7 @@ import { useState } from 'react';
 import ModalShell from './ModalShell';
 import TextareaField from './TextareaField';
 import Button from '../Button';
+import FormActions from './FormActions';
 import { requireActionReason } from '../../../lib/actionReason.mjs';
 
 export default function ReasonDialog({ title, message, confirmLabel = 'Confirm', destructive = false, requireDeleteText = false, illustration, onConfirm, onCancel }) {
@@ -18,7 +19,7 @@ export default function ReasonDialog({ title, message, confirmLabel = 'Confirm',
     catch (failure) { setError(failure.message || 'Could not complete this action.'); }
     finally { setPending(false); }
   }
-  return <ModalShell title={title} onClose={pending ? undefined : onCancel} size="sm" className={`reason-dialog${illustration ? " reason-dialog--illustrated" : ""}`} footer={<><Button variant="ghost" onClick={onCancel} disabled={pending}>Cancel</Button><Button variant={destructive ? 'danger' : undefined} onClick={submit} disabled={!enabled}>{pending ? 'Saving…' : confirmLabel}</Button></>}>
+  return <ModalShell title={title} onClose={pending ? undefined : onCancel} size="sm" className={`reason-dialog${illustration ? " reason-dialog--illustrated" : ""}`} footer={<FormActions><Button variant={destructive ? 'danger' : undefined} onClick={submit} disabled={!enabled}>{pending ? 'Saving…' : confirmLabel}</Button><Button variant="ghost" onClick={onCancel} disabled={pending}>Cancel</Button></FormActions>}>
     <div className="reason-dialog-content">
     {illustration && <img className="reason-dialog-illustration" src={`/illustrations/${illustration}-person.svg`} alt="" />}
     <div className="reason-dialog-fields">

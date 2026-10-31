@@ -1,4 +1,6 @@
 "use client";
+import InputField from './ui/InputField';
+import FormActions from './ui/FormActions';
 
 import {useContext} from "react";
 import {ComposerDismissContext} from "./ui/BottomComposer";
@@ -19,6 +21,10 @@ export function emptyTaskCreateDraft(projectId = "") {
 export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: submitAdd, onCancel: cancelAdd, inputRef, projects: assignableProjects, remainingHint: addRemainingHint, unitOptions: UNIT_OPTIONS, formatUnitOption, members, assigneeId, onAssigneeChange }) {
   const dismissComposer=useContext(ComposerDismissContext);
   const cancel=()=>dismissComposer?dismissComposer():cancelAdd();
+  async function saveTask() {
+    const saved=await submitAdd();
+    if(saved)dismissComposer?.();
+  }
   const { addTitle, addTime, addProject, addDeadline, addSubtasks, addLinks } = draft;
   function setAddSubtask(index, field, value) {
     const next = [...addSubtasks];
@@ -100,7 +106,7 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                   {addRemainingHint ? (
                     <span className="meta-helper-chip">{addRemainingHint}</span>
                   ) : null}
-                  <FormField label="Date"><input
+                  <FormField label="Date"><InputField
                     type="date"
                     className="meta-date"
                     aria-label="Task date"
@@ -111,13 +117,13 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
               </div>
 
               <div className="notepad-add-sections">
-                <details
+                <section className="task-compose-section"><h3>Subtasks</h3><details
                   className="todo-edit-disclosure"
                   open={addSubtasks.length > 0}
                 >
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">
-                      Subtasks ({addSubtasks.length})
+                      {addSubtasks.length ? `${addSubtasks.length} added` : 'None yet'}
                     </span>
                     <Button
                       type="button"
@@ -167,15 +173,15 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                       </div>
                     )}
                   </div>
-                </details>
+                </details></section>
 
-                <details
+                <section className="task-compose-section"><h3>Links</h3><details
                   className="todo-edit-disclosure"
                   open={addLinks.length > 0}
                 >
                   <summary className="todo-edit-disclosure-summary">
                     <span className="todo-edit-section-title">
-                      Links ({addLinks.length})
+                      {addLinks.length ? `${addLinks.length} added` : 'None yet'}
                     </span>
                     <Button
                       type="button"
@@ -230,13 +236,13 @@ export default function TaskCreateForm({ draft, onChange: patchUi, onSubmit: sub
                       </div>
                     )}
                   </div>
-                </details>
+                </details></section>
               </div>
 
-              <div className="notepad-add-actions">
-                <TimeButton onClick={submitAdd} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
+              <FormActions className="notepad-add-actions">
+                <TimeButton onClick={saveTask} disabled={!addTitle.trim() || !addTime || !addProject || (members && !assigneeId)}>Save</TimeButton>
                 <TimeButton quiet onClick={cancel}>Cancel</TimeButton>
-              </div>
+              </FormActions>
             </div>
   );
 }

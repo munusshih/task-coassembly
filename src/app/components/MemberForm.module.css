@@ -1,0 +1,9 @@
+.form { --form-type:16px; }
+.form :global(.member-editor-field) { gap:8px; }
+.form :global(.member-editor-field > span:first-child) { font:400 var(--form-type)/1.4 var(--font-body); text-decoration:none; }
+.form :global(.member-editor-field :is(input,textarea,select,button)),.form :global(.member-editor-toggle) { font:400 var(--form-type)/1.4 var(--font-body); }
+.form :global(.member-editor-field textarea) { min-height:100px; }
+.form :global(.member-select-trigger img),.form :global(.member-select-options img) { width:28px; height:32px; border-radius:0; object-fit:contain; background:transparent; }
+.form :global(.member-editor-actions) { margin-top:28px; padding:0; gap:16px; }
+.form :global(.member-editor-field :is(input,button[aria-haspopup])) { min-height:44px; box-sizing:border-box; padding:8px 16px; }
+.form :global(.member-select-trigger img) { height:28px; }

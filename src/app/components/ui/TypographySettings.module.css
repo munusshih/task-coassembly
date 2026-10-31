@@ -1,0 +1,11 @@
+.settings { display:grid; gap:24px; }
+.settings > p { margin:0; font:400 16px/1.5 var(--font-body); max-width:62ch; }
+.presets { display:flex; flex-wrap:wrap; gap:12px; }
+.roles { display:grid; gap:24px; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.role { min-width:0; padding:20px; border-radius:var(--radius-panel); background:var(--surface-quiet); }
+.description { margin:12px 0 24px; color:var(--muted); font:400 14px/1.4 var(--font-body); }
+.sample { min-height:100px; margin:0; overflow-wrap:anywhere; }
+.heading { font-size:32px; line-height:1.2; }
+.body { font-size:20px; line-height:1.6; }
+.label { font-size:14px; line-height:1.6; }
+@media(max-width:850px){.roles{grid-template-columns:1fr;}.sample{min-height:0;}}

@@ -35,6 +35,43 @@ export function weekKeyFromTs(ts) {
   return weekStartDateForTs(ts).toISOString().slice(0, 10);
 }
 
+export function weekStartForDateKey(dateKey) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ""));
+  if (!match) return null;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (date.toISOString().slice(0, 10) !== dateKey) return null;
+  const weekday = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() + (weekday === 0 ? -6 : 1 - weekday));
+  return date.toISOString().slice(0, 10);
+}
+
+export function weekKeyToIsoWeek(weekKey) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(weekKey || ""));
+  if (!match) return "";
+  const monday = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (monday.toISOString().slice(0, 10) !== weekKey || monday.getUTCDay() !== 1) return "";
+  const thursday = new Date(monday);
+  thursday.setUTCDate(thursday.getUTCDate() + 3);
+  const weekYear = thursday.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(weekYear, 0, 4));
+  firstThursday.setUTCDate(firstThursday.getUTCDate() + 3 - ((firstThursday.getUTCDay() + 6) % 7));
+  const weekNumber = 1 + Math.round((thursday - firstThursday) / 604800000);
+  return `${weekYear}-W${String(weekNumber).padStart(2, "0")}`;
+}
+
+export function weekStartForIsoWeek(isoWeek) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(String(isoWeek || ""));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  if (week < 1 || week > 53) return null;
+  const januaryFourth = new Date(Date.UTC(year, 0, 4));
+  const monday = new Date(januaryFourth);
+  monday.setUTCDate(januaryFourth.getUTCDate() - ((januaryFourth.getUTCDay() + 6) % 7) + (week - 1) * 7);
+  const dateKey = monday.toISOString().slice(0, 10);
+  return weekKeyToIsoWeek(dateKey) === isoWeek ? dateKey : null;
+}
+
 export function currentWeekKey() {
   return weekKeyFromTs(Date.now());
 }

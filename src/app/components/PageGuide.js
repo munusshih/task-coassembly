@@ -344,7 +344,7 @@ const PAGE_GUIDES = {
       "嗨，歡迎來到共用資源架！團隊可在這裡保存能重複使用的參考資料、工具、廠商、服務與專案素材，避免重要知識埋在舊任務裡。",
     ),
     outro: copy(
-      "You’re ready! Add one resource with a clear name, a sentence explaining when to use it, the right category, and any closely related sub-links.",
+      "You’re ready! Add one resource with a clear name, a sentence explaining when to use it, the right category.",
       "準備好了！新增資源時，請填寫清楚的名稱、一句使用情境說明、正確分類，以及密切相關的子連結。",
     ),
     steps: [
@@ -366,7 +366,7 @@ const PAGE_GUIDES = {
         },
         title: copy("Save enough context to reuse it", "補足資訊，讓資源能再次使用"),
         description: copy(
-          "Add the main URL, a clear name and description, a category, and any related sub-links so teammates know what the resource is for.",
+          "Add the main URL, a clear name and description, a category so teammates know what the resource is for.",
           "請加入主要網址、清楚的名稱與說明、分類，以及相關子連結，讓其他成員知道這項資源適合用在什麼情境。",
         ),
       },
@@ -383,7 +383,7 @@ const PAGE_GUIDES = {
         element: ".resources-page .resource-sticky",
         title: copy("Open, edit, or expand a resource", "開啟、編輯或延伸資源"),
         description: copy(
-          "A resource card links to its main destination and any sub-links. Use its controls when the description, category, or destination changes.",
+          "A resource card links to its main destination. Use its controls when the description, category, or destination changes.",
           "資源卡會連到主要網址與所有子連結。當說明、分類或目的地改變時，可使用卡片上的控制項更新內容。",
         ),
         side: "top",

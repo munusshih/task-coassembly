@@ -11,5 +11,5 @@ export default function NoteDiscussion({note,members,username=''}) {
   catch(err){setError(err.message);return false;}
   finally{setBusy(false);}
  }
- return <DiscussionThread entries={note?.data?.discussion||[]} members={members} username={username} onSend={post} busy={busy} error={error}/>;
+ return <DiscussionThread inverted entries={note?.data?.discussion||[]} members={members} username={username} onSend={post} busy={busy} error={error}/>;
 }

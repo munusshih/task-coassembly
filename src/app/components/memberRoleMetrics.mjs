@@ -1,4 +1,4 @@
-import { taskWeekKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToProject } from './taskBoardRules.js';
+import { taskWeekKey, weekStartForDateKey, weekStartDateForTs, isProjectClosed, isMemberAssignedToProject } from './taskBoardRules.js';
 
 export const WORK_CATEGORIES = [
   { key: 'rd', label: 'R&D', tone: 'project' },
@@ -26,8 +26,8 @@ export function memberRoleMetrics(memberId, tasks, projects, now = Date.now(), m
   });
   const rangeWeeks = [];
   if (mode === "weekly" && /^\d{4}-\d{2}-\d{2}$/.test(range.start || "")) {
-    const first = new Date(`${range.start}T00:00:00Z`);
-    const last = new Date(`${range.end || range.start}T00:00:00Z`);
+    const first = new Date(`${weekStartForDateKey(range.start)}T00:00:00Z`);
+    const last = new Date(`${weekStartForDateKey(range.end || range.start)}T00:00:00Z`);
     for (let date = new Date(first); date <= last; date.setUTCDate(date.getUTCDate() + 7)) {
       rangeWeeks.push({ key: date.toISOString().slice(0, 10), units: 0, projects: new Map() });
     }

@@ -17,7 +17,7 @@ function ProjectCard({project,tasks,members,folder,onOpen,selected,editable,onSt
  if(!folder)return <KanbanCard id={project.id} type="application/x-protocol-project" selected={selected} title={data.name||'Unnamed'} openLabel={`Open project: ${data.name||'Unnamed'}`} draggable={editable} onOpen={()=>onOpen(project.id)} metadata={data.kind&&<MetadataPill tone={projectWorkTone(data.kind)}>{data.kind}</MetadataPill>}><ProjectTimeSummary progress={progress} compact/></KanbanCard>;
  return <li className={`project-preview-card${folder?' project-preview-card--folder':''}${selected?' project-preview-card--selected':''}`} style={{'--folder-paper':`var(--workspace-${projectWorkTone(data.kind)})`}} data-rationale-anchor={`project-${project.id}`} data-rationale-label={data.name||'Project'} draggable={!folder&&editable} onDragStart={event=>{event.dataTransfer.setData('application/x-protocol-project',project.id);event.dataTransfer.effectAllowed='move';event.currentTarget.classList.add('project-preview-card--dragging');}} onDragEnd={event=>event.currentTarget.classList.remove('project-preview-card--dragging')}>
   <button className="project-preview-open" onClick={()=>onOpen(project.id)} aria-label={`Open project: ${data.name||'Unnamed'}`} aria-expanded={selected}>
-   {folder&&<FolderOutline fill="var(--folder-paper)"/>}
+   {folder&&<FolderOutline fill="var(--folder-paper)" stroke="none"/>}
    <span className="project-preview-title">{data.name||'Unnamed'}</span>
    <span className="project-preview-pills">{folder&&<ProjectStatusPill status={data.status}/>}{data.kind&&<MetadataPill tone={projectWorkTone(data.kind)}>{data.kind}</MetadataPill>}</span>
    <ProjectTimeSummary progress={progress} compact={!folder}/>

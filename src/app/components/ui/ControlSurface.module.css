@@ -1,0 +1,6 @@
+.surface { --control-background:transparent; --control-ink:var(--ink); transition:opacity 150ms ease; }
+.solid { --control-background:var(--ink); --control-ink:var(--paper); }
+.outlined { --control-background:var(--paper); --control-ink:var(--ink); }
+.quiet { --control-background:transparent; --control-ink:var(--ink); }
+.surface.surface:not(:disabled):hover { background:var(--control-background)!important; color:var(--control-ink)!important; opacity:var(--hover-opacity,.72); box-shadow:none; }
+@media(prefers-reduced-motion:reduce){.surface{transition:none;}}

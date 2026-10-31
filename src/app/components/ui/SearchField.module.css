@@ -1,0 +1,41 @@
+.field {
+  position: relative;
+}
+
+.field.field .input {
+  padding-left: 46px;
+}
+
+.field .input:focus-visible {
+  outline-offset: 2px;
+}
+
+.field .clear {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  transform: translateY(-50%);
+  place-items: center;
+  border-radius: var(--radius-button);
+  color: var(--ink);
+}
+
+.field .clear:hover {
+  background: var(--surface-strong);
+}
+
+.field :global(.search-field-icon) {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 16px;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}

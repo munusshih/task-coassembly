@@ -1,0 +1,10 @@
+.picker { position:relative; display:inline-block; max-width:100%; min-width:0; }
+.trigger { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:44px; padding:10px 18px; border:0; border-radius:var(--radius-button); background:var(--ink); color:var(--paper); font:400 var(--type-caption)/1.4 var(--font-body); white-space:nowrap; cursor:pointer; }
+.trigger:hover { opacity:var(--hover-opacity,.72); }
+.calendar { position:absolute; z-index:1200; top:calc(100% + 12px); right:0; display:block; width:max-content; max-width:calc(100vw - 32px); padding:16px; border:1px solid var(--line); border-radius:var(--radius-panel); background:var(--paper); color:var(--ink); box-shadow:0 8px 32px #0001; --rdp-accent-color:var(--ink); --rdp-accent-background-color:var(--palette-planned); --rdp-day_button-border-radius:50%; --rdp-selected-border:0; --rdp-day-height:40px; --rdp-day-width:40px; --rdp-day_button-height:38px; --rdp-day_button-width:38px; }
+.calendar button { font-size:var(--type-caption); }
+.calendar :global(.rdp-root) { --rdp-accent-color:var(--ink); --rdp-accent-background-color:var(--palette-planned); --rdp-selected-border:0; }
+.hint { display:block; max-width:290px; padding-top:12px; font:400 14px/1.4 var(--font-body); color:var(--muted); white-space:normal; }
+@media(max-width:600px){.calendar{position:fixed;top:80px;right:16px;left:auto;}.trigger{font-size:14px;gap:8px;padding:10px 14px;}}
+
+.trigger > img { width:16px; height:16px; object-fit:contain; filter:invert(1); transform:rotate(90deg); }

@@ -1,0 +1,62 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(240px, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 6px 4px 24px;
+}
+
+.board :global(.project-status-column) {
+  width: 100%;
+  min-width: 0;
+  height:auto;
+  min-height: 340px;
+  padding: 20px;
+  border-radius: var(--radius-panel);
+}
+
+.board :global(.project-status-column > header) {
+  gap: 10px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.board :global(.project-status-column > ul) {
+  gap: 12px;
+}
+
+.board :global(.project-task-card) {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.board :global(.kanban-card-open h3) {
+  margin: 12px 0;
+  font: 500 var(--type-heading)/1.3 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.board :global(.proposal-board-estimates) {
+  margin-top: 12px;
+  gap: 8px 16px;
+  color: var(--muted);
+  font-size: var(--type-caption);
+}
+
+.board :global(.project-column-empty) {
+  padding: 16px 0;
+  font-size: var(--type-caption);
+}
+
+@media (max-width: 700px) {
+  .board {
+    grid-template-columns: repeat(5, minmax(260px, 1fr));
+    gap: 12px;
+  }
+}

@@ -1,0 +1,8 @@
+.overview { display:grid; grid-template-columns:1fr 1fr; width:100%; align-items:start; gap:32px 64px; margin-top:24px; padding:24px 0; border-block:1px solid var(--line); }
+.summary { display:flex; flex-wrap:wrap; align-items:start; gap:24px 40px; }
+.summary > div { display:grid; gap:6px; }
+.summary strong { font:500 var(--type-metric)/1.2 var(--font-body); }
+.summary span { color:var(--muted); font:400 var(--type-caption)/1.4 var(--font-body); }
+.summary > button { flex-basis:100%; width:fit-content; margin-right:auto; padding:0; text-align:left; font-size:var(--type-caption); }
+.chart { width:100%; padding-top:4px; }
+@media(max-width:750px){.overview{grid-template-columns:1fr;gap:24px}.summary{gap:20px 32px}.summary>button{flex-basis:auto;margin-left:auto;align-self:center}}

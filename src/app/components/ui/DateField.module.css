@@ -1,0 +1,11 @@
+.field { display:block; width:100%; min-width:0; }
+.trigger { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; text-align:left; cursor:pointer; font:inherit; }
+.trigger img { width:18px; height:18px; object-fit:contain; transform:rotate(90deg); }
+.trigger:disabled { cursor:default; }
+.calendar { position:fixed; inset:auto; margin:0; width:320px; max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); overflow:auto; box-sizing:border-box; padding:16px; border:1px solid var(--line); border-radius:var(--radius-panel); background:var(--paper); color:var(--ink); box-shadow:0 8px 32px #0002; font:400 16px/1.4 var(--font-body); }
+.calendar :global(.rdp-root) { --rdp-accent-color:var(--ink); --rdp-accent-background-color:var(--palette-planned); --rdp-selected-border:0; --rdp-day-height:38px; --rdp-day-width:38px; --rdp-day_button-height:36px; --rdp-day_button-width:36px; }
+.calendar :global(.rdp-dropdown) { font:inherit; }
+.actions { display:flex; justify-content:flex-end; gap:20px; padding-top:12px; }
+.actions button { border:0; background:transparent; color:var(--ink); font:inherit; cursor:pointer; }
+.calendar { overscroll-behavior:contain; }
+.trigger.trigger { width:100%; max-width:none; min-width:0; }

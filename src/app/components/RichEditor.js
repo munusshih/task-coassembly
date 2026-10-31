@@ -1,5 +1,6 @@
 "use client";
 
+import prose from './ui/NoteProse.module.css';
 import { seriesColorForKey } from "./ui/palette";
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -639,5 +640,5 @@ export function RichReader({content,title=''}) {
     if(first&&/^(H[1-6]|P)$/.test(first.tagName)&&normalized(first.textContent)===normalized(title))first.remove();
     editor.commands.setContent(doc.body.innerHTML,{emitUpdate:false});
   },[editor,content,title]);
-  return <div className="note-preview-content"><EditorContent editor={editor}/></div>;
+  return <div className={`note-preview-content ${prose.paper}`}><EditorContent className={prose.prose} editor={editor}/></div>;
 }

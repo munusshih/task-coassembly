@@ -1,0 +1,15 @@
+.history.history { margin-top:12px; padding:0; }
+.latest > summary { display:flex; align-items:center; flex-wrap:wrap; gap:8px; list-style:none; color:var(--ink); font:500 14px/1.4 var(--font-body); cursor:pointer; }
+.latest > summary::-webkit-details-marker { display:none; }
+.latest > summary::before { content:'▸'; font-size:14px; }
+.latest[open] > summary::before { content:'▾'; }
+.latest > summary img { width:20px; height:24px; object-fit:contain; }
+.count { color:var(--muted); font-weight:400; margin-left:auto; }
+.entry { margin-top:16px; }
+.meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; font:400 14px/1.4 var(--font-body); }
+.meta :global(.person-identity) { font:inherit; }
+.meta time { color:var(--muted); font:inherit; }
+.history.history blockquote { margin:12px 0 0; padding:0; border:0; font:400 16px/1.5 var(--font-body); color:var(--ink); overflow-wrap:anywhere; }
+.earlier { margin-top:20px; }
+.earlier > summary { font:400 14px/1.4 var(--font-body); }
+.earlier .entry { padding-top:16px; border-top:1px solid var(--line); }

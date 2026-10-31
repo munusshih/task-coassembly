@@ -1,8 +1,12 @@
 "use client";
+import FormActions from './ui/FormActions';
 
 
+import noteProse from './ui/NoteProse.module.css';
 import NoteAuditLine from './ui/NoteAuditLine';
 import {RichReader} from './RichEditor';
+import NoteMarkdownEditor, {NoteMarkdownPreview} from './NoteMarkdownEditor';
+import {isLegacyHtmlNote,noteContentToMarkdown} from '../lib/noteMarkdown.mjs';
 import FormField from "./ui/FormField";
 import WorkspaceCreateDock from "./ui/WorkspaceCreateDock";
 import BottomComposer from "./ui/BottomComposer";
@@ -41,7 +45,6 @@ import {
 import { auth, firebaseReady, realtimeDb } from "../../firebase";
 import Button from "./Button";
 import IconButton from "./IconButton";
-import RichEditor from "./RichEditor";
 import {
   DELETE_ICON,
   EDIT_ICON,
@@ -55,6 +58,8 @@ import SectionBlock from "./ui/SectionBlock";
 import TabPage from "./ui/TabPage";
 import DeleteConfirmDialog from "./ui/DeleteConfirmDialog";
 import ModalShell from "./ui/ModalShell";
+import noteStyles from "./MeetingNotesPage.module.css";
+import ActionLink from "./ui/ActionLink";
 
 const NOTE_SCOPE_DATE = "date";
 const NOTE_SCOPE_PROJECT = "project";
@@ -66,21 +71,20 @@ const ROLE_FIELDS = [
   { key: "notetakerId", label: "Notetaker" },
 ];
 
-function buildStarterNoteContent(title, scopeType, projectName) {
-  const heading = String(title || "Notes").trim() || "Notes";
-  const scopeLine =
-    scopeType === NOTE_SCOPE_PROJECT && projectName
-      ? `Project: ${projectName}`
-      : "General meeting";
-
+function buildStarterNoteContent() {
   return [
-    `<p><strong>${heading}</strong></p>`,
-    `<p><em>${scopeLine}</em></p>`,
-    "<p><strong>Agenda</strong></p>",
-    "<ul><li>Updates</li><li>Decisions</li><li>Blockers</li></ul>",
-    "<p><strong>Next steps</strong></p>",
-    "<ul><li>Owner and follow-up</li></ul>",
-  ].join("");
+    "## Agenda",
+    "- Updates",
+    "- Decisions",
+    "- Blockers",
+    "",
+    "## Discussion",
+    "",
+    "## Decisions",
+    "",
+    "## Follow-up",
+    "- [ ] Action — owner — due date",
+  ].join("\n");
 }
 
 function normalizeScopeType(raw) {
@@ -664,17 +668,10 @@ export default function MeetingNotesPage({ viewerName = "" }) {
 
   function startEditing(note) {
     const normalizedAssignments = normalizeRoleAssignments(note?.data);
-    const fallbackProjectTeamIds = getProjectTeamMemberIds(
-      note?.data?.projectId || "",
-      projects,
-    );
-    const participantIds =
-      normalizedAssignments.meetingParticipantIds.length > 0
-        ? normalizedAssignments.meetingParticipantIds
-        : fallbackProjectTeamIds;
+    const participantIds = normalizedAssignments.meetingParticipantIds;
     setEditingId(note.id);
     setViewingId(note.id);
-    setEditContent(note?.data?.content || "");
+    setEditContent(noteContentToMarkdown(note?.data?.content || "", note?.data?.title || ""));
     setEditMeta({
       imageUrl: note?.data?.imageUrl || "",
       title: note?.data?.title || "",
@@ -683,12 +680,11 @@ export default function MeetingNotesPage({ viewerName = "" }) {
       scopeType: normalizeScopeType(note?.data?.scopeType),
       projectId: note?.data?.projectId || "",
       facilitatorId:
-        normalizedAssignments.facilitatorId ||
-        defaultMeetingRoles.facilitatorId,
+        normalizedAssignments.facilitatorId,
       timekeeperId:
-        normalizedAssignments.timekeeperId || defaultMeetingRoles.timekeeperId,
+        normalizedAssignments.timekeeperId,
       notetakerId:
-        normalizedAssignments.notetakerId || defaultMeetingRoles.notetakerId,
+        normalizedAssignments.notetakerId,
       guestNames: normalizedAssignments.guestNames,
       meetingParticipantIds: participantIds,
       absentParticipantIds: normalizedAssignments.absentParticipantIds.filter(
@@ -716,24 +712,16 @@ export default function MeetingNotesPage({ viewerName = "" }) {
         linkUrl: normalizedLinkUrl || null,
         content: normalizedLinkUrl
           ? ""
-          : buildStarterNoteContent(newTitle.trim(), scopeType, projectName),
+          : buildStarterNoteContent(),
         scopeType,
         projectId:
           scopeType === NOTE_SCOPE_PROJECT ? newProjectId || null : null,
-        guestNames: isLinkOnly?'':String(newRoles.guestNames||'').trim(),
-        facilitatorId: isLinkOnly ? null : newRoles.facilitatorId || null,
-        timekeeperId: isLinkOnly ? null : newRoles.timekeeperId || null,
-        notetakerId: isLinkOnly ? null : newRoles.notetakerId || null,
-        meetingParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
-            ? normalizeIdList(newRoles.meetingParticipantIds)
-            : [],
-        absentParticipantIds:
-          scopeType === NOTE_SCOPE_PROJECT && !isLinkOnly
-            ? normalizeIdList(newRoles.absentParticipantIds).filter((id) =>
-                normalizeIdList(newRoles.meetingParticipantIds).includes(id),
-              )
-            : [],
+        guestNames: '',
+        facilitatorId: null,
+        timekeeperId: null,
+        notetakerId: null,
+        meetingParticipantIds: [],
+        absentParticipantIds: [],
         createdAt: now,
         updatedAt: now,
         createdByUsername: authorUsername || null,
@@ -1062,7 +1050,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
             </div>
           </div>
         )}
-        <FormField label="Guests outside the workspace" className="note-meta-field--wide"><InputField value={meta.guestNames||''} placeholder="Names, separated by commas" onChange={event=>onChange('guestNames',event.target.value)}/></FormField>
+        <FormField label="Guests outside the workspace" className="note-meta-field note-meta-field--wide"><InputField className="note-meta-input" value={meta.guestNames||''} placeholder="Names, separated by commas" onChange={event=>onChange('guestNames',event.target.value)}/></FormField>
       </div>
     );
   }
@@ -1135,8 +1123,8 @@ export default function MeetingNotesPage({ viewerName = "" }) {
   return (
     <TabPage
       className="notes-page"
-      title="Notes"
-      header={<WorkspacePageHero title="Notes" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker compact value={groupMode} onChange={value=>{setGroupMode(value);if(value==='project'&&notesLayout==='calendar')setNotesLayout('grid');}} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Projects' }]} label="Note grouping" /><WorkspaceViewPicker compact prefix="in" value={groupMode==='project'?'grid':notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},...(groupMode==='date'?[{value:'calendar',label:'Calendar'}]:[])]} label="Notes layout" /></div></WorkspacePageHero>}
+      title="Note"
+      header={<WorkspacePageHero title="Note" illustration="book-carrier"><div className="notes-view-controls"><WorkspaceViewPicker value={groupMode} onChange={value=>{setGroupMode(value);if(value==='project'&&notesLayout==='calendar')setNotesLayout('grid');}} options={[{ value: 'date', label: 'Date' }, { value: 'project', label: 'Project' }]} label="Note grouping" /><WorkspaceViewPicker prefix="in" value={groupMode==='project'?'grid':notesLayout} onChange={setNotesLayout} options={[{value:"grid",label:"Grid"},...(groupMode==='date'?[{value:'calendar',label:'Calendar'}]:[])]} label="Notes layout" /></div></WorkspacePageHero>}
     >
       <WorkspaceCreateDock label="New note" expanded={createOpen} onClick={() => setCreateOpen(true)} />
       <div className="notes-search"><SearchField ariaLabel="Search notes" placeholder="Search titles, content, projects, people…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onClear={() => setSearchQuery('')} /></div>
@@ -1218,14 +1206,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
           </Button>
         </div>
 
-        {!newLinkUrl.trim() && (
-          <details className="note-roles-disclosure">
-            <summary className="note-roles-summary">People and meeting roles <span>Optional</span></summary>
-            <div className="note-roles-body">
-              {renderRoleSelectors(newRoles, updateNewRole)}
-            </div>
-          </details>
-        )}
+
       </BottomComposer>
 
       )}
@@ -1264,19 +1245,22 @@ export default function MeetingNotesPage({ viewerName = "" }) {
 
       {activeNote && (
         <ModalShell
-          title={editingId === activeNote.id ? "Edit note" : "Notes"}
-          headerActions={<>{activeNote.data.linkUrl&&<a className="note-header-document" href={normalizeExternalUrl(activeNote.data.linkUrl)} target="_blank" rel="noopener noreferrer">Open document ↗</a>}{editingId !== activeNote.id&&<EditButton label="Edit note" onClick={()=>startEditing(activeNote)}/>}<IconButton title="Delete note" variant="delete" onClick={()=>handleDeleteNote(activeNote.id,activeNote.data.title)}>{DELETE_ICON}</IconButton></>}
+          title={editingId === activeNote.id ? "Edit note" : "Note"}
+          headerActions={<>{activeNote.data.linkUrl&&<ActionLink href={normalizeExternalUrl(activeNote.data.linkUrl)} iconOnly label="Open linked document"/>}{editingId !== activeNote.id&&<EditButton label="Edit note" onClick={()=>startEditing(activeNote)}/>}<IconButton title="Delete note" variant="delete" onClick={()=>handleDeleteNote(activeNote.id,activeNote.data.title)}>{DELETE_ICON}</IconButton></>}
           size="lg"
           fullscreen
-          className="note-detail-modal"
+          className={`note-detail-modal ${noteStyles.detail}`}
           onClose={() => {
             setViewingId(null);
             setEditingId(null);
           }}
         >
           {editingId === activeNote.id || activeNoteIsLinkOnly ? (
-            <div className="note-editor-row">
-              <div className="note-editor-meta">
+            <div className={`note-editor-row ${noteStyles.editor}`}>
+              <details className={noteStyles.metadataDisclosure}>
+                <summary><span>Note details</span><strong>{editMeta.title || "Untitled note"}</strong><span>{editMeta.noteDate}</span></summary>
+                <div className={`note-editor-meta ${noteStyles.editorMeta}`}>
+                <h2 className={noteStyles.sectionHeading}>Meeting details</h2>
                 {activeEditors.length > 0 && (
                   <div className="note-live-editing">
                     {activeEditors.map((editor) => (
@@ -1301,7 +1285,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   />
                 </label>
 
-                <label className="note-meta-field note-meta-field--wide"><span>Cover image URL (optional)</span><InputField type="url" value={editMeta.imageUrl||''} onChange={event=>updateEditMeta('imageUrl',event.target.value)} placeholder="https://…"/>{editMeta.imageUrl?.trim()&&!noteImageUrl(editMeta.imageUrl)&&<small role="alert">Use an http or https image URL.</small>}</label>
                 <label className="note-meta-field">
                   <span>Date</span>
                   <InputField
@@ -1310,19 +1293,6 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                     value={editMeta.noteDate}
                     onChange={(event) =>
                       updateEditMeta("noteDate", event.target.value)
-                    }
-                  />
-                </label>
-
-                <label className="note-meta-field note-meta-field--wide">
-                  <span>Link URL (optional)</span>
-                  <InputField
-                    type="url"
-                    className="note-meta-input"
-                    placeholder="https://..."
-                    value={editMeta.linkUrl}
-                    onChange={(event) =>
-                      updateEditMeta("linkUrl", event.target.value)
                     }
                   />
                 </label>
@@ -1380,26 +1350,55 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   </label>
                 )}
 
-                {!editIsLinkOnly &&
-                  renderRoleSelectors(editMeta, updateEditMeta)}
+                <details
+                  className={noteStyles.optionalFields}
+                  open={Boolean(editMeta.imageUrl?.trim() || editMeta.linkUrl?.trim())}
+                >
+                  <summary>Optional cover image or document link</summary>
+                  <label className="note-meta-field">
+                    <span>Cover image URL</span>
+                    <InputField
+                      type="url"
+                      className="note-meta-input"
+                      value={editMeta.imageUrl || ""}
+                      onChange={(event) =>
+                        updateEditMeta("imageUrl", event.target.value)
+                      }
+                      placeholder="https://…"
+                    />
+                    {editMeta.imageUrl?.trim() &&
+                      !noteImageUrl(editMeta.imageUrl) && (
+                        <small role="alert">
+                          Use an http or https image URL.
+                        </small>
+                      )}
+                  </label>
+                  <label className="note-meta-field">
+                    <span>Link URL</span>
+                    <InputField
+                      type="url"
+                      className="note-meta-input"
+                      placeholder="https://..."
+                      value={editMeta.linkUrl}
+                      onChange={(event) =>
+                        updateEditMeta("linkUrl", event.target.value)
+                      }
+                    />
+                  </label>
+                </details>
+
+
               </div>
 
-              <RichEditor
-                value={editContent}
-                onChange={setEditContent}
-                onSelectionChange={setEditSelection}
-                members={members}
-                projects={projects}
-                tasks={filteredTasks}
-                resources={resources}
-                notes={notes}
-                collaborators={activeEditors}
-                currentNoteId={activeNote.id}
-                showDateObjectButton={
-                  normalizeScopeType(editMeta.scopeType) === NOTE_SCOPE_PROJECT
-                }
-              />
-              <div className="note-editor-actions">
+              </details>
+              <div className={noteStyles.writingPanel}>
+                <NoteMarkdownEditor
+                  value={editContent}
+                  onChange={setEditContent}
+                  onSelectionChange={setEditSelection}
+                />
+              </div>
+              <FormActions className={`note-editor-actions ${noteStyles.editorActions}`}>
                 <span className="note-autosave-status">{autoSaveLabel}</span>
                 <Button
                   onClick={() => handleSaveEdit(activeNote.id)}
@@ -1416,7 +1415,7 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                 >
                   Cancel
                 </Button>
-              </div>
+              </FormActions>
             </div>
           ) : (
             <div className="note-preview-row"><NoteCover key={noteCover(activeNote?.data)} src={noteCover(activeNote?.data)} title={activeNote?.data?.title} className="note-preview-cover"/>
@@ -1441,16 +1440,14 @@ export default function MeetingNotesPage({ viewerName = "" }) {
                   )}
                 </div>
 
-                <div className="note-role-line">
-                  {!activeNoteIsLinkOnly && renderRoleSummary(activeNote?.data)}
-                </div>
-
                 {!activeNoteIsLinkOnly &&
                   renderMeetingAttendanceDetail(activeNote?.data)}
               </div>
 
               {activeNote?.data?.content ? (
-                <RichReader content={activeNote.data.content} title={activeNote.data.title}/>
+                isLegacyHtmlNote(activeNote.data.content)
+                  ? <RichReader content={activeNote.data.content} title={activeNote.data.title}/>
+                  : <div className={`note-preview-content ${noteProse.paper}`}><NoteMarkdownPreview source={activeNote.data.content}/></div>
               ) : (
                 <p className="note-empty">
                   {activeNote?.data?.linkUrl

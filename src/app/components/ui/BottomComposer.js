@@ -16,7 +16,7 @@ export default function BottomComposer({ title, onClose, children, className = "
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   const [closing,setClosing]=useState(false);
   const timer=useRef(null),closingRef=useRef(false);
-  function dismiss(){if(closingRef.current)return;closingRef.current=true;setClosing(true);timer.current=setTimeout(()=>closeRef.current(),window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:220);}
+  function dismiss(){if(closingRef.current)return;closingRef.current=true;setClosing(true);timer.current=setTimeout(()=>closeRef.current(),window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:260);}
   useEffect(()=>()=>clearTimeout(timer.current),[]);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

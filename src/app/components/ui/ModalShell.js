@@ -1,7 +1,7 @@
 "use client";
 
 import {createPortal} from "react-dom";
-import {useEffect,useState,useRef} from "react";
+import {useEffect,useState,useRef,useId} from "react";
 import CloseButton from "./CloseButton";
 
 export default function ModalShell({
@@ -20,16 +20,19 @@ export default function ModalShell({
   unsavedWarning = "You have unsaved changes. Close anyway?",
   onDiscardChanges,
 }) {
+  const titleId=useId();
   const modalRef=useRef(null);
   const closeRef=useRef(null);
   const [mounted,setMounted]=useState(false);
   useEffect(()=>setMounted(true),[]);
   useEffect(()=>{
-    if(!fullscreen||!mounted)return;
+    if(!mounted)return;
     const previous=document.activeElement, overflow=document.body.style.overflow;
     document.body.style.overflow='hidden';
     modalRef.current?.focus();
     const key=event=>{
+      const dialogs=[...document.querySelectorAll('.edit-modal-overlay .edit-modal')].filter(node=>node.getClientRects().length);
+      if(dialogs.at(-1)!==modalRef.current)return;
       if(event.key==='Escape'){event.preventDefault();closeRef.current?.();}
       if(event.key==='Tab'){
         const nodes=[...modalRef.current.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[contenteditable=true],[tabindex="0"]')].filter(node=>node.getClientRects().length);
@@ -79,13 +82,14 @@ export default function ModalShell({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label={title || "Dialog"}
+        aria-label={title?undefined:"Dialog"}
+        aria-labelledby={title?titleId:undefined}
         className={modalClasses}
         onClick={(event) => event.stopPropagation()}
       >
         {(title || onClose) && (
           <div className="edit-modal-header">
-            <span className="edit-modal-title">{title}</span>
+            <span id={titleId} className="edit-modal-title">{title}</span>
             {headerActions}
             {onClose ? (
               <CloseButton className="edit-modal-close" onClick={requestClose} label={closeTitle} />

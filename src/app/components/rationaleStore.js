@@ -1,3 +1,4 @@
+import {withRationaleSource} from '../lib/rationaleSource.mjs';
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { isWorkerOwner } from '../../authAccess';
@@ -5,14 +6,14 @@ import { requireActionReason } from '../../lib/actionReason.mjs';
 import { validateRationale, assertRationaleRevision, assertRationaleAuthor } from './rationaleNotes.mjs';
 export async function saveRationale(id, draft, member, expectedRevision = 0) {
   if (!member?.id || member.active === false) throw new Error('Sign in as an active member to edit your notes.');
-  const fields = validateRationale(draft);
+  const fields = validateRationale({...draft,body:withRationaleSource(draft.body,draft.sourceUrl||'')});
   if (!db) throw new Error('The shared workspace is not available.');
   await runTransaction(db, async transaction => {
     const ref=doc(db,'workspaceRationales',id);
     const snapshot=await transaction.get(ref);
     const current=snapshot.exists()?snapshot.data():null;
     if(current)assertRationaleAuthor(current,member.id);
-    else if(!isWorkerOwner(member))throw new Error('Only worker-owners can add notes.');
+    else if(!isWorkerOwner(member)&&fields.kind!=='question')throw new Error('Only worker-owners can publish explanations. Add a question to challenge one.');
     assertRationaleRevision(current,expectedRevision);
     if(current?.deleted)throw new Error('This note has been removed.');
     const now=Date.now();

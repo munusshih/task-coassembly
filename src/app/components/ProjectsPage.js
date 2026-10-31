@@ -1,4 +1,5 @@
 "use client";
+import FormActions from './ui/FormActions';
 
 
 import useUrlState from "../hooks/useUrlState";
@@ -12,7 +13,7 @@ import TabBar from "./ui/TabBar";
 import ProjectCapacityChart from "./ui/ProjectCapacityChart";
 import {projectCapacityProgress} from "./projectProgress.mjs";
 import {durationLabel} from "./time/trackingModel.mjs";
-import ProjectsOverview from './ui/ProjectsOverview';
+
 import ProjectViewToolbar from './ui/ProjectViewToolbar';
 import ProjectTaskBoard from "./ProjectTaskBoard";
 import {PROJECT_STATES} from "./projectStates.mjs";
@@ -2233,8 +2234,8 @@ export default function ProjectsPage({
   return (
     <TabPage
       className="projects-page"
-      title="Projects"
-      header={<WorkspacePageHero title="Projects" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'},{value:'priority',label:'Priority'},{value:'tasks',label:'Tasks'}]} /><ProjectsOverview projects={collectionProjects} tasks={visibleTasks} closedCount={closedProjectCount} showClosed={showClosedProjects} onToggle={()=>setShowClosedProjects(value=>!value)}/></WorkspacePageHero>}
+      title="Project"
+      header={<WorkspacePageHero title="Project" illustration="projects-team"><WorkspaceViewPicker label="Project grouping" value={viewMode === 'kanban' ? 'status' : viewMode === 'list' ? 'category' : viewMode} onChange={setViewMode} options={[{value:'category',label:'Category'},{value:'status',label:'Status'},{value:'priority',label:'Priority'},{value:'tasks',label:'Task'}]} /></WorkspacePageHero>}
     >
       {!isLimitedViewer ? (
         <><WorkspaceCreateDock label="New project" expanded={createOpen} onClick={() => setCreateOpen(true)} />
@@ -2311,7 +2312,7 @@ export default function ProjectsPage({
                 Budget comes from self funding. Donation is disabled.
               </span>
             )}
-            <FormField label="Start date"><InputField
+            <div className="project-date-range"><FormField label="Start date"><InputField
               className="project-field"
               type="date"
               value={form.startDate}
@@ -2324,7 +2325,7 @@ export default function ProjectsPage({
               value={form.endDate}
               onChange={(e) => setField("endDate", e.target.value)}
               title="Project end date"
-            /></FormField>
+            /></FormField></div>
             {isInternalOrAdminKind(form.kind) && (
               <FormField label="Projected hourly rate (TWD)"><InputField
                 className="project-field"
@@ -2339,7 +2340,7 @@ export default function ProjectsPage({
                 title="Projected hourly wage for Internal/Admin projects (TWD)"
               /></FormField>
             )}
-            <div className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></div>
+            <FormActions className="workspace-compose-actions"><Button type="submit" disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Add project'}</Button><Button type="button" variant="ghost" onClick={()=>setCreateOpen(false)}>Cancel</Button></FormActions>
           </form>
         </BottomComposer>}</>
       ) : (
@@ -2354,7 +2355,8 @@ export default function ProjectsPage({
 
 
       {collectionProjects.length === 0 ? <EmptyState>{visibleProjects.length?'No active projects.':'No projects yet.'}</EmptyState> : <>
-        <ProjectViewToolbar projects={collectionProjects} value={effectiveProjectFilter} onChange={setProjectFilter}>{viewMode==='tasks'&&<label><input type="checkbox" checked={rejectedOnly} onChange={event=>setRejectedOnly(event.target.checked)}/> Rejected twice or more</label>}</ProjectViewToolbar>
+        <ProjectViewToolbar projects={collectionProjects} value={effectiveProjectFilter} onChange={setProjectFilter}><div className="project-collection-options">{closedProjectCount>0&&<Button variant="ghost" aria-pressed={showClosedProjects} onClick={()=>setShowClosedProjects(value=>!value)}>{showClosedProjects?"Hide closed projects":`Show ${closedProjectCount} closed projects`}</Button>}</div>
+        {viewMode==='tasks'&&<label><input type="checkbox" checked={rejectedOnly} onChange={event=>setRejectedOnly(event.target.checked)}/> Rejected twice or more</label>}</ProjectViewToolbar>
         {viewMode==='tasks'?<ProjectTaskBoard rejected={rejectedOnly} projects={filteredCollectionProjects} tasks={visibleTasks} members={members} viewerMemberId={viewerMemberId}/>:<ProjectCollection projects={filteredCollectionProjects} showClosed={showClosedProjects} tasks={visibleTasks} members={members} mode={viewMode==='priority'?'priority':['status','kanban'].includes(viewMode)?'status':'category'} selected={focusedProject} onOpen={id=>setFocusedProject(previous=>previous===id?'':id)} editable={!isLimitedViewer} statuses={PROJECT_STATUSES} onStatusChange={(project,status)=>status==='Completed'?requestCompleteProject(project):handleSave(project,{status})} renderDetails={project=>(<section id="project-selected-detail" className="project-selected-detail" aria-label="Selected project details"><header><h2>Project details</h2><CloseButton label="Close project details" onClick={()=>setFocusedProject('')}/></header><ul className="project-list project-card-grid"><ProjectRow key={project.id} project={project} focusedProject={focusedProject} onFocusProject={setFocusedProject} allTasks={visibleTasks} members={members} onSave={handleSave} onComplete={isLimitedViewer?null:requestCompleteProject} onDelete={handleDelete}/></ul></section>)}/>}
 
       </>}
@@ -2384,16 +2386,7 @@ export default function ProjectsPage({
           onClose={() => setCompleteTarget(null)}
           size="sm"
           footer={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={() => setCompleteTarget(null)}
-                disabled={Boolean(completingProjectId)}
-              >
-                Cancel
-              </Button>
+            <FormActions>
               <Button
                 type="button"
                 size="small"
@@ -2407,7 +2400,16 @@ export default function ProjectsPage({
               >
                 {completingProjectId ? "Completing…" : "Complete project"}
               </Button>
-            </>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setCompleteTarget(null)}
+                disabled={Boolean(completingProjectId)}
+              >
+                Cancel
+              </Button>
+            </FormActions>
           }
         >
           <p className="delete-confirm-body">
