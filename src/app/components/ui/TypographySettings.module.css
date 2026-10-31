@@ -1,11 +1,18 @@
-.settings { display:grid; gap:24px; }
-.settings > p { margin:0; font:400 16px/1.5 var(--font-body); max-width:62ch; }
-.presets { display:flex; flex-wrap:wrap; gap:12px; }
-.roles { display:grid; gap:24px; grid-template-columns:repeat(3,minmax(0,1fr)); }
-.role { min-width:0; padding:20px; border-radius:var(--radius-panel); background:var(--surface-quiet); }
-.description { margin:12px 0 24px; color:var(--muted); font:400 14px/1.4 var(--font-body); }
-.sample { min-height:100px; margin:0; overflow-wrap:anywhere; }
-.heading { font-size:32px; line-height:1.2; }
-.body { font-size:20px; line-height:1.6; }
-.label { font-size:14px; line-height:1.6; }
-@media(max-width:850px){.roles{grid-template-columns:1fr;}.sample{min-height:0;}}
+.settings {display:grid;gap:4px;margin-top:16px;}
+.presets {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 0 16px;}
+.presets > span {color:var(--muted);font:400 13px/1.4 var(--font-body);}
+.presets > div {display:flex;flex-wrap:wrap;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--radius-button);}
+.presets button {border:0;padding:7px 12px;border-radius:var(--radius-button);background:transparent;color:var(--ink);font:400 13px/1.4 var(--font-body);cursor:pointer;}
+.presets button[aria-pressed=true] {background:var(--ink);color:var(--paper);}
+.presets button:hover {opacity:var(--hover-opacity);}
+.roles {display:grid;}
+.role {min-width:0;padding:20px 0;border-top:1px solid var(--line);}
+.roleControls {display:grid;grid-template-columns:minmax(0,1fr) 220px;align-items:center;gap:24px;}
+.roleControls label {font:500 var(--type-caption)/1.4 var(--font-body);}
+.roleControls p {margin:6px 0 0;color:var(--muted);font:400 13px/1.5 var(--font-body);}
+.sample {margin:16px 0 0;padding:16px 20px;background:var(--surface-quiet);border-radius:var(--radius-panel);overflow-wrap:anywhere;}
+.heading {font-size:26px;line-height:1.35;}
+.body {font-size:18px;line-height:1.6;}
+.label {font-size:13px;line-height:1.6;}
+@media(max-width:900px){.roleControls{grid-template-columns:minmax(0,1fr) 190px;gap:16px}}
+@media(max-width:650px){.roleControls{grid-template-columns:1fr;gap:12px}.presets{align-items:start;flex-direction:column;gap:12px}.sample{padding:16px}.heading{font-size:24px}}
