@@ -1,9 +1,10 @@
 'use client';
 
-import {useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import CodeMirror, {EditorView} from '@uiw/react-codemirror';
 import {markdown} from '@codemirror/lang-markdown';
 import {languages} from '@codemirror/language-data';
+import {usePreferences} from '../lib/preferences';
 import prose from './ui/NoteProse.module.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,12 +19,14 @@ export function NoteMarkdownPreview({ source }) {
 }
 
 export default function NoteMarkdownEditor({value, onChange, onSelectionChange}) {
+  const preferences = usePreferences();
   const [mode, setMode] = useState('write');
+  useEffect(()=>setMode(preferences.editorMode),[preferences.editorMode]);
   const editor = useRef(null);
   const extensions = useMemo(() => [markdown({codeLanguages: languages}), EditorView.lineWrapping, EditorView.theme({
     '&': {height: '100%', fontSize: 'calc(var(--type-body) * .85)'},
     '.cm-scroller': {overflow: 'auto', fontFamily: 'var(--font-body)', lineHeight: '1.8'},
-    '.cm-content': {maxWidth: '800px', width: '100%', margin: '0 auto', padding: '36px 28px 45vh', boxSizing: 'border-box'},
+    '.cm-content': {maxWidth: 'var(--note-reading-width, 780px)', width: '100%', margin: '0 auto', padding: '36px 28px 45vh', boxSizing: 'border-box'},
     '.cm-line': {padding: '0'},
     '&.cm-focused': {outline: 'none'},
     '.cm-gutters': {display: 'none'},

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import FocusModality from './ui/FocusModality';
 import ConstructionIcon from "./ui/ConstructionIcon";
 import ProtocolLogo from "./ui/ProtocolLogo";
-import {applyPreferences} from "./SettingsPage";
+import {initializePreferences} from "../lib/preferences";
 import TaskWeekInfo from "./TaskWeekInfo";
 import { createPortal } from "react-dom";
 import WorkspaceIllustration from "./ui/WorkspaceIllustration";
@@ -34,7 +34,7 @@ export default function Navigation({
   allowedTabs = [],
 }) {
   const [portalReady,setPortalReady] = useState(false);
-  useEffect(()=>{setPortalReady(true);try{applyPreferences(JSON.parse(localStorage.getItem("protocol-preferences")||"{}"));}catch{}},[]);
+  useEffect(()=>{setPortalReady(true);return initializePreferences();},[]);
   const navigationRef = useRef(null);
   const overlayRef = useRef(null);
   const [hoveredTab,setHoveredTab] = useState(null);

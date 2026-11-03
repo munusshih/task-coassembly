@@ -1,0 +1,12 @@
+/* Preference variables are shared by the indexes, task list, and their real previews. */
+:root[data-density=compact] :is(.notes-editorial-list,.resources-page .resources-grid,.proposal-grid,.project-folder-grid,.backlog-list) {gap:var(--workspace-grid-gap);}
+:root[data-density=compact] .members-page .task-scope .todo-item {padding-block:var(--workspace-item-space);min-height:0;}
+:root[data-density=compact] :is(.project-preview-card:not(.project-preview-card--folder),.proposal-card,.project-task-card,.wish-item) {padding:12px;}
+:root[data-density=compact] .resources-page .resource-list-card {padding:12px!important;}
+:root[data-density=compact] .notes-editorial-list {row-gap:16px;}
+.metadata-pill--project,.members-page .task-scope .chip--project {color:var(--on-project,var(--ink));}
+.metadata-pill--worked {color:var(--on-worked,var(--ink));}
+.metadata-pill--planned,.members-page .task-scope .chip--time {color:var(--on-planned,var(--ink));}
+.metadata-pill--date {color:var(--on-date,var(--ink));}
+.notes-calendar-day.is-selected {color:var(--on-project,var(--ink));}
+@media(prefers-reduced-motion:reduce){:root[data-motion=system] *, :root[data-motion=system] *::before, :root[data-motion=system] *::after {animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
