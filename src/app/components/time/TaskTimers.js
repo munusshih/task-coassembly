@@ -8,6 +8,7 @@ import FormField from "../ui/FormField";
 import InputField from "../ui/InputField";
 import ClockTimePanel from "./ClockTimePanel";
 
+import {usePreferences} from "../../lib/preferences";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTaskTime } from "./TimeTrackingProvider";
 import { durationLabel, focusElapsed, eligibleTimeFragments, MIN_TRACKED_SECONDS } from "./trackingModel.mjs";
@@ -119,12 +120,15 @@ function ReviewTime({ tracker, tasks, initial, onClose }) {
 
 export default function TaskTimers({ tasks }) {
   const tracker = useTaskTime();
+  const preferences = usePreferences();
   const [mode, setMode] = useState("countdown");
   const [range, setRange] = useState("day");
   const [minutes, setMinutes] = useState(25);
   const [taskId, setTaskId] = useState("");
   const [review, setReview] = useState(null);
-  useEffect(()=>{try{const value=JSON.parse(localStorage.getItem("protocol-preferences")||"{}");if(Number(value.focusMinutes)>=1&&Number(value.focusMinutes)<=240)setMinutes(Number(value.focusMinutes));}catch{}},[]);
+  // Defaults update the next session, without changing any running session.
+  useEffect(()=>setMinutes(preferences.focusMinutes),[preferences.focusMinutes]);
+  useEffect(()=>setMode(preferences.focusMode),[preferences.focusMode]);
   if (!tracker) return null;
   const { journal, now, owner, busy } = tracker;
   const focus = journal.focus;

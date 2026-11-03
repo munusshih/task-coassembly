@@ -341,8 +341,8 @@
 .writingPanel.writingPanel {flex:1;display:block;min-height:0;}
 .editorActions.editorActions {position:static;flex:none;margin:0;padding:10px 24px;min-height:60px;border-top:1px solid var(--line);background:var(--paper);}
 .editorActions.editorActions > :global(.note-autosave-status) {font-size:13px;}
-.detail.detail :global(.note-preview-header),.detail.detail :global(.note-preview-meta),.detail.detail :global(.note-preview-content) {width:min(100%,780px);max-width:780px;margin-inline:auto;}
-.detail.detail :global(.note-preview-cover) {max-width:780px;margin-inline:auto;}
+.detail.detail :global(.note-preview-header),.detail.detail :global(.note-preview-meta),.detail.detail :global(.note-preview-content) {width:min(100%,var(--note-reading-width,780px));max-width:var(--note-reading-width,780px);margin-inline:auto;}
+.detail.detail :global(.note-preview-cover) {max-width:var(--note-reading-width,780px);margin-inline:auto;}
 @media(max-width:600px){.metadataDisclosure > summary{gap:12px;padding-inline:16px}.metadataDisclosure > summary > span:last-of-type{display:none}.editorMeta.editorMeta{padding-inline:16px}.editorMeta.editorMeta > :global(.note-meta-field){grid-column:1/-1}.editorActions.editorActions{padding:8px 16px}}
 .editorMeta.editorMeta :global(.field-select-chevron) {color:#fff;}
 .editorMeta.editorMeta :global(input[type=date]) {color-scheme:dark;}

@@ -16,3 +16,5 @@
 .paper .prose.prose li > :is(p,ul,ol) { margin-block:0; }
 .paper .prose.prose hr { margin-block:var(--writing-line-height); border:0; height:var(--writing-line-height); }
 .paper .prose.prose > :first-child,.paper .prose.prose :global(.note-prose) > :first-child { margin-top:0; }
+
+:global(:root[data-note-guides=off]) .paper.paper.paper {background-image:none;}
